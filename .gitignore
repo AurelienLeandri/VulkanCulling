@@ -1,0 +1,6 @@
+.*
+!.gitignore
+**/x86/
+**/x64/
+**/Libraries/
+Resources/
