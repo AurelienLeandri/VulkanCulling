@@ -6,12 +6,12 @@
 
 namespace leo {
 	Triangle::Triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2)
-		: _data(ShapesDataManager::createTriangleData(v0, v1, v2))
+		: Shape(Type::TRIANGLE), _data(ShapesDataManager::createTriangleData(v0, v1, v2))
 	{
 	}
 
 	Triangle::Triangle(const TriangleData* data)
-		: _data(data)
+		: Shape(Type::TRIANGLE), _data(data)
 	{
 	}
 }

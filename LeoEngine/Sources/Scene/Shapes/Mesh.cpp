@@ -5,7 +5,7 @@
 
 namespace leo {
 	Mesh::Mesh(const MeshData* data)
-		: _data(data)
+		: Shape(Type::MESH), _data(data)
 	{
 	}
 }

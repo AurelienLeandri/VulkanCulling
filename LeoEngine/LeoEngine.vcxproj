@@ -21,7 +21,7 @@
   <ItemGroup>
     <ClInclude Include="Include\LeoEngine\Scene\Data\MeshData.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Data\SphereData.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Data\TextureData.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\ImageTextureData.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Data\TriangleData.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Data\Vertex.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
@@ -41,12 +41,13 @@
     <ClInclude Include="Include\LeoEngine\Scene\Transform.h" />
     <ClInclude Include="Sources\GeometryIncludes.h" />
     <ClInclude Include="Sources\Scene\Data\ShapesDataManager.hxx" />
+    <ClInclude Include="Sources\Scene\Data\TexturesDataManager.hxx" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Data\MeshData.cpp" />
     <ClCompile Include="Sources\Scene\Data\ShapesDataManager.cpp" />
     <ClCompile Include="Sources\Scene\Data\ResourcesLoader.cpp" />
-    <ClCompile Include="Sources\Scene\Data\TextureData.cpp" />
+    <ClCompile Include="Sources\Scene\Data\ImageTextureData.cpp" />
     <ClCompile Include="Sources\Scene\Data\TexturesDataManager.cpp" />
     <ClCompile Include="Sources\Scene\Data\TriangleData.cpp" />
     <ClCompile Include="Sources\Scene\Data\Vertex.cpp" />
