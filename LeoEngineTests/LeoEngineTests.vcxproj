@@ -19,7 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source.cpp" />
+    <ClCompile Include="SceneDataTests.cpp" />
+    <ClCompile Include="SceneMaterialsTests.cpp" />
+    <ClCompile Include="SceneShapesTests.cpp" />
+    <ClCompile Include="SceneTests.cpp" />
+    <ClCompile Include="SceneTexturesTests.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BoostIncludes.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -118,7 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\boost_1_76_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,7 +142,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\boost_1_76_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

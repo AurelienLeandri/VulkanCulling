@@ -19,11 +19,42 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\Integrator.cpp" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\MeshData.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\TextureData.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\MeshesDataManager.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\ResourcesLoader.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Scene.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Mesh.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Shape.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Sphere.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Triangle.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Textures\ConstantTexture.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Textures\ImageTexture.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Textures\Texture.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\TexturesDataManager.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Transform.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Include\LeoEngine\Integrator.h" />
-    <ClInclude Include="Sources\Header.h" />
+    <ClCompile Include="Sources\Scene\Data\MeshData.cpp" />
+    <ClCompile Include="Sources\Scene\Data\MeshesDataManager.cpp" />
+    <ClCompile Include="Sources\Scene\Data\ResourcesLoader.cpp" />
+    <ClCompile Include="Sources\Scene\Data\TextureData.cpp" />
+    <ClCompile Include="Sources\Scene\Data\TexturesDataManager.cpp" />
+    <ClCompile Include="Sources\Scene\Materials\Material.cpp" />
+    <ClCompile Include="Sources\Scene\Materials\PBRMaterial.cpp" />
+    <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp" />
+    <ClCompile Include="Sources\Scene\Scene.cpp" />
+    <ClCompile Include="Sources\Scene\Shapes\Mesh.cpp" />
+    <ClCompile Include="Sources\Scene\Shapes\Shape.cpp" />
+    <ClCompile Include="Sources\Scene\Shapes\Sphere.cpp" />
+    <ClCompile Include="Sources\Scene\Shapes\Triangle.cpp" />
+    <ClCompile Include="Sources\Scene\Textures\ConstantTexture.cpp" />
+    <ClCompile Include="Sources\Scene\Textures\ImageTexture.cpp" />
+    <ClCompile Include="Sources\Scene\Textures\Texture.cpp" />
+    <ClCompile Include="Sources\Scene\Transform.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
