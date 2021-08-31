@@ -9,16 +9,16 @@ namespace leo {
 	}
 
 	template <typename... Args>
-	TriangleData* ShapesDataManager::createTriangleData(Args... args)
+	TriangleData* ShapesDataManager::createTriangleData(Args&&... args)
 	{
-		_trianglesPool.emplace_back(args);
+		_trianglesPool.emplace_back(std::forward<Args>(args)...);
 		return &_trianglesPool.back();
 	}
 
 	template <typename... Args>
-	SphereData* ShapesDataManager::createSphereData(Args... args)
+	SphereData* ShapesDataManager::createSphereData(Args&&... args)
 	{
-		_spheresPool.emplace_back(args);
+		_spheresPool.emplace_back(std::forward<Args>(args)...);
 		return &_spheresPool.back();
 	}
 }

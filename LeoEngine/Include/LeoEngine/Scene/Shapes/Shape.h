@@ -7,6 +7,7 @@
 namespace leo {
 	struct HitRecord;
 	class Transform;
+	class Material;
 
 	class Shape {
 	public:
@@ -22,5 +23,6 @@ namespace leo {
 
 	private:
 		std::shared_ptr<const Transform> _transform;
+		std::shared_ptr<const Material> _material;
 	};
 }

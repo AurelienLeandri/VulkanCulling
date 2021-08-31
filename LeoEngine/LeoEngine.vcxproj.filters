@@ -33,7 +33,7 @@
     <ClInclude Include="Include\LeoEngine\Scene\Data\TexturesDataManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\MeshesDataManager.h">
+    <ClInclude Include="Include\LeoEngine\Scene\Data\ShapesDataManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Shapes\Triangle.h">
@@ -75,6 +75,12 @@
     <ClInclude Include="Include\LeoEngine\Scene\Data\TriangleData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\Data\SphereData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\Scene\Data\ShapesDataManager.hxx">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Scene.cpp">
@@ -86,7 +92,7 @@
     <ClCompile Include="Sources\Scene\Data\MeshData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\MeshesDataManager.cpp">
+    <ClCompile Include="Sources\Scene\Data\ShapesDataManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sources\Scene\Data\ResourcesLoader.cpp">

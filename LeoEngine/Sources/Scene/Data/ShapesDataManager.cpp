@@ -5,5 +5,7 @@
 #include <Scene/Data/TriangleData.h>
 
 namespace leo {
-	ShapesDataManager::~ShapesDataManager() = default;
+	std::vector<std::unique_ptr<MeshData>> ShapesDataManager::_meshesPool;
+	std::vector<TriangleData> ShapesDataManager::_trianglesPool;
+	std::vector<SphereData> ShapesDataManager::_spheresPool;
 }
