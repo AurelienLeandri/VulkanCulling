@@ -2,15 +2,20 @@
 
 namespace leo {
 
-	ImageTexture::ImageTexture(const ImageTextureData* data)
-		: Texture(Texture::Type::IMAGE), _data(data)
+	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout)
+		: Texture(Texture::Type::IMAGE), width(width), height(height), type(type), layout(layout), data(new float[width * height * static_cast<size_t>(layout)])
 	{
+	}
+
+	ImageTexture::~ImageTexture()
+	{
+		delete[] data;
+		data = nullptr;
 	}
 
 	glm::vec4 ImageTexture::getTexel(float u, float v) const
 	{
-		size_t width, height, nbChannels;
-		getDimensions(width, height, nbChannels);
+		size_t nbChannels = static_cast<size_t>(layout);
 		float dummy;
 		u = glm::modf(u, dummy);
 		v = glm::modf(v, dummy);
@@ -21,26 +26,9 @@ namespace leo {
 		size_t index = (nbChannels * width) * j + (i * nbChannels);
 		glm::vec4 texel(0);
 		for (size_t channel = 0; channel < nbChannels; ++channel) {
-			texel[static_cast<glm::vec4::length_type>(channel)] = _data->data[index + channel];
+			texel[static_cast<glm::vec4::length_type>(channel)] = data[index + channel];
 		}
 		return texel;
-	}
-
-	void ImageTexture::getDimensions(size_t& width, size_t& height, size_t& nbChannels) const
-	{
-		width = _data->width;
-		height = _data->height;
-		nbChannels = static_cast<size_t>(_data->layout);
-	}
-
-	ImageTextureData::Type ImageTexture::getType() const
-	{
-		return _data->type;
-	}
-
-	ImageTextureData::Layout ImageTexture::getLayout() const
-	{
-		return _data->layout;
 	}
 
 }

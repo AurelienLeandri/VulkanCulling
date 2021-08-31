@@ -12,6 +12,7 @@ namespace leo {
 
 	public:
 		Texture(Type type);
+		virtual ~Texture() = default;
 
 	public:
 		virtual glm::vec4 getTexel(float u, float v) const = 0;

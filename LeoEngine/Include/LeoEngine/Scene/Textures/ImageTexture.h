@@ -2,23 +2,31 @@
 
 #include <Scene/Textures/Texture.h>
 
-#include <Scene/Data/ImageTextureData.h>
-
 namespace leo {
 	class ImageTexture : public Texture
 	{
 	public:
-		ImageTexture(const ImageTextureData* data);
+		enum class Type {
+			FLOAT
+		};
+		enum class Layout : size_t {
+			RGB = 3,
+			RGBA = 4,
+			LUMINANCE = 1
+		};
+
+	public:
+		ImageTexture(size_t width, size_t height, Type type, Layout layout);
+		~ImageTexture();
 
 	public:
 		virtual glm::vec4 getTexel(float u, float v) const override;
 
 	public:
-		void getDimensions(size_t& width, size_t& height, size_t& nbChannels) const;
-		ImageTextureData::Type getType() const;
-		ImageTextureData::Layout getLayout() const;
-
-	private:
-		const ImageTextureData* const _data;
+		const size_t width = 0;
+		const size_t height = 0;
+		const Type type;
+		const Layout layout;
+		float* data;
 	};
 }

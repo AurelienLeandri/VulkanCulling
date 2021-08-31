@@ -5,27 +5,13 @@
 #include <memory>
 
 namespace leo {
-	struct HitRecord;
 	class Transform;
 	class Material;
+	class Shape;
 
-	class Shape {
+	class SceneObject {
 	public:
-		enum class Type {
-			TRIANGLE,
-			MESH,
-			SPHERE
-		};
-
-	public:
-		Shape(Type type);
-
-	public:
-		virtual float area() const = 0;
-
-		virtual glm::vec3 sample(const HitRecord& record, float& pdf) const = 0;
-
-		virtual float pdf(const glm::vec3& point, const HitRecord& record) const = 0;
+		SceneObject(const std::shared_ptr<const Shape> shape);
 
 	public:
 		const std::shared_ptr<const Transform> getTransform() const;
@@ -33,11 +19,9 @@ namespace leo {
 		const std::shared_ptr<const Material> getMaterial() const;
 		void setMaterial(std::shared_ptr<const Material> material);
 
-	public:
-		const Type type;
-
 	private:
 		std::shared_ptr<const Transform> _transform;
 		std::shared_ptr<const Material> _material;
+		const std::shared_ptr<const Shape> _shape;
 	};
 }

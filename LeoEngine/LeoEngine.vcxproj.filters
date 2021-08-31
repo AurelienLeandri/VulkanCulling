@@ -21,7 +21,7 @@
     <ClInclude Include="Include\LeoEngine\Scene\Textures\Texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Shape.h">
+    <ClInclude Include="Include\LeoEngine\Scene\SceneObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h">
@@ -30,28 +30,13 @@
     <ClInclude Include="Include\LeoEngine\Scene\Transform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\TexturesDataManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\ShapesDataManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Triangle.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Sphere.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Shapes\Mesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\ResourcesLoader.h">
+    <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\TextureLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Textures\ImageTexture.h">
@@ -60,28 +45,31 @@
     <ClInclude Include="Include\LeoEngine\Scene\Textures\ConstantTexture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\ImageTextureData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\MeshData.h">
+    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Sources\GeometryIncludes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\Vertex.h">
+    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Vertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\TriangleData.h">
+    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Triangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\Data\SphereData.h">
+    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Sphere.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Sources\Scene\Data\ShapesDataManager.hxx">
+    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Shape.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Sources\Scene\Data\TexturesDataManager.hxx">
+    <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\ModelLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\SceneLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -92,19 +80,10 @@
     <ClCompile Include="Sources\Scene\Transform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\MeshData.cpp">
+    <ClCompile Include="Sources\Scene\Geometry\Mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\ShapesDataManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\ResourcesLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\ImageTextureData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\TexturesDataManager.cpp">
+    <ClCompile Include="Sources\Scene\ResourcesLoading\TextureLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sources\Scene\Materials\Material.cpp">
@@ -116,16 +95,10 @@
     <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Shapes\Mesh.cpp">
+    <ClCompile Include="Sources\Scene\Geometry\SceneObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Shapes\Shape.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\Scene\Shapes\Sphere.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\Scene\Shapes\Triangle.cpp">
+    <ClCompile Include="Sources\Scene\Geometry\Sphere.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sources\Scene\Textures\ConstantTexture.cpp">
@@ -137,10 +110,13 @@
     <ClCompile Include="Sources\Scene\Textures\Texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\Vertex.cpp">
+    <ClCompile Include="Sources\Scene\Geometry\Vertex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\Scene\Data\TriangleData.cpp">
+    <ClCompile Include="Sources\Scene\Geometry\Triangle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Scene\ResourcesLoading\SceneLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
