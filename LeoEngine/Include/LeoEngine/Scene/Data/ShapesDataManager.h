@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <vector>
-#include <unordered_map>
 
 namespace leo {
 	struct MeshData;
