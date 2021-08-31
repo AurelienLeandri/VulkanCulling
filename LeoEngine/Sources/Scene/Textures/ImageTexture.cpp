@@ -21,7 +21,7 @@ namespace leo {
 		size_t index = (nbChannels * width) * j + (i * nbChannels);
 		glm::vec4 texel(0);
 		for (size_t channel = 0; channel < nbChannels; ++channel) {
-			texel[channel] = _data->data[static_cast<glm::vec4::length_type>(index + channel)];
+			texel[static_cast<glm::vec4::length_type>(channel)] = _data->data[index + channel];
 		}
 		return texel;
 	}
