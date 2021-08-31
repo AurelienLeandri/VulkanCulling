@@ -14,7 +14,7 @@ namespace leo {
 		Texture(Type type);
 
 	public:
-		virtual glm::vec3 getColor(float u, float v) const = 0;
+		virtual glm::vec4 getTexel(float u, float v) const = 0;
 
 	public:
 		const Type type;
