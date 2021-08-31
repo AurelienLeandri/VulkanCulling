@@ -69,6 +69,12 @@
     <ClInclude Include="Sources\GeometryIncludes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\Data\Vertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\Data\TriangleData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Scene.cpp">
@@ -120,6 +126,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sources\Scene\Textures\Texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Scene\Data\Vertex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Scene\Data\TriangleData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

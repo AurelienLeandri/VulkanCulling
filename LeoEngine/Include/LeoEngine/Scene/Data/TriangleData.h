@@ -5,11 +5,9 @@
 #include <array>
 
 namespace leo {
-	class TriangleData {
-	public:
+	struct TriangleData {
 		TriangleData(const Vertex& v0, const Vertex& v1, const Vertex& v2);
 
-	public:
-		const std::array<const Vertex, 3> vertices;
+		std::array<Vertex, 3> vertices;
 	};
 }

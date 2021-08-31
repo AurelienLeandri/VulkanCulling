@@ -21,6 +21,8 @@
   <ItemGroup>
     <ClInclude Include="Include\LeoEngine\Scene\Data\MeshData.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Data\TextureData.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\TriangleData.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Data\Vertex.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h" />
@@ -44,6 +46,8 @@
     <ClCompile Include="Sources\Scene\Data\ResourcesLoader.cpp" />
     <ClCompile Include="Sources\Scene\Data\TextureData.cpp" />
     <ClCompile Include="Sources\Scene\Data\TexturesDataManager.cpp" />
+    <ClCompile Include="Sources\Scene\Data\TriangleData.cpp" />
+    <ClCompile Include="Sources\Scene\Data\Vertex.cpp" />
     <ClCompile Include="Sources\Scene\Materials\Material.cpp" />
     <ClCompile Include="Sources\Scene\Materials\PBRMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp" />
