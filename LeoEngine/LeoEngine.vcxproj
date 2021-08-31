@@ -36,6 +36,7 @@
     <ClInclude Include="Include\LeoEngine\Scene\Textures\Texture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Data\TexturesDataManager.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Transform.h" />
+    <ClInclude Include="Sources\GeometryIncludes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Data\MeshData.cpp" />
@@ -137,7 +138,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;$(ProjectDir)Sources;$(SolutionDir)ThirdParty\Headers</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -158,7 +159,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;$(ProjectDir)Sources;$(SolutionDir)ThirdParty\Headers</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -179,7 +180,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;$(ProjectDir)Sources;$(SolutionDir)ThirdParty\Headers</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -200,7 +201,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Include\LeoEngine;$(ProjectDir)Sources;$(SolutionDir)ThirdParty\Headers</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>
