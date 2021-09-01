@@ -2,20 +2,26 @@
 
 namespace leo {
 
-	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout)
-		: Texture(Texture::Type::IMAGE), width(width), height(height), type(type), layout(layout), data(new float[width * height * static_cast<size_t>(layout)])
+	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout, float* data) :
+		Texture(Texture::Type::IMAGE),
+		width(width),
+		height(height),
+		nbChannels(getNbChannelsFromLayout(layout)),
+		type(type),
+		layout(layout),
+		data(data ? data : new float[width * height * nbChannels])
 	{
 	}
 
 	ImageTexture::~ImageTexture()
 	{
-		delete[] data;
-		data = nullptr;
+		if (data) {
+			delete[] data;
+		}
 	}
 
 	glm::vec4 ImageTexture::getTexel(float u, float v) const
 	{
-		size_t nbChannels = static_cast<size_t>(layout);
 		float dummy;
 		u = glm::modf(u, dummy);
 		v = glm::modf(v, dummy);
@@ -29,6 +35,22 @@ namespace leo {
 			texel[static_cast<glm::vec4::length_type>(channel)] = data[index + channel];
 		}
 		return texel;
+	}
+
+	size_t ImageTexture::getNbChannelsFromLayout(ImageTexture::Layout layout)
+	{
+		switch (layout) {
+		case ImageTexture::Layout::INVALID:
+			return 0;
+		case ImageTexture::Layout::A:
+			return 1;
+		case ImageTexture::Layout::RGB:
+			return 3;
+		case ImageTexture::Layout::RGBA:
+			return 4;
+		case ImageTexture::Layout::LUMINANCE:
+			return 1;
+		}
 	}
 
 }

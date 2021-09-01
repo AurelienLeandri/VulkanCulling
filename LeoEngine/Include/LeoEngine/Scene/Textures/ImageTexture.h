@@ -7,27 +7,33 @@ namespace leo {
 	{
 	public:
 		enum class Type {
+			INVALID = 0,
 			FLOAT
 		};
-		enum class Layout : size_t {
-			RGB = 3,
-			RGBA = 4,
-			LUMINANCE = 1,
-			A = 1
+		enum class Layout {
+			INVALID = 0,
+			RGB,
+			RGBA,
+			LUMINANCE,
+			A
 		};
 
 	public:
-		ImageTexture(size_t width, size_t height, Type type, Layout layout);
+		ImageTexture(size_t width, size_t height, Type type, Layout layout, float* data = nullptr);
 		~ImageTexture();
 
 	public:
 		virtual glm::vec4 getTexel(float u, float v) const override;
 
 	public:
+		static size_t getNbChannelsFromLayout(ImageTexture::Layout layout);
+
+	public:
 		const size_t width = 0;
 		const size_t height = 0;
-		const Type type;
-		const Layout layout;
-		float* data;
+		const size_t nbChannels = 0;
+		const Type type = Type::INVALID;
+		const Layout layout = Layout::INVALID;
+		const float* data = nullptr;
 	};
 }

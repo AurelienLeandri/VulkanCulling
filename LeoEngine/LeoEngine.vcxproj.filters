@@ -72,6 +72,9 @@
     <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\SceneLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\Lights\Light.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Scene.cpp">

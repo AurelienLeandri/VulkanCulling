@@ -24,6 +24,7 @@
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Sphere.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Triangle.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Vertex.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Lights\Light.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h" />
