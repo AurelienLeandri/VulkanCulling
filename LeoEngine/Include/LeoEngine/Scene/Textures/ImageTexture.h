@@ -12,7 +12,8 @@ namespace leo {
 		enum class Layout : size_t {
 			RGB = 3,
 			RGBA = 4,
-			LUMINANCE = 1
+			LUMINANCE = 1,
+			A = 1
 		};
 
 	public:
