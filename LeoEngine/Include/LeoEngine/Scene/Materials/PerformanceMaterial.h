@@ -13,18 +13,18 @@ namespace leo {
 		virtual Type getType() const override;
 
 	public:
-		glm::vec3 diffuseValue;
+		glm::vec3 diffuseValue = glm::vec3(1);
 		std::shared_ptr<ImageTexture> diffuseTexture;
-		glm::vec3 specularValue;
+		glm::vec3 specularValue = glm::vec3(1);
 		std::shared_ptr<ImageTexture> specularTexture;
-		glm::vec3 ambientValue;
+		glm::vec3 ambientValue = glm::vec3(0);
 		std::shared_ptr<ImageTexture> ambientTexture;
-		glm::vec3 emissiveValue;
+		glm::vec3 emissiveValue = glm::vec3(0);
 		std::shared_ptr<ImageTexture> emissiveTexture;
-		glm::vec3 opacityValue;
-		std::shared_ptr<ImageTexture> opacityTexture;
-		std::shared_ptr<ImageTexture> normalTexture;
-		std::shared_ptr<ImageTexture> occlusionTexture;
+		float opacityValue = 1;
+		std::shared_ptr<ImageTexture> opacityTexture;  // TODO: default value!
+		std::shared_ptr<ImageTexture> normalsTexture;  // TODO: default value!
+		std::shared_ptr<ImageTexture> occlusionTexture;  // TODO: default value!
 	};
 }
 

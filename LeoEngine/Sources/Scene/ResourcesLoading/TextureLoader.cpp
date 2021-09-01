@@ -11,16 +11,16 @@ namespace leo {
         void rgbToLuminance(const float* src, float* dest, int width, int height, int srcNbCHannels);
     }
 
-    std::shared_ptr<const ImageTexture> TextureLoader::loadTexture(const char* fileName, TextureLoader::LoadingOptions options)
+    std::shared_ptr<const ImageTexture> TextureLoader::loadTexture(const char* filePath, TextureLoader::LoadingOptions options)
     {
-        auto cacheIterator = _fileTexturesCache.find(fileName);
+        auto cacheIterator = _fileTexturesCache.find(filePath);
         if (cacheIterator != _fileTexturesCache.end()) {
             return cacheIterator->second;
         }
 
         stbi_set_flip_vertically_on_load(false);
         int width = 0, height = 0, nbChannels = 0;
-        float* data = stbi_loadf(fileName, &width, &height, &nbChannels, 0);
+        float* data = stbi_loadf(filePath, &width, &height, &nbChannels, 0);
         if (!data) {
             return nullptr;
         }
@@ -41,14 +41,14 @@ namespace leo {
             }
         }
 
-        std::shared_ptr<ImageTexture> newTexture = std::make_shared<ImageTexture>(
+        _fileTexturesCache[filePath] = std::make_shared<ImageTexture>(
             static_cast<size_t>(width),
             static_cast<size_t>(height),
             ImageTexture::Type::FLOAT,
             layout,
             data);
 
-        return newTexture;
+        return _fileTexturesCache[filePath];
     }
 
     namespace {

@@ -5,14 +5,20 @@
 
 namespace leo {
 	class SceneObject;
+	class Transform;
 
 	struct Model {
-		std::vector<std::shared_ptr<SceneObject>> objects;
+		std::vector<SceneObject> objects;
 	};
 
 	class ModelLoader {
 	public:
-		static const Model* loadModel(const char* fileName);
+		struct LoadingOptions {
+			std::shared_ptr<Transform> globalTransform;
+		};
+
+	public:
+		static const Model loadModel(const char* filePath, LoadingOptions options = {});
 
 	private:
 		static std::unordered_map<std::string, Model> _modelsCache;
