@@ -19,11 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Mesh.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Shape.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Sphere.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Triangle.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Geometry\Vertex.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Geometries\Mesh.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Geometries\Shape.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Geometries\Sphere.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Geometries\Triangle.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Geometries\Vertex.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h" />
@@ -40,17 +40,17 @@
     <ClInclude Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\Scene\Geometry\Mesh.cpp" />
+    <ClCompile Include="Sources\Scene\Geometries\Mesh.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\SceneLoader.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\TextureLoader.cpp" />
-    <ClCompile Include="Sources\Scene\Geometry\Triangle.cpp" />
-    <ClCompile Include="Sources\Scene\Geometry\Vertex.cpp" />
+    <ClCompile Include="Sources\Scene\Geometries\Triangle.cpp" />
+    <ClCompile Include="Sources\Scene\Geometries\Vertex.cpp" />
     <ClCompile Include="Sources\Scene\Materials\Material.cpp" />
     <ClCompile Include="Sources\Scene\Materials\PBRMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Scene.cpp" />
-    <ClCompile Include="Sources\Scene\Geometry\SceneObject.cpp" />
-    <ClCompile Include="Sources\Scene\Geometry\Sphere.cpp" />
+    <ClCompile Include="Sources\Scene\Geometries\SceneObject.cpp" />
+    <ClCompile Include="Sources\Scene\Geometries\Sphere.cpp" />
     <ClCompile Include="Sources\Scene\Textures\ConstantTexture.cpp" />
     <ClCompile Include="Sources\Scene\Textures\ImageTexture.cpp" />
     <ClCompile Include="Sources\Scene\Textures\Texture.cpp" />

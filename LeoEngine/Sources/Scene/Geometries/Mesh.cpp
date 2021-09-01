@@ -1,4 +1,4 @@
-#include <Scene/Geometry/Mesh.h>
+#include <Scene/Geometries/Mesh.h>
 
 namespace leo {
 	Mesh::Mesh(size_t nbVertices, size_t nbIndices)

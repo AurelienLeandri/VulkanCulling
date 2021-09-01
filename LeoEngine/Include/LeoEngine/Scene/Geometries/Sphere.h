@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Scene/Geometry/Shape.h>
+#include <Scene/Geometries/Shape.h>
 
 namespace leo {
 	class Sphere : public Shape {

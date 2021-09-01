@@ -1,4 +1,4 @@
-#include <Scene/Geometry/Triangle.h>
+#include <Scene/Geometries/Triangle.h>
 
 namespace leo {
 	Triangle::Triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2)

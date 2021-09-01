@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Scene/Geometry/Shape.h>
-#include <Scene/Geometry/Vertex.h>
+#include <Scene/Geometries/Shape.h>
+#include <Scene/Geometries/Vertex.h>
 
 #include <vector>
 

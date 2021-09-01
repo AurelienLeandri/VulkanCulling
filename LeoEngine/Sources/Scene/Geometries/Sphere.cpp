@@ -1,4 +1,4 @@
-#include <Scene/Geometry/Sphere.h>
+#include <Scene/Geometries/Sphere.h>
 
 namespace leo {
 	Sphere::Sphere(const glm::vec3& position, float radius)
