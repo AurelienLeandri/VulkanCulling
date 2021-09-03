@@ -19,12 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Include\LeoEngine\Scene\Camera.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Mesh.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Shape.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Sphere.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Triangle.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Vertex.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Lights\DirectionalLight.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Lights\Light.h" />
+    <ClInclude Include="Include\LeoEngine\Scene\Lights\PointLight.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\Material.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PBRMaterial.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Materials\PerformanceMaterial.h" />
@@ -41,6 +44,7 @@
     <ClInclude Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Sources\Scene\Camera.cpp" />
     <ClCompile Include="Sources\Scene\Geometries\Mesh.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\SceneLoader.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\TextureLoader.cpp" />
@@ -50,7 +54,6 @@
     <ClCompile Include="Sources\Scene\Materials\PBRMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Scene.cpp" />
-    <ClCompile Include="Sources\Scene\Geometries\SceneObject.cpp" />
     <ClCompile Include="Sources\Scene\Geometries\Sphere.cpp" />
     <ClCompile Include="Sources\Scene\Textures\ConstantTexture.cpp" />
     <ClCompile Include="Sources\Scene\Textures\ImageTexture.cpp" />

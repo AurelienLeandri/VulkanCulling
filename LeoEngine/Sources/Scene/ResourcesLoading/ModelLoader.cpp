@@ -15,8 +15,6 @@
 
 namespace leo {
     namespace {
-        std::vector<std::shared_ptr<Texture>> loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName, std::vector<std::shared_ptr<Texture>>& textures, const std::string& directory);
-        
         void processNode(
             aiNode* node,
             const aiScene* aiScene,
@@ -43,7 +41,7 @@ namespace leo {
         if (cacheIterator != _modelsCache.end()) {
             Model model = cacheIterator->second;
             for (SceneObject& object : model.objects) {
-                object.setTransform(std::make_shared<Transform>(options.globalTransform->getMatrix() * object.getTransform()->getMatrix()));
+                object.transform = std::make_shared<Transform>(options.globalTransform->getMatrix() * object.transform->getMatrix());
             }
             return model;
         }
@@ -68,7 +66,7 @@ namespace leo {
         processNode(aiScene->mRootNode, aiScene, fileDirectoryPath, modelMaterials, model.objects);
 
         for (SceneObject& object : model.objects) {
-            object.setTransform(std::make_shared<Transform>(options.globalTransform->getMatrix() * object.getTransform()->getMatrix()));
+            object.transform = std::make_shared<Transform>(options.globalTransform->getMatrix() * object.transform->getMatrix());
         }
 
         return model;
@@ -102,7 +100,8 @@ namespace leo {
             std::vector<SceneObject>& sceneObjects)
         {
             std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
-            SceneObject sceneObject(mesh);
+            SceneObject sceneObject;
+            sceneObject.shape = mesh;
 
             // Process material
             aiMaterial* assimpMaterial = aiScene->mMaterials[assimpMesh->mMaterialIndex];
@@ -116,7 +115,7 @@ namespace leo {
                     // Add the material to the Scene and also the cache to avoid duplicates.
                     modelMaterials[assimpMaterial] = material;
                 }
-                sceneObject.setMaterial(modelMaterials[assimpMaterial]);
+                sceneObject.material = modelMaterials[assimpMaterial];
             }
 
             // Populate indices vector

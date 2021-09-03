@@ -4,7 +4,7 @@
 #include <memory>
 
 namespace leo {
-	class SceneObject;
+	struct SceneObject;
 	class Transform;
 
 	struct Model {
@@ -14,7 +14,7 @@ namespace leo {
 	class ModelLoader {
 	public:
 		struct LoadingOptions {
-			std::shared_ptr<Transform> globalTransform;
+			std::shared_ptr<const Transform> globalTransform;
 		};
 
 	public:
