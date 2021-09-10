@@ -29,11 +29,15 @@ namespace leo {
             std::unordered_map<aiMaterial*, std::shared_ptr<Material>>& model_materials,
             std::vector<SceneObject>& sceneObjects);
 
-        std::shared_ptr<const ImageTexture> loadMaterialTexture(
+        std::shared_ptr<Material> loadMaterial(aiMaterial* assimpMaterial, const std::string& fileDirectoryPath);
+
+        std::shared_ptr<ImageTexture> loadMaterialTexture(
             aiMaterial* assimpMaterial,
             aiTextureType assimpTextureType,
             const std::string& fileDirectoryPath);
     }
+
+    std::unordered_map<std::string, Model> ModelLoader::_modelsCache;
 
     const Model ModelLoader::loadModel(const char* filePath, LoadingOptions options)
     {
@@ -52,7 +56,7 @@ namespace leo {
         Assimp::Importer importer;
         const aiScene* aiScene = importer.ReadFile(filePath,
             aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_PreTransformVertices | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_SortByPType
-        
+
         );
 
         if (!aiScene || aiScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !aiScene->mRootNode) // if is Not Zero
@@ -65,8 +69,12 @@ namespace leo {
         std::string fileDirectoryPath = strFilePath.substr(0, strFilePath.find_last_of('/'));
         processNode(aiScene->mRootNode, aiScene, fileDirectoryPath, modelMaterials, model.objects);
 
-        for (SceneObject& object : model.objects) {
-            object.transform = std::make_shared<Transform>(options.globalTransform->getMatrix() * object.transform->getMatrix());
+        if (options.globalTransform) {
+            for (SceneObject& object : model.objects) {
+                if (object.transform) {
+                    object.transform = std::make_shared<Transform>(options.globalTransform->getMatrix() * object.transform->getMatrix());
+                }
+            }
         }
 
         return model;
@@ -100,7 +108,8 @@ namespace leo {
             std::vector<SceneObject>& sceneObjects)
         {
             std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
-            SceneObject sceneObject;
+            sceneObjects.push_back({});
+            SceneObject& sceneObject = sceneObjects.back();
             sceneObject.shape = mesh;
 
             // Process material
@@ -132,16 +141,17 @@ namespace leo {
             std::vector<Vertex>& vertices = mesh->vertices;
             bool hasUv = assimpMesh->mTextureCoords[0];
             bool hasNormals = assimpMesh->HasNormals();
+            bool hasTangents = assimpMesh->HasTangentsAndBitangents();
             for (unsigned int i = 0; i < assimpMesh->mNumVertices; ++i) {
                 vertices.push_back({
                         glm::vec3(assimpMesh->mVertices[i].x, assimpMesh->mVertices[i].y, assimpMesh->mVertices[i].z),  // Position
                         hasNormals ? glm::vec3(assimpMesh->mNormals[i].x, assimpMesh->mNormals[i].y, assimpMesh->mNormals[i].z) : glm::vec3(0, 0, 1),  // Normal or z+ by default
+                        hasTangents ? glm::vec3(assimpMesh->mTangents[i].x, assimpMesh->mTangents[i].y, assimpMesh->mTangents[i].z) : glm::vec3(1, 0, 0),  // Tangents or x+ by default
                         hasUv ? glm::vec2(assimpMesh->mTextureCoords[0][i].x, assimpMesh->mTextureCoords[0][i].y) : glm::vec2(0, 0)  // UVs if any
                     });
             }
-    }
+        }
 
-    namespace {
         std::shared_ptr<Material> loadMaterial(aiMaterial* assimpMaterial, const std::string& fileDirectoryPath)
         {
             // TODO: Check which material should be created using what values and textures are present.
@@ -150,22 +160,18 @@ namespace leo {
                 aiTextureType_DIFFUSE,
                 aiTextureType_SPECULAR,
                 aiTextureType_AMBIENT,
-                aiTextureType_EMISSIVE,
                 aiTextureType_NORMALS,
-                aiTextureType_LIGHTMAP,
-                aiTextureType_OPACITY
+                aiTextureType_HEIGHT,
             };
             std::unordered_map<aiTextureType, std::shared_ptr<ImageTexture>*> materialTextureSlots = {
                 { aiTextureType_DIFFUSE, &material->diffuseTexture },
                 { aiTextureType_SPECULAR, &material->specularTexture },
                 { aiTextureType_AMBIENT, &material->ambientTexture },
-                { aiTextureType_EMISSIVE, &material->emissiveTexture },
                 { aiTextureType_NORMALS, &material->normalsTexture },
-                { aiTextureType_LIGHTMAP, &material->occlusionTexture },
-                { aiTextureType_OPACITY, &material->opacityTexture }
+                { aiTextureType_HEIGHT, &material->heightTexture },
             };
             for (const aiTextureType& textureType : textureTypes) {
-                std::shared_ptr<const ImageTexture> texture = loadMaterialTexture(assimpMaterial, textureType, fileDirectoryPath);
+                std::shared_ptr<ImageTexture> texture = loadMaterialTexture(assimpMaterial, textureType, fileDirectoryPath);
                 if (texture) {
                     *materialTextureSlots[textureType] = texture;
                 }
@@ -175,7 +181,7 @@ namespace leo {
             return material;
         }
 
-        std::shared_ptr<const ImageTexture> loadMaterialTexture(
+        std::shared_ptr<ImageTexture> loadMaterialTexture(
             aiMaterial* assimpMaterial,
             aiTextureType assimpTextureType,
             const std::string& fileDirectoryPath)
@@ -188,7 +194,7 @@ namespace leo {
             assimpMaterial->GetTexture(assimpTextureType, 0, &str);  // "0" for texture at index 0. The rest is ignored because unsupported by all renderers.
             std::string texturePath = fileDirectoryPath + "/" + str.C_Str();
 
-            std::shared_ptr<const ImageTexture> texture = TextureLoader::loadTexture(texturePath.c_str());
+            std::shared_ptr<ImageTexture> texture = TextureLoader::loadTexture(texturePath.c_str());
             return texture;
         }
 

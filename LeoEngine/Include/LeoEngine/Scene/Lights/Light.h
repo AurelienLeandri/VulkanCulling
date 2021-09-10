@@ -4,18 +4,12 @@
 
 namespace leo {
 
-    class Transform;
-    struct HitRecord;
-    class Shape;
-    class ImageTexture;
-    class Distribution2D;
-
     class Light
     {
     public:
         enum class Type {
-            AREA,
-            INFINITE_AREA
+            DIRECTIONAL,
+            POINT
         };
 
     public:

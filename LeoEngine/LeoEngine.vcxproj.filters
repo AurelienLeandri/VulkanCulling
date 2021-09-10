@@ -48,7 +48,7 @@
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Sources\GeometryIncludes.h">
+    <ClInclude Include="Include\LeoEngine\GeometryIncludes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Vertex.h">
@@ -61,12 +61,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Geometries\Shape.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\ModelLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\SceneLoader.h">
@@ -82,6 +76,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\LeoEngine\Scene\Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\ModelLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -129,6 +126,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Sources\Scene\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Scene\Lights\DirectionalLight.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

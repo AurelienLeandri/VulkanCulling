@@ -40,8 +40,6 @@ namespace leo {
 	size_t ImageTexture::getNbChannelsFromLayout(ImageTexture::Layout layout)
 	{
 		switch (layout) {
-		case ImageTexture::Layout::INVALID:
-			return 0;
 		case ImageTexture::Layout::A:
 			return 1;
 		case ImageTexture::Layout::RGB:
@@ -50,6 +48,8 @@ namespace leo {
 			return 4;
 		case ImageTexture::Layout::LUMINANCE:
 			return 1;
+		default:
+			return 0;
 		}
 	}
 

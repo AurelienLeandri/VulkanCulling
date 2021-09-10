@@ -40,12 +40,13 @@
     <ClInclude Include="Include\LeoEngine\Scene\Textures\ImageTexture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Textures\Texture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Transform.h" />
-    <ClInclude Include="Sources\GeometryIncludes.h" />
-    <ClInclude Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp" />
+    <ClInclude Include="Include\LeoEngine\GeometryIncludes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\Scene\Camera.cpp" />
     <ClCompile Include="Sources\Scene\Geometries\Mesh.cpp" />
+    <ClCompile Include="Sources\Scene\Lights\DirectionalLight.cpp" />
+    <ClCompile Include="Sources\Scene\ResourcesLoading\ModelLoader.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\SceneLoader.cpp" />
     <ClCompile Include="Sources\Scene\ResourcesLoading\TextureLoader.cpp" />
     <ClCompile Include="Sources\Scene\Geometries\Triangle.cpp" />

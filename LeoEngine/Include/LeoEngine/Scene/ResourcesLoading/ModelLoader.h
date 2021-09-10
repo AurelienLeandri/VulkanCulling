@@ -14,7 +14,7 @@ namespace leo {
 	class ModelLoader {
 	public:
 		struct LoadingOptions {
-			std::shared_ptr<const Transform> globalTransform;
+			std::shared_ptr<const Transform> globalTransform = std::make_shared<Transform>();
 		};
 
 	public:

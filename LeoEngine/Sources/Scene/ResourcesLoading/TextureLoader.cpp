@@ -2,6 +2,7 @@
 
 #include <Scene/Textures/ImageTexture.h>
 
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 namespace leo {
@@ -11,7 +12,9 @@ namespace leo {
         void rgbToLuminance(const float* src, float* dest, int width, int height, int srcNbCHannels);
     }
 
-    std::shared_ptr<const ImageTexture> TextureLoader::loadTexture(const char* filePath, TextureLoader::LoadingOptions options)
+    std::unordered_map<std::string, std::shared_ptr<ImageTexture>> TextureLoader::_fileTexturesCache;
+
+    std::shared_ptr<ImageTexture> TextureLoader::loadTexture(const char* filePath, TextureLoader::LoadingOptions options)
     {
         auto cacheIterator = _fileTexturesCache.find(filePath);
         if (cacheIterator != _fileTexturesCache.end()) {
@@ -72,8 +75,6 @@ namespace leo {
 
         bool isImageInfoValid(ImageTexture::Layout& layout, int nbChannels) {
             switch (layout) {
-            case ImageTexture::Layout::INVALID:
-                return false;
             case ImageTexture::Layout::RGB:
                 return nbChannels == 3;
             case ImageTexture::Layout::RGBA:
@@ -82,6 +83,8 @@ namespace leo {
                 return nbChannels == 1;
             case ImageTexture::Layout::LUMINANCE:
                 return nbChannels == 1 || nbChannels == 3;
+            default:
+                return false;
             }
         }
 

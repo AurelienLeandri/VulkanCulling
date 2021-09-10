@@ -18,6 +18,6 @@ namespace leo {
 
 	class SceneLoader {
 	public:
-		static void loadScene(const char* filePath, std::shared_ptr<Scene> scene, std::shared_ptr<Camera> camera);
+		static void loadScene(const char* filePath, std::shared_ptr<Scene>& scene, std::shared_ptr<Camera>& camera);
 	};
 }

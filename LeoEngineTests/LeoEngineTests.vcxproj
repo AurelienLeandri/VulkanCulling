@@ -19,14 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SceneDataTests.cpp" />
-    <ClCompile Include="SceneMaterialsTests.cpp" />
-    <ClCompile Include="SceneShapesTests.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="SceneTests.cpp" />
-    <ClCompile Include="SceneTexturesTests.cpp" />
+    <ClCompile Include="TestUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BoostIncludes.h" />
+    <ClInclude Include="SceneTests.h" />
+    <ClInclude Include="TestUtils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -125,13 +124,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;$(SolutionDir)LeoEngine\Include\LeoEngine</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)LeoEngine\Libraries\x86\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>LeoEngine.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Libs;C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);$(SolutionDir)LeoEngine\Libraries\x86\Debug;%(AdditionalLibraryDirectories);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>LeoEngine.lib;assimp-vc142-mt.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -142,15 +141,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;$(SolutionDir)LeoEngine\Include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)LeoEngine\Libraries\x86\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>LeoEngine.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Libs;C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);$(SolutionDir)LeoEngine\Libraries\x86\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>LeoEngine.lib;assimp-vc142-mt.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -159,13 +158,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\boost_1_76_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;$(SolutionDir)LeoEngine\Include\LeoEngine</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)LeoEngine\Libraries\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>LeoEngine.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Libs;C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);$(SolutionDir)LeoEngine\Libraries\x64\Debug;%(AdditionalLibraryDirectories);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>LeoEngine.lib;assimp-vc142-mt.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -176,15 +175,15 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include;C:\Users\Mlem\Documents\Libraries\boost_1_76_0\boost_1_76_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Headers;$(SolutionDir)LeoEngine\Include;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)LeoEngine\Libraries\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>LeoEngine.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Mlem\Documents\Projects\LeoEngine\ThirdParty\Libs;C:\Users\Mlem\Documents\Projects\LeoEngine\LeoEngine\Libraries\$(Platform)\$(Configuration);$(SolutionDir)LeoEngine\Libraries\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>LeoEngine.lib;assimp-vc142-mt.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

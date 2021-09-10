@@ -14,7 +14,7 @@
 
 namespace leo {
 	namespace {
-		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera> camera, size_t lineNb);
+		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera>& camera, size_t lineNb);
 		void loadModelEntry(
 			std::stringstream& entry,
 			std::unordered_map<std::string, Model>& models,
@@ -36,8 +36,12 @@ namespace leo {
 		return message;
 	}
 
-	void SceneLoader::loadScene(const char* filePath, std::shared_ptr<Scene> scene, std::shared_ptr<Camera> camera)
+	void SceneLoader::loadScene(const char* filePath, std::shared_ptr<Scene>& scene, std::shared_ptr<Camera>& camera)
 	{
+		if (!scene) {
+			scene = std::make_shared<Scene>();
+		}
+
 		std::string strFilePath(filePath);
 		std::string fileDirectoryPath = strFilePath.substr(0, strFilePath.find_last_of('/'));
 		std::ifstream ifs(filePath);
@@ -74,7 +78,7 @@ namespace leo {
 	}
 
 	namespace {
-		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera> camera, size_t lineNb)
+		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera>& camera, size_t lineNb)
 		{
 			if (camera) {
 				throw SceneLoaderException("An entry for a camera was previously found. Only specify one camera entry.", lineNb);
@@ -155,7 +159,12 @@ namespace leo {
 			Model m = models.at(modelName);
 			std::shared_ptr<const Transform> transform = transforms.at(transformName);
 			for (SceneObject object : m.objects) {
-				object.transform = std::make_shared<Transform>(transform->getMatrix() * object.transform->getMatrix());
+				if (object.transform) {
+					object.transform = std::make_shared<Transform>(transform->getMatrix() * object.transform->getMatrix());
+				}
+				else {
+					object.transform = transform;
+				}
 				scene->objects.push_back(object);
 			}
 		}
