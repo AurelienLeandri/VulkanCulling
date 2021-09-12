@@ -15,8 +15,8 @@ namespace {
     const bool enableValidationLayers = true;
 #endif
 
-    void getRequiredInstanceExtensions(std::vector<const char*>& requiredExtensions);
-    void checkInstanceRequiredExtensionsSupport(const std::vector<const char*>& requiredExtensions);
+    void getRequiredInstanceExtensionsNames(std::vector<const char*>& requiredExtensions);
+    bool checkRequiredInstanceExtensionsSupport(const std::vector<const char*>& requiredExtensions);
     bool checkValidationLayerSupport(const std::vector<const char*>& requiredLayers);
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
@@ -26,7 +26,7 @@ namespace {
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
         void* pUserData);
 
-    const std::vector<const char*> instanceExtensions = {
+    const std::vector<const char*> debugInstanceExtensions = {
     VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     };
 
@@ -50,6 +50,9 @@ int VulkanInstance::init()
     * Intance
     */
 
+    VkInstanceCreateInfo instanceCreateInfo = {};
+    instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "LeoEngine";
@@ -58,14 +61,15 @@ int VulkanInstance::init()
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
-    VkInstanceCreateInfo instanceCreateInfo = {};
-    instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCreateInfo.pApplicationInfo = &appInfo;
 
     // Get the extension from GLFW so that Vulkan can interface with the window system
     std::vector<const char*> requiredInstanceExtensions;
-    getRequiredInstanceExtensions(requiredInstanceExtensions);
-    checkInstanceRequiredExtensionsSupport(requiredInstanceExtensions);
+    getRequiredInstanceExtensionsNames(requiredInstanceExtensions);
+    if (!checkRequiredInstanceExtensionsSupport(requiredInstanceExtensions)) {
+        std::cerr << "Error: Some required extensions are not supported by the Vulkan implementation." << std::endl;
+        return -1;
+    }
     instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(requiredInstanceExtensions.size());
     instanceCreateInfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
@@ -83,6 +87,10 @@ int VulkanInstance::init()
         populateDebugMessengerCreateInfo(debugCreateInfo);
         instanceCreateInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT*>(&debugCreateInfo);
     }
+    else {
+        instanceCreateInfo.enabledLayerCount = 0;
+        instanceCreateInfo.ppEnabledLayerNames = nullptr;
+    }
 
     if (vkCreateInstance(&instanceCreateInfo, nullptr, &_instance)) {
         std::cerr << "Error: Failed to create instance." << std::endl;
@@ -99,12 +107,12 @@ int VulkanInstance::init()
 
         if (auto vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT")) {
             if (vkCreateDebugUtilsMessengerEXT(_instance, &debugMsgCreateInfo, nullptr, &_debugMessenger)) {
-                std::cerr << "Error: Failed to create required VkDebugUtilsMessengerEXT" << std::endl;
+                std::cerr << "Error: Failed to create required VkDebugUtilsMessengerEXT." << std::endl;
                 return -1;
             }
         }
         else {
-            std::cerr << "Error: Failed to load extension function vkCreateDebugUtilsMessengerEXT" << std::endl;
+            std::cerr << "Error: Failed to load extension function vkCreateDebugUtilsMessengerEXT." << std::endl;
             return -1;
         }
     }
@@ -229,7 +237,10 @@ int VulkanInstance::_cleanup()
 {
     cleanupSwapChain();
 
+    vkDeviceWaitIdle(_device);
+
     vkDestroyDevice(_device, nullptr);
+    _device = VK_NULL_HANDLE;
 
     if (_debugMessenger) {
         if (auto vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")) {
@@ -244,6 +255,7 @@ int VulkanInstance::_cleanup()
 
     vkDestroySurfaceKHR(_instance, _surface, nullptr);
     _surface = VK_NULL_HANDLE;
+
     vkDestroyInstance(_instance, nullptr);
     _instance = VK_NULL_HANDLE;
 
@@ -266,8 +278,6 @@ void VulkanInstance::recreateSwapChain()
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(_device);
-
     cleanupSwapChain();
     _createSwapChain();
 }
@@ -278,6 +288,8 @@ void VulkanInstance::waitForIdleDevice() const
 }
 
 void VulkanInstance::cleanupSwapChain() {
+    vkDeviceWaitIdle(_device);
+
     for (size_t i = 0; i < _swapChainImageViews.size(); i++) {
         vkDestroyImageView(_device, _swapChainImageViews[i], nullptr);
     }
@@ -429,16 +441,9 @@ int VulkanInstance::_createSwapChain()
         _queueFamilyIndices.presentationFamily.value()
     };
 
-    if (_queueFamilyIndices.graphicsFamily != _queueFamilyIndices.presentationFamily) {
-        swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        swapChainCreateInfo.queueFamilyIndexCount = 2;
-        swapChainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
-    }
-    else {
-        swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        swapChainCreateInfo.queueFamilyIndexCount = 0;
-        swapChainCreateInfo.pQueueFamilyIndices = nullptr;
-    }
+    swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapChainCreateInfo.queueFamilyIndexCount = 0;
+    swapChainCreateInfo.pQueueFamilyIndices = nullptr;
 
     swapChainCreateInfo.preTransform = _swapChainSupportDetails.capabilities.currentTransform;
     swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -484,12 +489,6 @@ VkSurfaceFormatKHR VulkanInstance::_chooseSwapSurfaceFormat(const std::vector<Vk
 
 VkPresentModeKHR VulkanInstance::_chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
 {
-    for (const auto& availablePresentMode : availablePresentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return availablePresentMode;
-        }
-    }
-
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
@@ -505,15 +504,15 @@ VkExtent2D VulkanInstance::_chooseSwapChainExtent(const VkSurfaceCapabilitiesKHR
         // glfwGetFramebufferSize gives us the size in pixels
         glfwGetFramebufferSize(_window, &width, &height);
 
-        VkExtent2D actualExtent = {
+        VkExtent2D extent = {
             static_cast<uint32_t>(width),
             static_cast<uint32_t>(height)
         };
 
-        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+        extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
-        return actualExtent;
+        return extent;
     }
 }
 
@@ -569,7 +568,8 @@ VkFormat VulkanInstance::findSupportedFormat(const std::vector<VkFormat>& candid
         }
     }
 
-    throw std::runtime_error("Failed to find supported format");
+    std::cerr << "Failed to find supported format" << std::endl;
+    return VkFormat::VK_FORMAT_UNDEFINED;
 }
 
 uint32_t VulkanInstance::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
@@ -621,7 +621,7 @@ size_t VulkanInstance::getSwapChainSize() const {
 }
 
 namespace {
-    void getRequiredInstanceExtensions(std::vector<const char*>& requiredExtensions) {
+    void getRequiredInstanceExtensionsNames(std::vector<const char*>& requiredExtensions) {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -629,13 +629,13 @@ namespace {
         requiredExtensions = std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
         if (enableValidationLayers) {
-            for (const char* extensionName : instanceExtensions) {
+            for (const char* extensionName : debugInstanceExtensions) {
                 requiredExtensions.push_back(extensionName);
             }
         }
     }
 
-    void checkInstanceRequiredExtensionsSupport(const std::vector<const char*>& requiredExtensions) {
+    bool checkRequiredInstanceExtensionsSupport(const std::vector<const char*>& requiredExtensions) {
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
         std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -643,22 +643,25 @@ namespace {
 
         // Check for GLFW extensions support
         const char* extensionNotFound = nullptr;
-        for (int i = 0; i < requiredExtensions.size(); ++i) {
+        for (const char* requiredExtensionName : requiredExtensions) {
             bool found = false;
             for (const VkExtensionProperties& availableExtension : availableExtensions) {
-                if (!strcmp(availableExtension.extensionName, requiredExtensions[i])) {
+                if (!strcmp(availableExtension.extensionName, requiredExtensionName)) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                extensionNotFound = requiredExtensions[i];
+                extensionNotFound = requiredExtensionName;
                 break;
             }
         }
         if (extensionNotFound) {
-            throw std::runtime_error(std::string("Error: Required instance extension \"") + extensionNotFound + "\" not found.");
+            std::cerr << "Error: Required instance extension \"" << extensionNotFound << "\" not found." << std::endl;
+            return false;
         }
+
+        return true;
     }
 
     bool checkValidationLayerSupport(const std::vector<const char*>& requiredLayers) {
