@@ -47,6 +47,7 @@ namespace leo {
 		std::ifstream ifs(filePath);
 		if (ifs.is_open()) {
 			std::unordered_map<std::string, std::shared_ptr<const Transform>> transforms;
+			transforms["__identity"] = std::make_shared<Transform>();
 			std::unordered_map<std::string,  Model> models;
 			std::string line;
 			std::string entryType;
@@ -69,7 +70,7 @@ namespace leo {
 			ifs.close();
 
 			if (!camera) {
-				// TODO: load default camera
+				camera = std::make_shared<Camera>(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0), glm::radians(90.f));
 			}
 		}
 		else {
@@ -121,6 +122,9 @@ namespace leo {
 			if (entry.fail() || !transformName.size()) {
 				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
 			}
+			if (transformName == "__identity") {
+				throw SceneLoaderException("Could not read transform entry. The transform name \"__identity\" is reserved. Please choose another transform name", lineNb);
+			}
 			if (transforms.find(transformName) != transforms.end()) {
 				throw SceneLoaderException("A transform with that name was already created. No duplicates are allowed for transform entries. Choose a different name.", lineNb);
 			}
@@ -146,21 +150,30 @@ namespace leo {
 		{
 			std::string modelName;
 			std::string transformName;
-			entry >> modelName >> transformName;
-			if (entry.fail() || !modelName.size() || !transformName.size()) {
+			entry >> modelName;
+			if (entry.fail() || !modelName.size()) {
 				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
 			}
 			if (models.find(modelName) == models.end()) {
 				throw SceneLoaderException("No model was created under the given name. Specify a model entry with that name beforehand.", lineNb);
 			}
-			if (transforms.find(transformName) == transforms.end()) {
-				throw SceneLoaderException("No transform was created under the given name. Specify a transform entry with that name beforehand.", lineNb);
+
+			std::shared_ptr<const Transform> transform;
+			entry >> modelName;
+			if (!entry.fail() && transformName.size()) {
+				if (transforms.find(transformName) == transforms.end()) {
+					throw SceneLoaderException("No transform was created under the given name. Specify a transform entry with that name beforehand.", lineNb);
+				}
+				transform = transforms.at(transformName);
 			}
+			else {
+				transform = transforms.at("__identity");
+			}
+
 			Model m = models.at(modelName);
-			std::shared_ptr<const Transform> transform = transforms.at(transformName);
 			for (SceneObject object : m.objects) {
 				if (object.transform) {
-					object.transform = std::make_shared<Transform>(transform->getMatrix() * object.transform->getMatrix());
+					object.transform = std::make_shared<Transform>(*transform * *object.transform);
 				}
 				else {
 					object.transform = transform;

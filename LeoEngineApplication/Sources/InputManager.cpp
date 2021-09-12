@@ -120,5 +120,5 @@ void InputManager::_mouseCallback(GLFWwindow* window, double xpos, double ypos)
     lastY = yposf;
 
     Application* app = (Application*)(glfwGetWindowUserPointer(window));
-    app->_inputManager.processMouseMovement(xoffset, yoffset);
+    app->_inputManager->processMouseMovement(xoffset, yoffset);
 }

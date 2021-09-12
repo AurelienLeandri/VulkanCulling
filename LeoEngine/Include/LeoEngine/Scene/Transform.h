@@ -21,9 +21,12 @@ namespace leo {
         bool swapsHandedness() const;
         const glm::mat4& getMatrix() const;
         const glm::mat4& getInvMatrix() const;
+        Transform& operator *=(const Transform& other);
 
     private:
         glm::mat4 _matrix = glm::mat4(1);
         glm::mat4 _invMatrix = glm::mat4(1);
     };
+
+    Transform operator*(Transform lhs, const Transform& rhs);
 }

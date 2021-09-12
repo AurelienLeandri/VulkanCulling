@@ -1,11 +1,19 @@
-#include <Scene/Scene.h>
-#include <Scene/ResourcesLoading/SceneLoader.h>
-#include <Scene/Lights/DirectionalLight.h>
+#include "Application.h"
+
+#include <iostream>
 
 int main() {
-	std::shared_ptr<leo::Scene> scene;
-	std::shared_ptr<leo::Camera> camera;
-	leo::SceneLoader::loadScene("../Resources/Models/Sponza/Sponza.scene", scene, camera);
-	scene->lights.push_back(std::make_shared<leo::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
+	Application application;
+
+	if (application.loadScene("../Resources/Models/Sponza/Sponza.scene")) {
+		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
+		return 1;
+	}
+
+	if (application.start()) {
+		std::cerr << "Error. Application failed to start. Exiting." << std::endl;
+		return 2;
+	}
+
 	return 0;
 }

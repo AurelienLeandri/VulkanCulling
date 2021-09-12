@@ -87,4 +87,16 @@ namespace leo {
 		return _invMatrix;
 	}
 
+	Transform& Transform::operator*=(const Transform& other)
+	{
+		_matrix *= other._matrix;
+		_invMatrix = glm::inverse(_matrix);
+		return *this;
+	}
+
+	Transform operator*(Transform lhs, const Transform& rhs)
+	{
+		return lhs *= rhs;
+	}
+
 }

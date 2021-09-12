@@ -5,6 +5,8 @@
 #include <optional>
 #include <vector>
 
+struct GLFWwindow;
+
 class VulkanInstance
 {
 public:
@@ -29,9 +31,16 @@ public:
 	};
 
 public:
-	int init(GLFWwindow* window);
+	VulkanInstance(GLFWwindow* window);
+	~VulkanInstance();
+	VulkanInstance(const VulkanInstance& other) = delete;
+	VulkanInstance(const VulkanInstance&& other) = delete;
+	VulkanInstance& operator=(const VulkanInstance& other) = delete;
+	VulkanInstance& operator=(const VulkanInstance&& other) = delete;
+
+public:
+	int init();
 	void recreateSwapChain();
-	int cleanup();
 	void waitForIdleDevice() const;
 
 	// Utility
@@ -52,24 +61,19 @@ public:
 	void cleanupSwapChain();
 
 private:
-	void _createInstance();
-	void _setupDebugMessenger();
-	void _createSurface();
+	int _cleanup();
 
 	// Device
-	void _pickPhysicalDevice();
 	int _ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndices& indices, SwapChainSupportDetails& swapChainSupportDetails);
 	QueueFamilyIndices _findRequiredQueueFamilies(VkPhysicalDevice device);
 	bool _areDeviceRequiredExtensionsSupported(VkPhysicalDevice device);
-	SwapChainSupportDetails _querySwapChainSupport(VkPhysicalDevice device);
-	void _createLogicalDevice();
+	SwapChainSupportDetails _querySwapChainSupportDetails(VkPhysicalDevice device);
 
 	// Swap chain
-	void _createSwapChain();
+	int _createSwapChain();
 	VkSurfaceFormatKHR _chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR _chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-	VkExtent2D _chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-	void _createSwapChainImageViews();
+	VkExtent2D _chooseSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 	VkSampleCountFlagBits _getMaxUsableSampleCount() const;
 
 private:

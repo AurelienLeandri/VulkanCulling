@@ -13,6 +13,8 @@ namespace leo {
 	class Scene;
 }
 
+class Window;
+
 class Application
 {
 public:
@@ -22,28 +24,18 @@ public:
 public:
 	int start();
 	int loadScene(const std::string& filePath);
-	int loadScene(leo::Scene* scene);
-	void setCamera(const leo::Camera& camera);
-	void mainLoop();
 
 private:
-	int _initWindow();
-	int _initRenderers(std::string& failed);
+	int _initMembers();
 	void _cleanUp();
 
 private:
-	static const unsigned int DEFAULT_WINDOW_WIDTH = 1200;
-	static const unsigned int DEFAULT_WINDOW_HEIGHT = 1200;
-
-private:
-	std::unordered_map<std::string, std::unique_ptr<VulkanRenderer>> _renderers;
-	InputManager _inputManager;
-	VulkanInstance _vulkan;
-	std::shared_ptr<leo::Camera> _camera;
-	GLFWwindow* _window = nullptr;
-	leo::Scene* _scene = nullptr;
-	std::vector<std::string> _rendererNames;
-	unsigned int _activeRenderer = -1;
+	std::unique_ptr<VulkanRenderer> _renderer;
+	std::unique_ptr<InputManager> _inputManager;
+	std::unique_ptr<VulkanInstance> _vulkan;
+	std::unique_ptr<leo::Camera> _camera;
+	std::unique_ptr<leo::Scene> _scene;
+	std::unique_ptr<Window> _window;
 
 	friend class InputManager;
 };
