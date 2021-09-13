@@ -63,6 +63,11 @@ int VulkanRenderer::_createInputBuffers()
         for (const leo::Shape* shape : entry.second) {
             if (shape->getType() == leo::Shape::Type::MESH) {
                 const leo::Mesh* mesh = static_cast<const leo::Mesh*>(shape);
+
+                /*
+                * Vertex buffer
+                */
+
                 const std::vector<leo::Vertex>& vertices = mesh->vertices;
 
                 VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -98,6 +103,43 @@ int VulkanRenderer::_createInputBuffers()
                 stagingBuffer = VK_NULL_HANDLE;
                 vkFreeMemory(_device, stagingBufferMemory, nullptr);
                 stagingBufferMemory = VK_NULL_HANDLE;
+
+                /*
+                * Index buffer
+                */
+
+                const std::vector<uint32_t>& indices = mesh->indices;
+                VkDeviceSize indicesBufferSize = sizeof(indices[0]) * indices.size();
+
+                VkBuffer indexStagingBuffer;
+                VkDeviceMemory indexStagingBufferMemory;
+                if (_createBuffer(indicesBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexStagingBuffer, indexStagingBufferMemory))
+                {
+                    return -1;
+                }
+
+                void* indexData = nullptr;
+                vkMapMemory(_device, indexStagingBufferMemory, 0, indicesBufferSize, 0, &indexData);
+                memcpy(indexData, indices.data(), (size_t)indicesBufferSize);
+                vkUnmapMemory(_device, indexStagingBufferMemory);
+
+                indexBuffers[material].push_back(_BufferData());
+                _BufferData& indexBufferData = indexBuffers[material].back();
+
+                if (_createBuffer(indicesBufferSize,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferData.buffer, indexBufferData.memory))
+                {
+                    return -1;
+                }
+
+                _copyBuffer(indexStagingBuffer, indexBufferData.buffer, indicesBufferSize);
+
+                vkDestroyBuffer(_device, indexStagingBuffer, nullptr);
+                indexStagingBuffer = VK_NULL_HANDLE;
+                vkFreeMemory(_device, indexStagingBufferMemory, nullptr);
+                indexStagingBufferMemory = VK_NULL_HANDLE;
             }
             else {
                 // TODO: Spheres and single triangles?
