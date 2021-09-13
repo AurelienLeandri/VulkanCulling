@@ -1,6 +1,7 @@
 #include "InputManager.h"
 
 #include "Application.h"
+#include "Window.h"
 
 #include <Scene/Camera.h>
 
@@ -8,20 +9,16 @@ bool InputManager::framebufferResized = false;
 const float InputManager::_MOVEMENT_SPEED = 5.f;
 
 InputManager::InputManager(Application& application) :
-    _application(application)
+    _application(application), _window(_application._window->window), _camera(_application._camera.get())
 {
 }
 
-void InputManager::init(GLFWwindow* window, leo::Camera* camera)
+void InputManager::init()
 {
-	_window = window;
-
     glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetWindowUserPointer(_window, &_application);
     glfwSetFramebufferSizeCallback(_window, _framebufferResizeCallback);
     glfwSetCursorPosCallback(_window, _mouseCallback);
-
-    _camera = camera;
 
     _frameClock = std::clock();
 }
@@ -34,17 +31,17 @@ bool InputManager::processInput()
     float deltaTime = (float(std::clock()) - _frameClock) / (float)CLOCKS_PER_SEC;
     _frameClock = std::clock();
     if (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS)
-        _processKeyboard(FORWARD, deltaTime);
+        _processKeyboard(CameraMovement::FORWARD, deltaTime);
     if (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS)
-        _processKeyboard(BACKWARD, deltaTime);
+        _processKeyboard(CameraMovement::BACKWARD, deltaTime);
     if (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS)
-        _processKeyboard(LEFT, deltaTime);
+        _processKeyboard(CameraMovement::LEFT, deltaTime);
     if (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS)
-        _processKeyboard(RIGHT, deltaTime);
+        _processKeyboard(CameraMovement::RIGHT, deltaTime);
     if (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        _processKeyboard(DOWN, deltaTime);
+        _processKeyboard(CameraMovement::DOWN, deltaTime);
     if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        _processKeyboard(UP, deltaTime);
+        _processKeyboard(CameraMovement::UP, deltaTime);
     return !(glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwWindowShouldClose(_window));
 
     // Closing window
@@ -60,19 +57,17 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     _currentYaw += xoffset;
     _currentPitch += yoffset;
 
-    // make sure that when pitch is out of bounds, screen doesn't get flipped
     if (_currentPitch > 89.0f)
         _currentPitch = 89.0f;
     if (_currentPitch < -89.0f)
         _currentPitch = -89.0f;
 
-    // update Front, Right and Up Vectors using the updated Euler angles
-    // calculate the new Front vector
     glm::vec3 cameraFront = glm::normalize(glm::vec3(
         cos(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch)),
         sin(glm::radians(_currentPitch)),
         sin(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch))
     ));
+
     _camera->setFront(cameraFront);
 }
 
@@ -81,22 +76,30 @@ void InputManager::_processKeyboard(CameraMovement direction, float deltaTime)
     float velocity = _MOVEMENT_SPEED * deltaTime;
     const glm::vec3& cameraFront = _camera->getFront();
     const glm::vec3& cameraRight = _camera->getRight();
-    if (direction == FORWARD)
+    switch (direction) {
+    case CameraMovement::FORWARD:
         _camera->setPosition(_camera->getPosition() + glm::vec3(cameraFront.x, 0, cameraFront.z) * velocity);
-    if (direction == BACKWARD)
+        break;
+    case CameraMovement::BACKWARD:
         _camera->setPosition(_camera->getPosition() - glm::vec3(cameraFront.x, 0, cameraFront.z) * velocity);
-    if (direction == LEFT)
+        break;
+    case CameraMovement::LEFT:
         _camera->setPosition(_camera->getPosition() - glm::vec3(cameraRight.x, 0, cameraRight.z) * velocity);
-    if (direction == RIGHT)
+        break;
+    case CameraMovement::RIGHT:
         _camera->setPosition(_camera->getPosition() + glm::vec3(cameraRight.x, 0, cameraRight.z) * velocity);
-    if (direction == UP)
+        break;
+    case CameraMovement::UP:
         _camera->setPosition(_camera->getPosition() + glm::vec3(0, velocity, 0));
-    if (direction == DOWN)
+        break;
+    case CameraMovement::DOWN:
         _camera->setPosition(_camera->getPosition() - glm::vec3(0, velocity, 0));
+        break;
+    }
 }
 
 void InputManager::_framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-    Application* app = (Application*)(glfwGetWindowUserPointer(window));
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     framebufferResized = true;
 }
 
@@ -119,6 +122,6 @@ void InputManager::_mouseCallback(GLFWwindow* window, double xpos, double ypos)
     lastX = xposf;
     lastY = yposf;
 
-    Application* app = (Application*)(glfwGetWindowUserPointer(window));
+    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
     app->_inputManager->processMouseMovement(xoffset, yoffset);
 }

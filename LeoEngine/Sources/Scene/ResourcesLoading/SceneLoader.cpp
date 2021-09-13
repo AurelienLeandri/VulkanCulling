@@ -14,7 +14,7 @@
 
 namespace leo {
 	namespace {
-		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera>& camera, size_t lineNb);
+		void loadCameraEntry(std::stringstream& entry, Camera* camera, size_t lineNb);
 		void loadModelEntry(
 			std::stringstream& entry,
 			std::unordered_map<std::string, Model>& models,
@@ -22,7 +22,8 @@ namespace leo {
 			const std::string& fileDirectoryPath,
 			size_t lineNb);
 		void loadTransformEntry(std::stringstream& entry, std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms, size_t lineNb);
-		void addModelInstance(std::stringstream& entry, std::shared_ptr<Scene> scene,
+		void addModelInstance(std::stringstream& entry,
+			Scene* scene,
 			const std::unordered_map<std::string, Model>& models,
 			const std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms,
 			size_t lineNb);
@@ -36,12 +37,8 @@ namespace leo {
 		return message;
 	}
 
-	void SceneLoader::loadScene(const char* filePath, std::shared_ptr<Scene>& scene, std::shared_ptr<Camera>& camera)
+	void SceneLoader::loadScene(const char* filePath, Scene* scene, Camera* camera)
 	{
-		if (!scene) {
-			scene = std::make_shared<Scene>();
-		}
-
 		std::string strFilePath(filePath);
 		std::string fileDirectoryPath = strFilePath.substr(0, strFilePath.find_last_of('/'));
 		std::ifstream ifs(filePath);
@@ -52,13 +49,20 @@ namespace leo {
 			std::string line;
 			std::string entryType;
 			size_t lineNb = 0;
+			bool cameraLoaded = false;
 			while (std::getline(ifs, line)) {
 				std::stringstream ss(line);
 				ss >> entryType;
 				if (ss.fail()) {
 					throw SceneLoaderException("Could not start reading line. File is empty or the line contains an invalid character.", lineNb);
 				}
-				if (entryType == "c") loadCameraEntry(ss, camera, lineNb);
+				if (entryType == "c") {
+					if (cameraLoaded) {
+						throw SceneLoaderException("An entry for a camera was previously found. Only specify one camera entry.", lineNb);
+					}
+					cameraLoaded = true;
+					loadCameraEntry(ss, camera, lineNb);
+				}
 				else if (entryType == "t") loadTransformEntry(ss, transforms, lineNb);
 				else if (entryType == "m") loadModelEntry(ss, models, transforms, fileDirectoryPath, lineNb);
 				else if (entryType == "o") addModelInstance(ss, scene, models, transforms, lineNb);
@@ -69,8 +73,8 @@ namespace leo {
 			}
 			ifs.close();
 
-			if (!camera) {
-				camera = std::make_shared<Camera>(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0), glm::radians(90.f));
+			if (!cameraLoaded) {
+				*camera = Camera(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0), glm::radians(90.f));
 			}
 		}
 		else {
@@ -79,11 +83,8 @@ namespace leo {
 	}
 
 	namespace {
-		void loadCameraEntry(std::stringstream& entry, std::shared_ptr<Camera>& camera, size_t lineNb)
+		void loadCameraEntry(std::stringstream& entry, Camera* camera, size_t lineNb)
 		{
-			if (camera) {
-				throw SceneLoaderException("An entry for a camera was previously found. Only specify one camera entry.", lineNb);
-			}
 			glm::vec3 position(0);
 			glm::vec3 target(0);
 			float fov = 0;
@@ -91,7 +92,7 @@ namespace leo {
 			if (fov <= 0 || glm::length(position - target) <= 0.0001f || entry.fail()) {
 				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
 			}
-			camera = std::make_shared<Camera>(position, target, glm::vec3(0, 1, 0), glm::radians(fov));
+			*camera = Camera(position, target, glm::vec3(0, 1, 0), glm::radians(fov));
 		}
 
 		void loadModelEntry(
@@ -142,7 +143,7 @@ namespace leo {
 
 		void addModelInstance(
 			std::stringstream& entry,
-			std::shared_ptr<Scene> scene,
+			Scene* scene,
 			const std::unordered_map<std::string,
 			Model>& models,
 			const std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms,

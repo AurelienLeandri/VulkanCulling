@@ -22,8 +22,10 @@ public:
 	~Application();
 
 public:
-	int start();
+	int init();
 	int loadScene(const std::string& filePath);
+	int start();
+	int stop();
 
 private:
 	int _initMembers();

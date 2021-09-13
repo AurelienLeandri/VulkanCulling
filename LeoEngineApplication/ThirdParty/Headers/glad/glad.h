@@ -2948,7 +2948,7 @@ GLAPI PFNGLPUSHCLIENTATTRIBPROC glad_glPushClientAttrib;
 #ifndef GL_VERSION_1_2
 #define GL_VERSION_1_2 1
 GLAPI int GLAD_GL_VERSION_1_2;
-typedef void (APIENTRYP PFNGLDRAWRANGEELEMENTSPROC)(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices);
+typedef void (APIENTRYP PFNGLDRAWRANGEELEMENTSPROC)(GLenum mode, GLuint init, GLuint end, GLsizei count, GLenum type, const void *indices);
 GLAPI PFNGLDRAWRANGEELEMENTSPROC glad_glDrawRangeElements;
 #define glDrawRangeElements glad_glDrawRangeElements
 typedef void (APIENTRYP PFNGLTEXIMAGE3DPROC)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
@@ -3916,7 +3916,7 @@ GLAPI int GLAD_GL_VERSION_3_2;
 typedef void (APIENTRYP PFNGLDRAWELEMENTSBASEVERTEXPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLint basevertex);
 GLAPI PFNGLDRAWELEMENTSBASEVERTEXPROC glad_glDrawElementsBaseVertex;
 #define glDrawElementsBaseVertex glad_glDrawElementsBaseVertex
-typedef void (APIENTRYP PFNGLDRAWRANGEELEMENTSBASEVERTEXPROC)(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices, GLint basevertex);
+typedef void (APIENTRYP PFNGLDRAWRANGEELEMENTSBASEVERTEXPROC)(GLenum mode, GLuint init, GLuint end, GLsizei count, GLenum type, const void *indices, GLint basevertex);
 GLAPI PFNGLDRAWRANGEELEMENTSBASEVERTEXPROC glad_glDrawRangeElementsBaseVertex;
 #define glDrawRangeElementsBaseVertex glad_glDrawRangeElementsBaseVertex
 typedef void (APIENTRYP PFNGLDRAWELEMENTSINSTANCEDBASEVERTEXPROC)(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount, GLint basevertex);

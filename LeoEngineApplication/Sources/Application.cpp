@@ -21,7 +21,7 @@ Application::~Application()
     _cleanUp();
 }
 
-int Application::start()
+int Application::init()
 {
     if (_initMembers()) {
         std::cerr << "Error: Failed to initialize application." << std::endl;
@@ -39,6 +39,7 @@ int Application::_initMembers() {
     }
 
     _inputManager = std::make_unique<InputManager>(*this);
+    _inputManager->init();
 
     _vulkan = std::make_unique<VulkanInstance>(_window->window);
     if (_vulkan->init()) {
@@ -58,44 +59,35 @@ void Application::_cleanUp()
 
 int Application::loadScene(const std::string& filePath)
 {
-    std::shared_ptr<leo::Scene> scene;
-    std::shared_ptr<leo::Camera> camera;
+    _scene = std::make_unique<leo::Scene>();
+    _camera = std::make_unique<leo::Camera>(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0), glm::radians(90.f));
 
     try {
-        leo::SceneLoader::loadScene("../Resources/Models/Sponza/Sponza.scene", scene, camera);
+        leo::SceneLoader::loadScene(filePath.c_str(), _scene.get(), _camera.get());
     }
     catch (leo::SceneLoaderException e) {
         return -1;
     }
 
-    if (!scene || !camera) {
-        std::cerr << "Error: Failed to load scene and/or camera." << std::endl;
-        return -1;
-    }
-
     // TODO: load lights from scene file
-    scene->lights.push_back(std::make_shared<leo::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
+    _scene->lights.push_back(std::make_shared<leo::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
 
     return 0;
 }
 
-/*
-void Application::mainLoop()
+int Application::start()
 {
-    int previouslyActive = _activeRenderer;
-    _renderers[_rendererNames[_activeRenderer]]->start();
+    //_renderer->start();
 
-    while (_inputManager.processInput()) {
-
-        if (_activeRenderer != previouslyActive) {
-            _renderers[_rendererNames[previouslyActive]]->stop();
-            previouslyActive = _activeRenderer;
-            _renderers[_rendererNames[_activeRenderer]]->start();
-        }
-
-        _renderers[_rendererNames[_activeRenderer]]->iterate();
+    while (_inputManager->processInput()) {
+        //_renderer->iterate();
     }
 
-    _renderers[_rendererNames[_activeRenderer]]->stop();
+    return 0;
 }
-*/
+
+int Application::stop()
+{
+    //_renderer->stop();
+    return 0;
+}

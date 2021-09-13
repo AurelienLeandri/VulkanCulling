@@ -16,7 +16,7 @@ class Application;
 class InputManager
 {
 private:
-	enum CameraMovement {
+	enum class CameraMovement {
 		FORWARD,
 		BACKWARD,
 		LEFT,
@@ -29,7 +29,7 @@ public:
 	InputManager(Application& application);
 
 public:
-	void init(GLFWwindow* window, leo::Camera* camera);
+	void init();
 	bool processInput();
 	void processMouseMovement(float xoffset, float yoffset);
 
