@@ -9,12 +9,14 @@ bool InputManager::framebufferResized = false;
 const float InputManager::_MOVEMENT_SPEED = 5.f;
 
 InputManager::InputManager(Application& application) :
-    _application(application), _window(_application._window->window), _camera(_application._camera.get())
+    _application(application)
 {
 }
 
 void InputManager::init()
 {
+    _camera = _application._camera.get();
+    _window = _application._window->window;
     glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetWindowUserPointer(_window, &_application);
     glfwSetFramebufferSizeCallback(_window, _framebufferResizeCallback);

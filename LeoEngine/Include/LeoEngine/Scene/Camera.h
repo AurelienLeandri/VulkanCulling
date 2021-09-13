@@ -7,6 +7,7 @@ namespace leo {
 	class Camera
 	{
 	public:
+		Camera();
 		Camera(glm::vec3 position, glm::vec3 look_at, glm::vec3 up_axis, float fov);
 
 	public:

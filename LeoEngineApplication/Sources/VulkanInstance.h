@@ -31,7 +31,7 @@ public:
 	};
 
 public:
-	VulkanInstance(GLFWwindow* window);
+	VulkanInstance(GLFWwindow* application);
 	~VulkanInstance();
 	VulkanInstance(const VulkanInstance& other) = delete;
 	VulkanInstance(const VulkanInstance&& other) = delete;
@@ -49,7 +49,7 @@ public:
 		VkImageTiling tiling, VkFormatFeatureFlags features) const;
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
-	// Accessorss
+	// Accessors
 	const Properties& getProperties() const;
 	VkDevice& getLogicalDevice();
 	const QueueFamilyIndices& getQueueFamilyIndices() const;
