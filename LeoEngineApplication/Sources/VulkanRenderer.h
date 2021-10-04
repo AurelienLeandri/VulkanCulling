@@ -31,12 +31,16 @@ private:
 	int _createDescriptorSetLayout();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
+	int _createFramebufferImageResources();
+	int _createFramebuffers();
+
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 	int _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
+
 	int _cleanup();
 
 private:
@@ -54,6 +58,14 @@ private:
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
+
+	std::vector<VkFramebuffer> _framebuffers;
+	VkImage _framebufferColor;
+	VkDeviceMemory _framebufferColorMemory;
+	VkImageView _framebufferColorView;
+	VkImage _framebufferDepth;
+	VkDeviceMemory _framebufferDepthMemory;
+	VkImageView _framebufferDepthView;
 
 	struct _BufferData {
 		VkBuffer buffer = VK_NULL_HANDLE;

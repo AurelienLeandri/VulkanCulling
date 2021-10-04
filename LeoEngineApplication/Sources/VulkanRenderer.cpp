@@ -36,8 +36,40 @@ int VulkanRenderer::_cleanup()
         buffers->clear();
     }
 
+
+    vkDestroyImageView(_device, _framebufferColorView, nullptr);
+    _framebufferColorView = VK_NULL_HANDLE;
+    vkDestroyImage(_device, _framebufferColor, nullptr);
+    _framebufferColor = VK_NULL_HANDLE;
+    vkFreeMemory(_device, _framebufferColorMemory, nullptr);
+    _framebufferColorMemory = VK_NULL_HANDLE;
+
+    vkDestroyImageView(_device, _framebufferDepthView, nullptr);
+    _framebufferDepthView = VK_NULL_HANDLE;
+    vkDestroyImage(_device, _framebufferDepth, nullptr);
+    _framebufferDepth = VK_NULL_HANDLE;
+    vkFreeMemory(_device, _framebufferDepthMemory, nullptr);
+    _framebufferDepthMemory = VK_NULL_HANDLE;
+
+    for (size_t i = 0; i < _framebuffers.size(); i++) {
+        vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
+    }
+    _framebuffers.clear();
+
     vkDestroyCommandPool(_device, _commandPool, nullptr);
     _commandPool = VK_NULL_HANDLE;
+
+    vkDestroyPipeline(_device, _graphicsPipeline, nullptr);
+    _graphicsPipeline = VK_NULL_HANDLE;
+
+    vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
+    _pipelineLayout = VK_NULL_HANDLE;
+
+    vkDestroyDescriptorSetLayout(_device, _descriptorSetLayout, nullptr);
+    _descriptorSetLayout = VK_NULL_HANDLE;
+
+    vkDestroyRenderPass(_device, _renderPass, nullptr);
+    _renderPass = VK_NULL_HANDLE;
 
     return 0;
 }
@@ -81,6 +113,11 @@ int VulkanRenderer::init()
 
     if (_createCommandPool()) {
         std::cerr << "Could not initialize command pool." << std::endl;
+        return -1;
+    }
+
+    if (_createFramebufferImageResources() || _createFramebuffers()) {
+        std::cerr << "Failed to create framebuffer resources" << std::endl;
         return -1;
     }
 
@@ -319,7 +356,7 @@ int VulkanRenderer::_createGraphicsPipeline()
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    VulkanInstance::Properties instanceProperties = _vulkan->getProperties();
+    const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -459,12 +496,38 @@ int VulkanRenderer::_createGraphicsPipeline()
 
 int VulkanRenderer::_createDescriptorSetLayout()
 {
+    // TODO: Adapt to what is actually needed
+
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(_device, &layoutInfo, nullptr, &_descriptorSetLayout)) {
+        std::cerr << "Failed to create descriptor set layout." << std::endl;
+    }
+
     return 0;
 }
 
 int VulkanRenderer::_createRenderPass()
 {
-    VulkanInstance::Properties instanceProperties = _vulkan->getProperties();
+    const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
 
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = instanceProperties.swapChainImageFormat;
@@ -546,6 +609,73 @@ int VulkanRenderer::_createRenderPass()
         return -1;
     }
 
+    return 0;
+}
+
+int VulkanRenderer::_createFramebufferImageResources()
+{
+    const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
+    VkFormat colorFormat = _vulkan->getProperties().swapChainImageFormat;
+
+    _vulkan->createImage(
+        instanceProperties.swapChainExtent.width,
+        instanceProperties.swapChainExtent.height,
+        1,
+        instanceProperties.maxNbMsaaSamples,
+        colorFormat, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        _framebufferColor,
+        _framebufferColorMemory);
+
+    _framebufferColorView = _vulkan->createImageView(_framebufferColor, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+    _vulkan->createImage(
+        instanceProperties.swapChainExtent.width,
+        instanceProperties.swapChainExtent.height,
+        1,
+        instanceProperties.maxNbMsaaSamples,
+        _depthBufferFormat,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        _framebufferDepth,
+        _framebufferDepthMemory);
+
+    _framebufferDepthView = _vulkan->createImageView(_framebufferDepth, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+
+    return 0;
+}
+
+int VulkanRenderer::_createFramebuffers()
+{
+    const std::vector<VkImageView>& swapChainImageViews = _vulkan->getSwapChainImageViews();
+
+    _framebuffers.resize(swapChainImageViews.size());
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        std::array<VkImageView, 3> attachments = {
+            _framebufferColorView,
+            _framebufferDepthView,
+            swapChainImageViews[i],
+        };
+
+        const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = _renderPass;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferInfo.pAttachments = attachments.data();
+        framebufferInfo.width = instanceProperties.swapChainExtent.width;
+        framebufferInfo.height = instanceProperties.swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(_device, &framebufferInfo, nullptr, &_framebuffers[i])) {
+            std::cerr << "Failed to create framebuffer." << std::endl;
+            return -1;
+        }
+    }
     return 0;
 }
 
