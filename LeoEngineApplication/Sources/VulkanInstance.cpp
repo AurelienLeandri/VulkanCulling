@@ -230,7 +230,9 @@ int VulkanInstance::init()
 
 VulkanInstance::~VulkanInstance()
 {
-    _cleanup();
+    if (_cleanup()) {
+        std::cerr << "Error: Cleanup of Vulkan instance entirely of partially failed" << std::endl;
+    }
 }
 
 int VulkanInstance::_cleanup()

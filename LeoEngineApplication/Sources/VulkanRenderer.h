@@ -19,6 +19,7 @@ public:
 	};
 
 	VulkanRenderer(VulkanInstance* vulkan, Options options = {});
+	~VulkanRenderer();
 
 public:
 	void setScene(const leo::Scene* scene);
@@ -27,11 +28,13 @@ public:
 private:
 	int _createCommandPool();
 	int _createInputBuffers();
+	int _createGraphicsPipeline();
 	int _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
+	int _cleanup();
 
 private:
 	const leo::Scene* _scene = nullptr;

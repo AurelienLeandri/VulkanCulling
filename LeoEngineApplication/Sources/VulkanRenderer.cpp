@@ -13,6 +13,33 @@ VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
 {
 }
 
+VulkanRenderer::~VulkanRenderer()
+{
+    if (_cleanup()) {
+        std::cerr << "Error: Cleanup of Vulkan renderer entirely of partially failed" << std::endl;
+    }
+}
+
+int VulkanRenderer::_cleanup()
+{
+    // Cleanup of buffers
+    for (auto* buffers : { &vertexBuffers, &indexBuffers }) {
+        for (auto& entry : *buffers) {
+            for (const _BufferData& bufferData : entry.second) {
+                vkDestroyBuffer(_device, bufferData.buffer, nullptr);
+                vkFreeMemory(_device, bufferData.memory, nullptr);
+            }
+            entry.second.clear();
+        }
+        buffers->clear();
+    }
+
+    vkDestroyCommandPool(_device, _commandPool, nullptr);
+    _commandPool = VK_NULL_HANDLE;
+
+    return 0;
+}
+
 int VulkanRenderer::init()
 {
 	for (const leo::SceneObject& sceneObject : _scene->objects) {
@@ -192,6 +219,11 @@ int VulkanRenderer::_copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
 
     _endSingleTimeCommands(commandBuffer, _commandPool);
 
+    return 0;
+}
+
+int VulkanRenderer::_createGraphicsPipeline()
+{
     return 0;
 }
 
