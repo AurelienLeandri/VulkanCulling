@@ -48,6 +48,8 @@ private:
 
 	VkCommandPool _commandPool = VK_NULL_HANDLE;
 
+	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
+
 	VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
