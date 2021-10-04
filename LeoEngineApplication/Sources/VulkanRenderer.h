@@ -28,7 +28,10 @@ public:
 private:
 	int _createCommandPool();
 	int _createInputBuffers();
+	int _createDescriptorSetLayout();
+	int _createRenderPass();
 	int _createGraphicsPipeline();
+	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 	int _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -44,6 +47,11 @@ private:
 	std::unordered_map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
 
 	VkCommandPool _commandPool = VK_NULL_HANDLE;
+
+	VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
+	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
+	VkRenderPass _renderPass = VK_NULL_HANDLE;
+	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
 	struct _BufferData {
 		VkBuffer buffer = VK_NULL_HANDLE;
