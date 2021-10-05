@@ -44,7 +44,7 @@ namespace leo {
 	size_t ImageTexture::getNbChannelsFromLayout(ImageTexture::Layout layout)
 	{
 		switch (layout) {
-		case ImageTexture::Layout::A:
+		case ImageTexture::Layout::R:
 			return 1;
 		case ImageTexture::Layout::RGB:
 			return 3;

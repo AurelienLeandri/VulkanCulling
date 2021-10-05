@@ -28,8 +28,10 @@ public:
 	int init();
 
 private:
+	void _constructSceneRelatedStructures();
 	int _createCommandPool();
-	int _createInputBuffers();
+	int _loadBuffersToDeviceMemory();
+	int _loadImagesToDeviceMemory();
 	int _createDescriptorSetLayouts();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
@@ -62,13 +64,16 @@ private:
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
+
+	struct _ImageData {
+		VkImage image = VK_NULL_HANDLE;
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		uint32_t mipLevels = 0;
+	};
+	_ImageData _framebufferColor;
+	_ImageData _framebufferDepth;
 	std::vector<VkFramebuffer> _framebuffers;
-	VkImage _framebufferColor;
-	VkDeviceMemory _framebufferColorMemory;
-	VkImageView _framebufferColorView;
-	VkImage _framebufferDepth;
-	VkDeviceMemory _framebufferDepthMemory;
-	VkImageView _framebufferDepthView;
 
 	struct _TransformsUBO {
 		alignas(16) glm::mat4 model;
@@ -87,5 +92,8 @@ private:
 	};
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> vertexBuffers;
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> indexBuffers;
+
+	// Order within each vector: diffuse, specular, ambient, normals, height
+	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
 };
 

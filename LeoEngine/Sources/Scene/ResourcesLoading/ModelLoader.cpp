@@ -163,7 +163,7 @@ namespace leo {
                 aiTextureType_NORMALS,
                 aiTextureType_HEIGHT,
             };
-            std::unordered_map<aiTextureType, std::shared_ptr<ImageTexture>*> materialTextureSlots = {
+            std::unordered_map<aiTextureType, std::shared_ptr<const ImageTexture>*> materialTextureSlots = {
                 { aiTextureType_DIFFUSE, &material->diffuseTexture },
                 { aiTextureType_SPECULAR, &material->specularTexture },
                 { aiTextureType_AMBIENT, &material->ambientTexture },
@@ -175,7 +175,6 @@ namespace leo {
                 if (texture) {
                     *materialTextureSlots[textureType] = texture;
                 }
-                // TODO: else case, for example adding a constant texture from another parameter of the material
             }
 
             return material;

@@ -17,7 +17,7 @@ namespace leo {
 			RGB,
 			RGBA,
 			LUMINANCE,
-			A
+			R
 		};
 
 	public:

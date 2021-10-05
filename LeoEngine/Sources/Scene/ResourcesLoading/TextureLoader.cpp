@@ -62,7 +62,7 @@ namespace leo {
             else {
                 switch (nbChannels) {
                 case 1:
-                    return ImageTexture::Layout::A;
+                    return ImageTexture::Layout::R;
                 case 3:
                     return ImageTexture::Layout::RGB;
                 case 4:
@@ -79,7 +79,7 @@ namespace leo {
                 return nbChannels == 3;
             case ImageTexture::Layout::RGBA:
                 return nbChannels == 4;
-            case ImageTexture::Layout::A:
+            case ImageTexture::Layout::R:
                 return nbChannels == 1;
             case ImageTexture::Layout::LUMINANCE:
                 return nbChannels == 1 || nbChannels == 3;

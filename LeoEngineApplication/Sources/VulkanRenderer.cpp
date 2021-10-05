@@ -47,19 +47,15 @@ int VulkanRenderer::_cleanup()
     _transformsUBOsMemory.clear();
 
     // Cleanup of the framebuffers
-    vkDestroyImageView(_device, _framebufferColorView, nullptr);
-    _framebufferColorView = VK_NULL_HANDLE;
-    vkDestroyImage(_device, _framebufferColor, nullptr);
-    _framebufferColor = VK_NULL_HANDLE;
-    vkFreeMemory(_device, _framebufferColorMemory, nullptr);
-    _framebufferColorMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(_device, _framebufferColor.view , nullptr);
+    vkDestroyImage(_device, _framebufferColor.image, nullptr);
+    vkFreeMemory(_device, _framebufferColor.memory, nullptr);
+    _framebufferColor = {};
 
-    vkDestroyImageView(_device, _framebufferDepthView, nullptr);
-    _framebufferDepthView = VK_NULL_HANDLE;
-    vkDestroyImage(_device, _framebufferDepth, nullptr);
-    _framebufferDepth = VK_NULL_HANDLE;
-    vkFreeMemory(_device, _framebufferDepthMemory, nullptr);
-    _framebufferDepthMemory = VK_NULL_HANDLE;
+    vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
+    vkDestroyImage(_device, _framebufferDepth.image, nullptr);
+    vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
+    _framebufferDepth = {};
 
     for (size_t i = 0; i < _framebuffers.size(); i++) {
         vkDestroyFramebuffer(_device, _framebuffers[i], nullptr);
@@ -90,15 +86,7 @@ int VulkanRenderer::_cleanup()
 
 int VulkanRenderer::init()
 {
-	for (const leo::SceneObject& sceneObject : _scene->objects) {
-		const leo::Material* material = sceneObject.material.get();
-		const leo::Shape* shape = sceneObject.shape.get();
-		const leo::Transform* transform = sceneObject.transform.get();  // No per scene object transform. No point in that since the scene doesnt move. We must pre-transform objects.
-		if (_shapesPerMaterial.find(material) == _shapesPerMaterial.end()) {
-			_shapesPerMaterial[material] = std::vector<const leo::Shape*>();
-		}
-		_shapesPerMaterial[material].push_back(shape);
-	}
+    _constructSceneRelatedStructures();
 
     _depthBufferFormat = _vulkan->findSupportedFormat(
         { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -131,12 +119,17 @@ int VulkanRenderer::init()
     }
 
     if (_createFramebufferImageResources() || _createFramebuffers()) {
-        std::cerr << "Failed to create framebuffer resources" << std::endl;
+        std::cerr << "Failed to create framebuffers" << std::endl;
         return -1;
     }
 
-    if (_createInputBuffers()) {
+    if (_loadBuffersToDeviceMemory()) {
         std::cerr << "Could not initialize input buffers." << std::endl;
+        return -1;
+    }
+
+    if (_loadImagesToDeviceMemory()) {
+        std::cerr << "Could not initialize input images." << std::endl;
         return -1;
     }
 
@@ -161,7 +154,7 @@ int VulkanRenderer::_createCommandPool()
     return 0;
 }
 
-int VulkanRenderer::_createInputBuffers()
+int VulkanRenderer::_loadBuffersToDeviceMemory()
 {
     for (auto& entry : _shapesPerMaterial) {
         const leo::Material* material = entry.first;
@@ -268,6 +261,75 @@ int VulkanRenderer::_createInputBuffers()
         _createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             _transformsUBOs[i], _transformsUBOsMemory[i]);
+    }
+
+    return 0;
+}
+
+int VulkanRenderer::_loadImagesToDeviceMemory() {
+    for (auto& entry : _materialsImages) {
+        const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
+        std::vector<_ImageData>& vulkanImages = entry.second;
+
+        static const size_t nbTexturesInMaterial = 5;
+        std::array<const leo::ImageTexture*, nbTexturesInMaterial> materialTextures = {
+            material->diffuseTexture.get(), material->specularTexture.get(), material->ambientTexture.get(), material->normalsTexture.get(), material->heightTexture.get()
+        };
+
+        for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
+            _ImageData& vulkanImageData = vulkanImages[i];
+            const leo::ImageTexture* materialTexture = materialTextures[i];
+
+            uint32_t texWidth = static_cast<uint32_t>(materialTexture->width);
+            uint32_t texHeight = static_cast<uint32_t>(materialTexture->height);
+
+            vulkanImageData.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+            VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+            void* data;
+            vkMapMemory(_device, stagingBufferMemory, 0, imageSize, 0, &data);
+            memcpy(data, materialTexture->data, static_cast<size_t>(imageSize));
+            vkUnmapMemory(_device, stagingBufferMemory);
+
+            VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
+            switch (materialTexture->layout) {
+            case leo::ImageTexture::Layout::R:
+                imageFormat = VK_FORMAT_R8_UNORM;
+                break;
+            case leo::ImageTexture::Layout::RGB:
+                imageFormat = VK_FORMAT_R8G8B8_SRGB;
+                break;
+            case leo::ImageTexture::Layout::RGBA:
+                imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                break;
+            default:
+                break;
+            }
+
+            if (imageFormat == VkFormat::VK_FORMAT_UNDEFINED) {
+                std::cerr << "A texture on a material has a format that is not expected. Something is very very wrong." << std::endl;
+                return -1;
+            }
+
+            // TODO: Image utils functions
+            /*
+            _createImage(texWidth, texHeight, vulkanImageData.mipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vulkanImageData.image, vulkanImageData.memory);
+
+            _transitionImageLayout(vulkanImageData.image, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vulkanImageData.mipLevels);
+            _copyBufferToImage(stagingBuffer, vulkanImageData.image, texWidth, texHeight);
+
+            _generateMipmaps(vulkanImageData.image, imageFormat, texWidth, texHeight, vulkanImageData.mipLevels);
+            */
+
+            vkDestroyBuffer(_device, stagingBuffer, nullptr);
+            stagingBuffer = VK_NULL_HANDLE;
+            vkFreeMemory(_device, stagingBufferMemory, nullptr);
+            stagingBufferMemory = VK_NULL_HANDLE;
+        }
     }
 
     return 0;
@@ -532,6 +594,22 @@ int VulkanRenderer::_createGraphicsPipeline()
     return 0;
 }
 
+void VulkanRenderer::_constructSceneRelatedStructures()
+{
+    for (const leo::SceneObject& sceneObject : _scene->objects) {
+        const leo::Material* material = sceneObject.material.get();
+        const leo::Shape* shape = sceneObject.shape.get();
+        const leo::Transform* transform = sceneObject.transform.get();  // No per scene object transform. No point in that since the scene doesnt move. We must pre-transform objects.
+        if (_shapesPerMaterial.find(material) == _shapesPerMaterial.end()) {
+            _shapesPerMaterial[material] = std::vector<const leo::Shape*>();
+        }
+        if (_materialsImages.find(material) == _materialsImages.end()) {
+            _materialsImages[material] = std::vector<_ImageData>(5);
+        }
+        _shapesPerMaterial[material].push_back(shape);
+    }
+}
+
 int VulkanRenderer::_createDescriptorSetLayouts()
 {
     /*
@@ -685,10 +763,10 @@ int VulkanRenderer::_createFramebufferImageResources()
         colorFormat, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _framebufferColor,
-        _framebufferColorMemory);
+        _framebufferColor.image,
+        _framebufferColor.memory);
 
-    _framebufferColorView = _vulkan->createImageView(_framebufferColor, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    _framebufferColor.view = _vulkan->createImageView(_framebufferColor.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 
     _vulkan->createImage(
         instanceProperties.swapChainExtent.width,
@@ -699,10 +777,10 @@ int VulkanRenderer::_createFramebufferImageResources()
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _framebufferDepth,
-        _framebufferDepthMemory);
+        _framebufferDepth.image,
+        _framebufferDepth.memory);
 
-    _framebufferDepthView = _vulkan->createImageView(_framebufferDepth, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    _framebufferDepth.view = _vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
     return 0;
 }
@@ -715,8 +793,8 @@ int VulkanRenderer::_createFramebuffers()
 
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
         std::array<VkImageView, 3> attachments = {
-            _framebufferColorView,
-            _framebufferDepthView,
+            _framebufferColor.view,
+            _framebufferDepth.view,
             swapChainImageViews[i],
         };
 
