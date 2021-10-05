@@ -5,6 +5,8 @@
 #include <memory>
 #include <unordered_map>
 
+#include <glm/glm.hpp>
+
 namespace leo {
 	class Scene;
 	class Material;
@@ -67,6 +69,17 @@ private:
 	VkImage _framebufferDepth;
 	VkDeviceMemory _framebufferDepthMemory;
 	VkImageView _framebufferDepthView;
+
+	struct _TransformsUBO {
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 proj;
+	};
+	std::vector<VkBuffer> _transformsUBOs;
+	std::vector<VkDeviceMemory> _transformsUBOsMemory;
+
+	struct _PushConstants {
+		alignas(16) glm::mat4 view;
+	};
 
 	struct _BufferData {
 		VkBuffer buffer = VK_NULL_HANDLE;

@@ -24,7 +24,7 @@ VulkanRenderer::~VulkanRenderer()
 
 int VulkanRenderer::_cleanup()
 {
-    // Cleanup of buffers
+    // Cleanup of the buffers
     for (auto* buffers : { &vertexBuffers, &indexBuffers }) {
         for (auto& entry : *buffers) {
             for (const _BufferData& bufferData : entry.second) {
@@ -36,7 +36,17 @@ int VulkanRenderer::_cleanup()
         buffers->clear();
     }
 
+    for (VkBuffer& buffer : _transformsUBOs) {
+        vkDestroyBuffer(_device, buffer, nullptr);
+    }
+    _transformsUBOs.clear();
 
+    for (VkDeviceMemory& memory : _transformsUBOsMemory) {
+        vkFreeMemory(_device, memory, nullptr);
+    }
+    _transformsUBOsMemory.clear();
+
+    // Cleanup of the framebuffers
     vkDestroyImageView(_device, _framebufferColorView, nullptr);
     _framebufferColorView = VK_NULL_HANDLE;
     vkDestroyImage(_device, _framebufferColor, nullptr);
@@ -56,6 +66,7 @@ int VulkanRenderer::_cleanup()
     }
     _framebuffers.clear();
 
+    // Cleanup of the pipeline
     vkDestroyCommandPool(_device, _commandPool, nullptr);
     _commandPool = VK_NULL_HANDLE;
 
@@ -241,6 +252,24 @@ int VulkanRenderer::_createInputBuffers()
             }
         }
     }
+
+    /*
+    * Transforms UBO
+    */
+
+    size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
+
+    VkDeviceSize bufferSize = sizeof(_TransformsUBO);
+
+    _transformsUBOs.resize(nbSwapChainImages);
+    _transformsUBOsMemory.resize(nbSwapChainImages);
+
+    for (size_t i = 0; i < nbSwapChainImages; i++) {
+        _createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            _transformsUBOs[i], _transformsUBOsMemory[i]);
+    }
+
     return 0;
 }
 
