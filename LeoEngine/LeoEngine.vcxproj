@@ -36,7 +36,6 @@
     <ClInclude Include="Include\LeoEngine\Scene\ResourcesLoading\TextureLoader.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Scene.h" />
     <ClInclude Include="Include\LeoEngine\Scene\SceneObject.h" />
-    <ClInclude Include="Include\LeoEngine\Scene\Textures\ConstantTexture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Textures\ImageTexture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Textures\Texture.h" />
     <ClInclude Include="Include\LeoEngine\Scene\Transform.h" />
@@ -56,7 +55,6 @@
     <ClCompile Include="Sources\Scene\Materials\PerformanceMaterial.cpp" />
     <ClCompile Include="Sources\Scene\Scene.cpp" />
     <ClCompile Include="Sources\Scene\Geometries\Sphere.cpp" />
-    <ClCompile Include="Sources\Scene\Textures\ConstantTexture.cpp" />
     <ClCompile Include="Sources\Scene\Textures\ImageTexture.cpp" />
     <ClCompile Include="Sources\Scene\Textures\Texture.cpp" />
     <ClCompile Include="Sources\Scene\Transform.cpp" />

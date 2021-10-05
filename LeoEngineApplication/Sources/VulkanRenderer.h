@@ -28,7 +28,7 @@ public:
 private:
 	int _createCommandPool();
 	int _createInputBuffers();
-	int _createDescriptorSetLayout();
+	int _createDescriptorSetLayouts();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
 	int _createFramebufferImageResources();
@@ -54,7 +54,8 @@ private:
 
 	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 
-	VkDescriptorSetLayout _descriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _transformsDescriptorSetLayout = VK_NULL_HANDLE;
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;

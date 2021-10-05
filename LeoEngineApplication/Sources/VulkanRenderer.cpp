@@ -65,8 +65,11 @@ int VulkanRenderer::_cleanup()
     vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
     _pipelineLayout = VK_NULL_HANDLE;
 
-    vkDestroyDescriptorSetLayout(_device, _descriptorSetLayout, nullptr);
-    _descriptorSetLayout = VK_NULL_HANDLE;
+    vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
+    _materialDescriptorSetLayout = VK_NULL_HANDLE;
+
+    vkDestroyDescriptorSetLayout(_device, _transformsDescriptorSetLayout, nullptr);
+    _transformsDescriptorSetLayout = VK_NULL_HANDLE;
 
     vkDestroyRenderPass(_device, _renderPass, nullptr);
     _renderPass = VK_NULL_HANDLE;
@@ -101,7 +104,7 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    if (_createDescriptorSetLayout()) {
+    if (_createDescriptorSetLayouts()) {
         std::cerr << "Could not create descriptor set layout." << std::endl;
         return -1;
     }
@@ -433,17 +436,23 @@ int VulkanRenderer::_createGraphicsPipeline()
     VK_DYNAMIC_STATE_LINE_WIDTH
     };
 
-    VkPipelineDynamicStateCreateInfo dynamicState{};
+    VkPipelineDynamicStateCreateInfo dynamicState = {};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.dynamicStateCount = 2;
     dynamicState.pDynamicStates = dynamicStates;
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
-    pipelineLayoutInfo.pushConstantRangeCount = 0;
-    pipelineLayoutInfo.pPushConstantRanges = nullptr;
+    pipelineLayoutInfo.setLayoutCount = 2;
+    std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _transformsDescriptorSetLayout, _materialDescriptorSetLayout };
+    pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
+
+    VkPushConstantRange pushConstants = {};
+    pushConstants.size = sizeof (glm::mat4);
+    pushConstants.offset = 0;
+    pushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstants;
 
     if (vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_pipelineLayout)) {
         std::cerr << "Failed to create pipeline layout." << std::endl;
@@ -494,32 +503,54 @@ int VulkanRenderer::_createGraphicsPipeline()
     return 0;
 }
 
-int VulkanRenderer::_createDescriptorSetLayout()
+int VulkanRenderer::_createDescriptorSetLayouts()
 {
-    // TODO: Adapt to what is actually needed
+    /*
+    * Transforms
+    */
 
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding uboTransformsLayoutBinding = {};
+    uboTransformsLayoutBinding.binding = 0;
+    uboTransformsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboTransformsLayoutBinding.descriptorCount = 1;
+    uboTransformsLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboTransformsLayoutBinding.pImmutableSamplers = nullptr;
 
-    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-    samplerLayoutBinding.binding = 1;
-    samplerLayoutBinding.descriptorCount = 1;
-    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    samplerLayoutBinding.pImmutableSamplers = nullptr;
-    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
+    VkDescriptorSetLayoutCreateInfo uboTransformsLayoutInfo = {};
+    uboTransformsLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    uboTransformsLayoutInfo.bindingCount = 1;
+    uboTransformsLayoutInfo.pBindings = &uboTransformsLayoutBinding;
 
-    if (vkCreateDescriptorSetLayout(_device, &layoutInfo, nullptr, &_descriptorSetLayout)) {
-        std::cerr << "Failed to create descriptor set layout." << std::endl;
+    if (vkCreateDescriptorSetLayout(_device, &uboTransformsLayoutInfo, nullptr, &_transformsDescriptorSetLayout)) {
+        std::cerr << "Failed to create transforms descriptor set layout." << std::endl;
+        return -1;
+    }
+
+    /*
+    * Material layout
+    */
+
+    static const uint32_t nbTexturesInMaterial = 5;
+
+    std::array<VkDescriptorSetLayoutBinding, nbTexturesInMaterial> bindings = { {} };
+
+    for (uint32_t i = 0; i < nbTexturesInMaterial; ++i) {
+        bindings[i].binding = i;
+        bindings[i].descriptorCount = 1;
+        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[i].pImmutableSamplers = nullptr;
+        bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+
+    VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
+    materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    materialLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    materialLayoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(_device, &materialLayoutInfo, nullptr, &_materialDescriptorSetLayout)) {
+        std::cerr << "Failed to create material descriptor set layout." << std::endl;
+        return -1;
     }
 
     return 0;

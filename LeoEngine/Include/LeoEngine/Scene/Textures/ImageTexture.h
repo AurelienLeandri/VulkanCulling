@@ -2,6 +2,8 @@
 
 #include <Scene/Textures/Texture.h>
 
+#include <memory>
+
 namespace leo {
 	class ImageTexture : public Texture
 	{
@@ -35,5 +37,10 @@ namespace leo {
 		const Type type = Type::INVALID;
 		const Layout layout = Layout::INVALID;
 		const float* data = nullptr;
+
+	public:
+		static const std::shared_ptr<const ImageTexture> white;
+		static const std::shared_ptr<const ImageTexture> black;
+		static const std::shared_ptr<const ImageTexture> blue;
 	};
 }

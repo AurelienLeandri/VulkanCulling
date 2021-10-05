@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Scene/Materials/Material.h>
+#include <Scene/Textures/ImageTexture.h>
 #include <GeometryIncludes.h>
 
 #include <memory>
@@ -13,14 +14,11 @@ namespace leo {
 		virtual Type getType() const override;
 
 	public:
-		glm::vec3 diffuseValue = glm::vec3(1);
-		std::shared_ptr<ImageTexture> diffuseTexture;
-		glm::vec3 specularValue = glm::vec3(1);
-		std::shared_ptr<ImageTexture> specularTexture;
-		glm::vec3 ambientValue = glm::vec3(0);
-		std::shared_ptr<ImageTexture> ambientTexture;
-		std::shared_ptr<ImageTexture> normalsTexture;  // TODO: default value!
-		std::shared_ptr<ImageTexture> heightTexture;  // TODO: default value!
+		std::shared_ptr<const ImageTexture> diffuseTexture = ImageTexture::white;
+		std::shared_ptr<const ImageTexture> specularTexture = ImageTexture::white;
+		std::shared_ptr<const ImageTexture> ambientTexture = ImageTexture::white;
+		std::shared_ptr<const ImageTexture> normalsTexture = ImageTexture::blue;
+		std::shared_ptr<const ImageTexture> heightTexture = ImageTexture::black;
 	};
 }
 
