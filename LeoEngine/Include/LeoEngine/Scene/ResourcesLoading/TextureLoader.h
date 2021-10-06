@@ -10,6 +10,7 @@ namespace leo {
 	public:
 		struct LoadingOptions {
 			ImageTexture::Layout forceLayout = ImageTexture::Layout::INVALID;
+			int desiredChannels = 0;
 		};
 
 	public:

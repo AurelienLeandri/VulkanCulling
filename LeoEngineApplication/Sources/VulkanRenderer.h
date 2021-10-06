@@ -28,6 +28,28 @@ public:
 	int init();
 
 private:
+	struct _ImageData {
+		VkImage image = VK_NULL_HANDLE;
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		uint32_t mipLevels = 0;
+	};
+
+	struct _TransformsUBO {
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 proj;
+	};
+
+	struct _PushConstants {
+		alignas(16) glm::mat4 view;
+	};
+
+	struct _BufferData {
+		VkBuffer buffer = VK_NULL_HANDLE;
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+	};
+
+private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPool();
 	int _loadBuffersToDeviceMemory();
@@ -39,9 +61,17 @@ private:
 	int _createFramebuffers();
 
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
+
 	int _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+	int _createImage(uint32_t width, uint32_t height, VkSampleCountFlagBits numSamples,
+		VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, _ImageData& imageData);
+	int _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	void _generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
+
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
 
@@ -64,32 +94,13 @@ private:
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
-
-	struct _ImageData {
-		VkImage image = VK_NULL_HANDLE;
-		VkDeviceMemory memory = VK_NULL_HANDLE;
-		VkImageView view = VK_NULL_HANDLE;
-		uint32_t mipLevels = 0;
-	};
 	_ImageData _framebufferColor;
 	_ImageData _framebufferDepth;
 	std::vector<VkFramebuffer> _framebuffers;
 
-	struct _TransformsUBO {
-		alignas(16) glm::mat4 model;
-		alignas(16) glm::mat4 proj;
-	};
 	std::vector<VkBuffer> _transformsUBOs;
 	std::vector<VkDeviceMemory> _transformsUBOsMemory;
 
-	struct _PushConstants {
-		alignas(16) glm::mat4 view;
-	};
-
-	struct _BufferData {
-		VkBuffer buffer = VK_NULL_HANDLE;
-		VkDeviceMemory memory = VK_NULL_HANDLE;
-	};
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> vertexBuffers;
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> indexBuffers;
 

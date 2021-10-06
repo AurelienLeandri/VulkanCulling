@@ -23,9 +23,14 @@ namespace leo {
 
         stbi_set_flip_vertically_on_load(false);
         int width = 0, height = 0, nbChannels = 0;
-        float* data = stbi_loadf(filePath, &width, &height, &nbChannels, 0);
+        float* data = stbi_loadf(filePath, &width, &height, &nbChannels, options.desiredChannels);
+
         if (!data) {
             return nullptr;
+        }
+
+        if (options.desiredChannels && nbChannels != options.desiredChannels) {
+            nbChannels = options.desiredChannels;
         }
 
         ImageTexture::Layout layout = pickLayout(options, nbChannels);

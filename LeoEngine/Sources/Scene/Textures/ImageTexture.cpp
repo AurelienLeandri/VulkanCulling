@@ -2,9 +2,9 @@
 
 namespace leo {
 
-	const std::shared_ptr<const ImageTexture> ImageTexture::white = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGB, new float[3]{1, 1, 1});
-	const std::shared_ptr<const ImageTexture> ImageTexture::black = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGB, new float[3]{ 0, 0, 0 });
-	const std::shared_ptr<const ImageTexture> ImageTexture::blue = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGB, new float[3]{ 0, 0, 1 });
+	const std::shared_ptr<const ImageTexture> ImageTexture::white = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{1, 1, 1});
+	const std::shared_ptr<const ImageTexture> ImageTexture::black = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{ 0, 0, 0 });
+	const std::shared_ptr<const ImageTexture> ImageTexture::blue = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{ 0, 0, 1 });
 
 	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout, float* data) :
 		Texture(Texture::Type::IMAGE),

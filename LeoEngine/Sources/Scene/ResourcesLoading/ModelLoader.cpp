@@ -193,7 +193,20 @@ namespace leo {
             assimpMaterial->GetTexture(assimpTextureType, 0, &str);  // "0" for texture at index 0. The rest is ignored because unsupported by all renderers.
             std::string texturePath = fileDirectoryPath + "/" + str.C_Str();
 
-            std::shared_ptr<ImageTexture> texture = TextureLoader::loadTexture(texturePath.c_str());
+            TextureLoader::LoadingOptions loadingOptions = {};
+            if (assimpTextureType == aiTextureType_DIFFUSE ||
+                assimpTextureType == aiTextureType_SPECULAR ||
+                assimpTextureType == aiTextureType_AMBIENT ||
+                assimpTextureType == aiTextureType_NORMALS)
+            {
+                loadingOptions.desiredChannels = 4;  // Vulkan implementation in Nvidia apparently rarely supports RGB.
+            }
+            else if (assimpTextureType == aiTextureType_HEIGHT)
+            {
+                loadingOptions.desiredChannels = 1;  // Vulkan implementation in Nvidia apparently rarely supports RGB.
+            }
+
+            std::shared_ptr<ImageTexture> texture = TextureLoader::loadTexture(texturePath.c_str(), loadingOptions);
             return texture;
         }
 
