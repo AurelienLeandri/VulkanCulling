@@ -150,7 +150,7 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    // TODO: inside these, maybe use only one descriptor set per material instead of one for each frame, and never update them?
+    // TODO: inside these, maybe use only one descriptor set for each frame, and never update them?
     if (_createDescriptorPools() || _createDescriptorSets()) {
         std::cerr << "Could not create descriptors data." << std::endl;
         return -1;
@@ -1023,13 +1023,13 @@ int VulkanRenderer::_createDescriptorPools()
 
     poolSizes.push_back({});
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize) * 5;  // 5 textures in the material
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize) * 5 * _shapesPerMaterial.size();  // 5 textures in the material
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize) * 2;  // Two sets per swap chain image
+    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize) * _shapesPerMaterial.size() + static_cast<uint32_t>(swapChainSize);  // One set per material plus one transform UBO, per swap chain image
 
     if (vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool)) {
         std::cerr << "Failed to create descriptor pool." << std::endl;
@@ -1045,26 +1045,25 @@ int VulkanRenderer::_createDescriptorSets()
 
     const VkDescriptorSetLayout* layoutTypes[] = { &_materialDescriptorSetLayout, &_transformsDescriptorSetLayout };
     std::vector<VkDescriptorSet>* sets[] = { &_materialDescriptorSets, &_transformsDescriptorSets };
+    size_t nbSets[] = { swapChainSize * _shapesPerMaterial.size(), swapChainSize };
     for (size_t i = 0; i < 2; ++i) {
-        std::vector<VkDescriptorSetLayout> layouts(swapChainSize, *layoutTypes[i]);
+        std::vector<VkDescriptorSetLayout> layouts(nbSets[i], *layoutTypes[i]);
 
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = _descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize);
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(nbSets[i]);
         allocInfo.pSetLayouts = layouts.data();
 
-        sets[i]->resize(swapChainSize);
+        sets[i]->resize(nbSets[i]);
         if (vkAllocateDescriptorSets(_device, &allocInfo, sets[i]->data())) {
             std::cerr << "Failed to allocate descriptor sets." << std::endl;
             return -1;
         }
     }
 
-    // Updating transforms UBO
-
     for (size_t i = 0; i < swapChainSize; ++i) {
-        VkWriteDescriptorSet descriptorWrite = {};
+        VkWriteDescriptorSet uboDescriptorWrite = {};
 
         // Updating descriptor set for transforms UBO
         // TODO: write once and copy the rest.
@@ -1074,33 +1073,43 @@ int VulkanRenderer::_createDescriptorSets()
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(_TransformsUBO);
 
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = _transformsDescriptorSets[i];
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
+        uboDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        uboDescriptorWrite.dstSet = _transformsDescriptorSets[i];
+        uboDescriptorWrite.dstBinding = 0;
+        uboDescriptorWrite.dstArrayElement = 0;
+        uboDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboDescriptorWrite.descriptorCount = 1;
+        uboDescriptorWrite.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(_device, 1, &uboDescriptorWrite, 0, nullptr);
 
         // Updating descriptor set for material textures
+        // TODO: write once and copy the rest.
+        std::vector<VkWriteDescriptorSet> descriptorWrites(_shapesPerMaterial.size(), VkWriteDescriptorSet());
+        size_t materialIdx = 0;
+        for (const auto& entry : _shapesPerMaterial) {
+            const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
+            const std::vector<_ImageData>& materialImages = _materialsImages[material];
 
-        /*
-        for (size_t t = 0; t < _materialsImages.size(); ++t)
-        VkDescriptorImageInfo imageInfo = {};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = _textureImageView;
-        imageInfo.sampler = _textureSampler;
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = materialImages[0].view;
+            imageInfo.sampler = materialImages[0].textureSampler;
 
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = _descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
-        */
+            for (size_t materialTextureIndex = 0; materialTextureIndex < 5; ++materialTextureIndex) {
+                size_t descriptorSetIndex = i * _shapesPerMaterial.size() + materialIdx * 5 + materialTextureIndex;
+                descriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[descriptorSetIndex];
+                descriptorWrites[descriptorSetIndex].dstBinding = materialTextureIndex;
+                descriptorWrites[descriptorSetIndex].dstArrayElement = 0;
+                descriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrites[descriptorSetIndex].descriptorCount = 1;
+                descriptorWrites[descriptorSetIndex].pImageInfo = &imageInfo;
+            }
 
-        vkUpdateDescriptorSets(_device, 1, &descriptorWrite, 0, nullptr);
+            materialIdx++;
+        }
+
     }
 
     return 0;

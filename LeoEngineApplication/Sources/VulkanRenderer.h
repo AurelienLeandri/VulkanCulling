@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <map>
 
 #include <glm/glm.hpp>
 
@@ -88,7 +89,7 @@ private:
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;
 	Options _options;
-	std::unordered_map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
+	std::map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
 
 	VkCommandPool _commandPool = VK_NULL_HANDLE;
 
