@@ -32,6 +32,7 @@ private:
 		VkImage image = VK_NULL_HANDLE;
 		VkDeviceMemory memory = VK_NULL_HANDLE;
 		VkImageView view = VK_NULL_HANDLE;
+		VkSampler textureSampler = VK_NULL_HANDLE;
 		uint32_t mipLevels = 0;
 	};
 
@@ -59,6 +60,8 @@ private:
 	int _createGraphicsPipeline();
 	int _createFramebufferImageResources();
 	int _createFramebuffers();
+	int _createDescriptorPools();
+	int _createDescriptorSets();
 
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 
@@ -66,8 +69,6 @@ private:
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-	int _createImage(uint32_t width, uint32_t height, VkSampleCountFlagBits numSamples,
-		VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, _ImageData& imageData);
 	int _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	void _generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);

@@ -472,7 +472,10 @@ int VulkanInstance::_createSwapChain()
     _swapChainImageViews.resize(_swapChainImages.size());
 
     for (uint32_t i = 0; i < _swapChainImages.size(); i++) {
-        _swapChainImageViews[i] = createImageView(_swapChainImages[i], _properties.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        if (createImageView(_swapChainImages[i], _properties.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _swapChainImageViews[i])) {
+            std::cerr << "Could not create swap chain image view for image at index " << i << "." << std::endl;
+            return -1;
+        }
     }
 
     return 0;
@@ -558,7 +561,7 @@ int VulkanInstance::createImage(
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+    if (vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory)) {
         std::cerr << "Failed to allocate image memory." << std::endl;
         return -1;
     }
@@ -568,10 +571,10 @@ int VulkanInstance::createImage(
     return 0;
 }
 
-VkImageView VulkanInstance::createImageView(
-    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) const
+int VulkanInstance::createImageView(
+    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView) const
 {
-    VkImageViewCreateInfo viewInfo{};
+    VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -582,13 +585,12 @@ VkImageView VulkanInstance::createImageView(
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    VkImageView imageView;
     if (vkCreateImageView(_device, &viewInfo, nullptr, &imageView)) {
-        std::cerr << "Error: Failed to create texture image view" << std::endl;
-        return VK_NULL_HANDLE;
+        std::cerr << "Error: Failed to create texture image view." << std::endl;
+        return -1;
     }
 
-    return imageView;
+    return 0;
 }
 
 VkSampleCountFlagBits VulkanInstance::_getMaxUsableSampleCount() const {

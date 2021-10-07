@@ -29,6 +29,8 @@ int VulkanRenderer::_cleanup()
         for (auto& imageData : entry.second) {
             vkDestroyImage(_device, imageData.image, nullptr);
             vkFreeMemory(_device, imageData.memory, nullptr);
+            vkDestroySampler(_device, imageData.textureSampler, nullptr);
+            vkDestroyImageView(_device, imageData.view, nullptr);
         }
         entry.second.clear();
     }
@@ -140,6 +142,11 @@ int VulkanRenderer::init()
 
     if (_loadImagesToDeviceMemory()) {
         std::cerr << "Could not initialize input images." << std::endl;
+        return -1;
+    }
+
+    if (_createDescriptorPools() || _createDescriptorSets()) {
+        std::cerr << "Could not create descriptors data." << std::endl;
         return -1;
     }
 
@@ -348,12 +355,13 @@ int VulkanRenderer::_loadImagesToDeviceMemory() {
                 imageFormat = VK_FORMAT_R8_UNORM;
                 nbChannels = 1;
                 break;
-            case leo::ImageTexture::Layout::RGB:
-                imageFormat = VK_FORMAT_R8G8B8_SRGB;
-                nbChannels = 3;
-                break;
             case leo::ImageTexture::Layout::RGBA:
-                imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                if (i == 3) { // Normals texture
+                    imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                }
+                else {
+                    imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                }
                 nbChannels = 4;
                 break;
             default:
@@ -365,10 +373,11 @@ int VulkanRenderer::_loadImagesToDeviceMemory() {
                 return -1;
             }
 
+            // Image handle and memory
 
-            if (_createImage(texWidth, texHeight, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
+            if (_vulkan->createImage(texWidth, texHeight, vulkanImageData.mipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vulkanImageData))
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vulkanImageData.image, vulkanImageData.memory))
             {
                 std::cerr << "Failed to create image." << std::endl;
                 return -1;
@@ -397,56 +406,43 @@ int VulkanRenderer::_loadImagesToDeviceMemory() {
             stagingBuffer = VK_NULL_HANDLE;
             vkFreeMemory(_device, stagingBufferMemory, nullptr);
             stagingBufferMemory = VK_NULL_HANDLE;
+
+            // Image view
+
+            if (_vulkan->createImageView(vulkanImageData.image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, vulkanImageData.mipLevels, vulkanImageData.view)) {
+                std::cerr << "Could not create image view for material texture." << std::endl;
+                return -1;
+            }
+
+            // Texture sampler
+
+            VkSamplerCreateInfo samplerInfo = {};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.anisotropyEnable = VK_TRUE;
+
+            samplerInfo.maxAnisotropy = _vulkan->getProperties().maxSamplerAnisotropy;
+
+            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerInfo.unnormalizedCoordinates = VK_FALSE;
+            samplerInfo.compareEnable = VK_FALSE;
+            samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerInfo.minLod = 0.0f;
+            samplerInfo.maxLod = static_cast<float>(vulkanImageData.mipLevels);
+            samplerInfo.mipLodBias = 0.0f;
+
+            if (vkCreateSampler(_device, &samplerInfo, nullptr, &vulkanImageData.textureSampler)) {
+                std::cerr << "Failed to create texture sampler." << std::endl;
+                return -1;
+            }
         }
     }
-
-    return 0;
-}
-
-int VulkanRenderer::_createImage(
-    uint32_t width,
-    uint32_t height,
-    VkSampleCountFlagBits numSamples,
-    VkFormat format,
-    VkImageTiling tiling,
-    VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties,
-    _ImageData& imageData)
-{
-    VkImageCreateInfo imageInfo = {};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = imageData.mipLevels;
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = format;
-    imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = usage;
-    imageInfo.samples = numSamples;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    if (vkCreateImage(_device, &imageInfo, nullptr, &imageData.image)) {
-        std::cerr << "Failed to create image." << std::endl;
-        return -1;
-    }
-
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(_device, imageData.image, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = _vulkan->findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(_device, &allocInfo, nullptr, &imageData.memory)) {
-        std::cerr << "Failed to allocate image memory." << std::endl;
-        return -1;
-    }
-
-    vkBindImageMemory(_device, imageData.image, imageData.memory, 0);
 
     return 0;
 }
@@ -986,7 +982,10 @@ int VulkanRenderer::_createFramebufferImageResources()
         _framebufferColor.image,
         _framebufferColor.memory);
 
-    _framebufferColor.view = _vulkan->createImageView(_framebufferColor.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    if (_vulkan->createImageView(_framebufferColor.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _framebufferColor.view)) {
+        std::cerr << "Could not create framebuffer color image view." << std::endl;
+        return -1;
+    }
 
     _vulkan->createImage(
         instanceProperties.swapChainExtent.width,
@@ -1000,8 +999,21 @@ int VulkanRenderer::_createFramebufferImageResources()
         _framebufferDepth.image,
         _framebufferDepth.memory);
 
-    _framebufferDepth.view = _vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    if (_vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view)) {
+        std::cerr << "Could not create framebuffer depth image view." << std::endl;
+        return -1;
+    }
 
+    return 0;
+}
+
+int VulkanRenderer::_createDescriptorPools()
+{
+    return 0;
+}
+
+int VulkanRenderer::_createDescriptorSets()
+{
     return 0;
 }
 
