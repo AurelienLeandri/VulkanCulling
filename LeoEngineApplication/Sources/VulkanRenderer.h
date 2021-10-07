@@ -50,6 +50,11 @@ private:
 		VkDeviceMemory memory = VK_NULL_HANDLE;
 	};
 
+	struct _DescriptorSets {
+		VkDescriptorSet _materialDescriptorSet;
+		VkDescriptorSet _transformsDescriptorSet;
+	};
+
 private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPool();
@@ -91,6 +96,8 @@ private:
 
 	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _transformsDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
@@ -101,6 +108,9 @@ private:
 
 	std::vector<VkBuffer> _transformsUBOs;
 	std::vector<VkDeviceMemory> _transformsUBOsMemory;
+
+	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image
+	std::vector<VkDescriptorSet> _transformsDescriptorSets;  // One entry per swapchain image
 
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> vertexBuffers;
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> indexBuffers;
