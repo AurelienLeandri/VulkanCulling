@@ -27,6 +27,7 @@ public:
 public:
 	void setScene(const leo::Scene* scene);
 	int init();
+	int iterate();
 
 private:
 	struct _ImageData {
@@ -61,6 +62,7 @@ private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPool();
 	int _loadBuffersToDeviceMemory();
+	int _allocateUniformBuffersToDeviceMemory();
 	int _loadImagesToDeviceMemory();
 	int _createDescriptorSetLayouts();
 	int _createRenderPass();
@@ -71,6 +73,8 @@ private:
 	int _createDescriptorSets();
 	int _createCommandBuffers();
 	int _createSyncObjects();
+
+	int _recreateSwapChainDependentResources();
 
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 
@@ -86,6 +90,7 @@ private:
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
 
 	int _cleanup();
+	void _cleanupSwapChainDependentResources();
 
 private:
 	const leo::Scene* _scene = nullptr;
@@ -125,6 +130,7 @@ private:
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
 
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
+	size_t _currentFrame = 0;
 	std::vector<VkSemaphore> _imageAvailableSemaphores;
 	std::vector<VkSemaphore> _renderFinishedSemaphores;
 	std::vector<VkFence> _inFlightFences;

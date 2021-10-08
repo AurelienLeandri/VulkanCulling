@@ -24,6 +24,11 @@ VulkanRenderer::~VulkanRenderer()
 
 int VulkanRenderer::_cleanup()
 {
+    vkDeviceWaitIdle(_device);
+
+    _cleanupSwapChainDependentResources();
+
+    // Cleanup of the synchronization objects
     _imagesInFlight.clear();
     for (size_t i = 0; i < _MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(_device, _renderFinishedSemaphores[i], nullptr);
@@ -33,11 +38,6 @@ int VulkanRenderer::_cleanup()
     _renderFinishedSemaphores.clear();
     _imageAvailableSemaphores.clear();
     _inFlightFences.clear();
-
-    vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
-    _descriptorPool = VK_NULL_HANDLE;
-    _materialDescriptorSets.clear();
-    _transformsDescriptorSets.clear();
 
     // Cleanup of the images
     for (auto& entry : _materialsImages) {
@@ -51,7 +51,7 @@ int VulkanRenderer::_cleanup()
     }
     _materialsImages.clear();
 
-    // Cleanup of the buffers
+    // Cleanup of the geometry buffers
     for (auto* buffers : { &_vertexBuffers, &_indexBuffers }) {
         for (auto& entry : *buffers) {
             for (const _BufferData& bufferData : entry.second) {
@@ -63,18 +63,27 @@ int VulkanRenderer::_cleanup()
         buffers->clear();
     }
 
-    for (VkBuffer& buffer : _transformsUBOs) {
-        vkDestroyBuffer(_device, buffer, nullptr);
-    }
-    _transformsUBOs.clear();
+    vkDestroyCommandPool(_device, _commandPool, nullptr);
+    _commandPool = VK_NULL_HANDLE;
 
-    for (VkDeviceMemory& memory : _transformsUBOsMemory) {
-        vkFreeMemory(_device, memory, nullptr);
-    }
-    _transformsUBOsMemory.clear();
+    vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
+    _materialDescriptorSetLayout = VK_NULL_HANDLE;
+
+    vkDestroyDescriptorSetLayout(_device, _transformsDescriptorSetLayout, nullptr);
+    _transformsDescriptorSetLayout = VK_NULL_HANDLE;
+
+    return 0;
+}
+
+
+void VulkanRenderer::_cleanupSwapChainDependentResources()
+{
+    // TODO: See more precisely what can be reused in case of resize. There must be a more elegant way than recreating all these objects.
+
+    vkDeviceWaitIdle(_device);
 
     // Cleanup of the framebuffers
-    vkDestroyImageView(_device, _framebufferColor.view , nullptr);
+    vkDestroyImageView(_device, _framebufferColor.view, nullptr);
     vkDestroyImage(_device, _framebufferColor.image, nullptr);
     vkFreeMemory(_device, _framebufferColor.memory, nullptr);
     _framebufferColor = {};
@@ -89,26 +98,34 @@ int VulkanRenderer::_cleanup()
     }
     _framebuffers.clear();
 
-    // Cleanup of the pipeline
-    vkDestroyCommandPool(_device, _commandPool, nullptr);
-    _commandPool = VK_NULL_HANDLE;
+    // Destroy command buffers allocated in the pool
+    vkFreeCommandBuffers(_device, _commandPool, static_cast<uint32_t>(_commandBuffers.size()), _commandBuffers.data());
+    _commandBuffers.clear();
 
+    // Destroy the graphics pipeline
     vkDestroyPipeline(_device, _graphicsPipeline, nullptr);
     _graphicsPipeline = VK_NULL_HANDLE;
-
     vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
     _pipelineLayout = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
-    _materialDescriptorSetLayout = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorSetLayout(_device, _transformsDescriptorSetLayout, nullptr);
-    _transformsDescriptorSetLayout = VK_NULL_HANDLE;
-
     vkDestroyRenderPass(_device, _renderPass, nullptr);
     _renderPass = VK_NULL_HANDLE;
 
-    return 0;
+    // Destroying UBOs
+    for (VkBuffer& buffer : _transformsUBOs) {
+        vkDestroyBuffer(_device, buffer, nullptr);
+    }
+    _transformsUBOs.clear();
+    
+    for (VkDeviceMemory& memory : _transformsUBOsMemory) {
+        vkFreeMemory(_device, memory, nullptr);
+    }
+    _transformsUBOsMemory.clear();
+
+    // Destroy the descriptor sets
+    vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
+    _descriptorPool = VK_NULL_HANDLE;
+    _materialDescriptorSets.clear();
+    _transformsDescriptorSets.clear();
 }
 
 int VulkanRenderer::init()
@@ -176,6 +193,133 @@ int VulkanRenderer::init()
     }
 
 	return 0;
+}
+
+int VulkanRenderer::iterate()
+{
+    vkWaitForFences(_device, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        _device, _vulkan->getSwapChain(), UINT64_MAX, _imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    // Swap chain is invalid or suboptimal (for example because of a window resize)
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        _cleanupSwapChainDependentResources();
+        _vulkan->recreateSwapChain();
+        _recreateSwapChainDependentResources();
+        return 0;
+    }
+    else if (result && result != VK_SUBOPTIMAL_KHR) {
+        std::cerr << "Failed to acquire swap chain image." << std::endl;
+        return -1;
+    }
+
+    // TODO: Put the actual values
+    VkCommandBuffer pushConstantCommandBuffer = _beginSingleTimeCommands(_commandPool);
+    glm::mat4 m(1);
+    vkCmdPushConstants(pushConstantCommandBuffer, _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof (glm::mat4), &m);
+    _endSingleTimeCommands(pushConstantCommandBuffer, _commandPool);
+
+    // Check if a previous frame is using this image (i.e. there is its fence to wait on)
+    if (_imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+        vkWaitForFences(_device, 1, &_imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+    }
+    // Mark the image as now being in use by this frame
+    _imagesInFlight[imageIndex] = _inFlightFences[_currentFrame];
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &_commandBuffers[imageIndex];
+    VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    vkResetFences(_device, 1, &_inFlightFences[_currentFrame]);
+
+    if (vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS) {
+        std::cerr << "Failed to submit draw command buffer." << std::endl;
+        return -1;
+    }
+
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = { _vulkan->getSwapChain() };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
+
+    result = vkQueuePresentKHR(_vulkan->getPresentationQueue(), &presentInfo);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || InputManager::framebufferResized) {
+        InputManager::framebufferResized = false;
+        _cleanupSwapChainDependentResources();
+        _vulkan->recreateSwapChain();
+        _recreateSwapChainDependentResources();
+    }
+    else if (result) {
+        std::cerr << "Failed to present swap chain image." << std::endl;
+        return -1;
+    }
+
+    _currentFrame = (_currentFrame + 1) % _MAX_FRAMES_IN_FLIGHT;
+
+    return 0;
+}
+
+int VulkanRenderer::_recreateSwapChainDependentResources() {
+    if (_createRenderPass()) {
+        std::cerr << "Could not create render pass" << std::endl;
+        return -1;
+    }
+
+    if (_createGraphicsPipeline()) {
+        std::cerr << "Could not create graphics pipeline." << std::endl;
+        return -1;
+    }
+
+    if (_createFramebufferImageResources()) {
+        std::cerr << "Failed to create framebuffers" << std::endl;
+        return -1;
+    }
+
+    if (_createFramebuffers()) {
+        std::cerr << "Failed to create framebuffers" << std::endl;
+        return -1;
+    }
+
+    if (_allocateUniformBuffersToDeviceMemory()) {
+        std::cerr << "Could not allocate UBs to device memory" << std::endl;
+        return -1;
+    }
+
+    if (_createDescriptorPools()) {
+        std::cerr << "Could not create descriptors data." << std::endl;
+        return -1;
+    }
+
+    if (_createDescriptorSets()) {
+        std::cerr << "Could not create descriptors data." << std::endl;
+        return -1;
+    }
+
+    if (_createCommandBuffers()) {
+        std::cerr << "Could not create and setup drawing command buffers." << std::endl;
+        return -1;
+    }
+
+    return 0;
 }
 
 
@@ -290,6 +434,16 @@ int VulkanRenderer::_loadBuffersToDeviceMemory()
         }
     }
 
+    if (_allocateUniformBuffersToDeviceMemory()) {
+        std::cerr << "Could not allocate UBs to device memory" << std::endl;
+        return -1;
+    }
+
+    return 0;
+}
+
+int VulkanRenderer::_allocateUniformBuffersToDeviceMemory()
+{
     /*
     * Transforms UBO
     */
@@ -302,9 +456,13 @@ int VulkanRenderer::_loadBuffersToDeviceMemory()
     _transformsUBOsMemory.resize(nbSwapChainImages);
 
     for (size_t i = 0; i < nbSwapChainImages; i++) {
-        _createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        if (_createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            _transformsUBOs[i], _transformsUBOsMemory[i]);
+            _transformsUBOs[i], _transformsUBOsMemory[i]))
+        {
+            std::cerr << "Could not create uniform buffer" << std::endl;
+            return -1;
+        }
     }
 
     return 0;
@@ -1304,6 +1462,7 @@ int VulkanRenderer::_createSyncObjects() {
 
     return 0;
 }
+
 
 VkCommandBuffer VulkanRenderer::_beginSingleTimeCommands(VkCommandPool& commandPool) {
     VkCommandBufferAllocateInfo allocInfo{};

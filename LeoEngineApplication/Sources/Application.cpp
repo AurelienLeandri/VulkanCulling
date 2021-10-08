@@ -90,7 +90,7 @@ int Application::start()
     //_renderer->start();
 
     while (_inputManager->processInput()) {
-        //_renderer->iterate();
+        _renderer->iterate();
     }
 
     return 0;
