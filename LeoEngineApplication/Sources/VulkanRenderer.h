@@ -49,6 +49,7 @@ private:
 	struct _BufferData {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VkDeviceMemory memory = VK_NULL_HANDLE;
+		size_t nbElements = 0;
 	};
 
 	struct _DescriptorSets {
@@ -68,6 +69,7 @@ private:
 	int _createFramebuffers();
 	int _createDescriptorPools();
 	int _createDescriptorSets();
+	int _createCommandBuffers();
 
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 
@@ -113,8 +115,10 @@ private:
 	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image
 	std::vector<VkDescriptorSet> _transformsDescriptorSets;  // One entry per swapchain image
 
-	std::unordered_map<const leo::Material*, std::vector<_BufferData>> vertexBuffers;
-	std::unordered_map<const leo::Material*, std::vector<_BufferData>> indexBuffers;
+	std::vector<VkCommandBuffer> _commandBuffers;
+
+	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _vertexBuffers;
+	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _indexBuffers;
 
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;

@@ -42,7 +42,7 @@ int VulkanRenderer::_cleanup()
     _materialsImages.clear();
 
     // Cleanup of the buffers
-    for (auto* buffers : { &vertexBuffers, &indexBuffers }) {
+    for (auto* buffers : { &_vertexBuffers, &_indexBuffers }) {
         for (auto& entry : *buffers) {
             for (const _BufferData& bufferData : entry.second) {
                 vkDestroyBuffer(_device, bufferData.buffer, nullptr);
@@ -150,9 +150,13 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    // TODO: inside these, maybe use only one descriptor set for each frame, and never update them?
     if (_createDescriptorPools() || _createDescriptorSets()) {
         std::cerr << "Could not create descriptors data." << std::endl;
+        return -1;
+    }
+
+    if (_createCommandBuffers()) {
+        std::cerr << "Could not create and setup drawing command buffers." << std::endl;
         return -1;
     }
 
@@ -181,7 +185,7 @@ int VulkanRenderer::_loadBuffersToDeviceMemory()
 {
     for (auto& entry : _shapesPerMaterial) {
         const leo::Material* material = entry.first;
-        vertexBuffers[material] = std::vector<_BufferData>();
+        _vertexBuffers[material] = std::vector<_BufferData>();
         for (const leo::Shape* shape : entry.second) {
             if (shape->getType() == leo::Shape::Type::MESH) {
                 const leo::Mesh* mesh = static_cast<const leo::Mesh*>(shape);
@@ -208,8 +212,9 @@ int VulkanRenderer::_loadBuffersToDeviceMemory()
                 memcpy(data, vertices.data(), (size_t)bufferSize);
                 vkUnmapMemory(_device, stagingBufferMemory);
 
-                vertexBuffers[material].push_back(_BufferData());
-                _BufferData& bufferData = vertexBuffers[material].back();
+                _vertexBuffers[material].push_back(_BufferData());
+                _BufferData& bufferData = _vertexBuffers[material].back();
+                bufferData.nbElements = vertices.size();
 
                 if (_createBuffer(bufferSize,
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -246,8 +251,9 @@ int VulkanRenderer::_loadBuffersToDeviceMemory()
                 memcpy(indexData, indices.data(), (size_t)indicesBufferSize);
                 vkUnmapMemory(_device, indexStagingBufferMemory);
 
-                indexBuffers[material].push_back(_BufferData());
-                _BufferData& indexBufferData = indexBuffers[material].back();
+                _indexBuffers[material].push_back(_BufferData());
+                _BufferData& indexBufferData = _indexBuffers[material].back();
+                indexBufferData.nbElements = indices.size();
 
                 if (_createBuffer(indicesBufferSize,
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -1023,13 +1029,13 @@ int VulkanRenderer::_createDescriptorPools()
 
     poolSizes.push_back({});
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize) * 5 * _shapesPerMaterial.size();  // 5 textures in the material
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize * _shapesPerMaterial.size()) * 5;  // 5 textures in the material
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize) * _shapesPerMaterial.size() + static_cast<uint32_t>(swapChainSize);  // One set per material plus one transform UBO, per swap chain image
+    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize * (_shapesPerMaterial.size() + 1));  // One set per material plus one transform UBO, per swap chain image
 
     if (vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool)) {
         std::cerr << "Failed to create descriptor pool." << std::endl;
@@ -1100,7 +1106,7 @@ int VulkanRenderer::_createDescriptorSets()
                 size_t descriptorSetIndex = i * _shapesPerMaterial.size() * 5 + materialIdx * 5 + materialTextureIndex;
                 materialsDescriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 materialsDescriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[i * _shapesPerMaterial.size() + materialIdx];
-                materialsDescriptorWrites[descriptorSetIndex].dstBinding = materialTextureIndex;
+                materialsDescriptorWrites[descriptorSetIndex].dstBinding = static_cast<uint32_t>(materialTextureIndex);
                 materialsDescriptorWrites[descriptorSetIndex].dstArrayElement = 0;
                 materialsDescriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 materialsDescriptorWrites[descriptorSetIndex].descriptorCount = 1;
@@ -1112,8 +1118,8 @@ int VulkanRenderer::_createDescriptorSets()
 
     }
 
-    vkUpdateDescriptorSets(_device, uboDescriptorWrites.size(), uboDescriptorWrites.data(), 0, nullptr);
-    vkUpdateDescriptorSets(_device, materialsDescriptorWrites.size(), materialsDescriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(uboDescriptorWrites.size()), uboDescriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(materialsDescriptorWrites.size()), materialsDescriptorWrites.data(), 0, nullptr);
 
     return 0;
 }
@@ -1147,6 +1153,86 @@ int VulkanRenderer::_createFramebuffers()
             return -1;
         }
     }
+    return 0;
+}
+
+int VulkanRenderer::_createCommandBuffers() {
+    _commandBuffers.resize(_vulkan->getSwapChainSize());
+
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = _commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = static_cast<uint32_t>(_commandBuffers.size());
+
+    if (vkAllocateCommandBuffers(_device, &allocInfo, _commandBuffers.data())) {
+        std::cerr << "Failed to allocate command buffers." << std::endl;
+        return -1;
+    }
+
+    // Recording draw commands for each shape
+
+    for (size_t imageIndex = 0; imageIndex < _commandBuffers.size(); imageIndex++) {
+        VkCommandBufferBeginInfo beginInfo = {};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        if (vkBeginCommandBuffer(_commandBuffers[imageIndex], &beginInfo)) {
+            std::cerr << "Failed to begin recording command buffer." << std::endl;
+            return -1;
+        }
+
+        VkRenderPassBeginInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = _renderPass;
+        renderPassInfo.framebuffer = _framebuffers[imageIndex];
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = _vulkan->getProperties().swapChainExtent;
+
+        std::array<VkClearValue, 2> clearValues = {};
+        clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        vkCmdBeginRenderPass(_commandBuffers[imageIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(_commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+
+        size_t materialIndex = 0;
+        for (auto& entry : _shapesPerMaterial) {
+            const leo::Material* material = entry.first;
+            const std::vector<_BufferData>& vertexBuffers = _vertexBuffers[material];
+            const std::vector<_BufferData>& indexBuffers = _indexBuffers[material];
+            VkDeviceSize offsets[] = { 0 };
+
+            for (size_t shapeIndex = 0; shapeIndex < vertexBuffers.size(); ++shapeIndex) {
+                vkCmdBindVertexBuffers(_commandBuffers[imageIndex], 0, 1, &vertexBuffers[shapeIndex].buffer, offsets);
+
+                vkCmdBindIndexBuffer(_commandBuffers[imageIndex], indexBuffers[shapeIndex].buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                std::array<VkDescriptorSet, 2> descriptorSets = {
+                    _transformsDescriptorSets[imageIndex],
+                    _materialDescriptorSets[imageIndex * _shapesPerMaterial.size() + materialIndex],
+                };
+                vkCmdBindDescriptorSets(_commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    _pipelineLayout, 0, 2, descriptorSets.data(), 0, nullptr);
+
+                vkCmdDrawIndexed(_commandBuffers[imageIndex], static_cast<uint32_t>(indexBuffers[shapeIndex].nbElements), 1, 0, 0, 0);
+            }
+
+            materialIndex++;
+        }
+
+        vkCmdEndRenderPass(_commandBuffers[imageIndex]);
+
+        if (vkEndCommandBuffer(_commandBuffers[imageIndex])) {
+            std::cerr << "Failed to record command buffer." << std::endl;
+            return -1;
+        }
+    }
+
     return 0;
 }
 
