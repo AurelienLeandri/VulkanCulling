@@ -1062,8 +1062,10 @@ int VulkanRenderer::_createDescriptorSets()
         }
     }
 
+    std::vector<VkWriteDescriptorSet> materialsDescriptorWrites(swapChainSize * _shapesPerMaterial.size() * 5, VkWriteDescriptorSet());
+    std::vector<VkWriteDescriptorSet> uboDescriptorWrites(swapChainSize, VkWriteDescriptorSet());
+
     for (size_t i = 0; i < swapChainSize; ++i) {
-        VkWriteDescriptorSet uboDescriptorWrite = {};
 
         // Updating descriptor set for transforms UBO
         // TODO: write once and copy the rest.
@@ -1073,19 +1075,17 @@ int VulkanRenderer::_createDescriptorSets()
         bufferInfo.offset = 0;
         bufferInfo.range = sizeof(_TransformsUBO);
 
-        uboDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        uboDescriptorWrite.dstSet = _transformsDescriptorSets[i];
-        uboDescriptorWrite.dstBinding = 0;
-        uboDescriptorWrite.dstArrayElement = 0;
-        uboDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboDescriptorWrite.descriptorCount = 1;
-        uboDescriptorWrite.pBufferInfo = &bufferInfo;
+        uboDescriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        uboDescriptorWrites[i].dstSet = _transformsDescriptorSets[i];
+        uboDescriptorWrites[i].dstBinding = 0;
+        uboDescriptorWrites[i].dstArrayElement = 0;
+        uboDescriptorWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboDescriptorWrites[i].descriptorCount = 1;
+        uboDescriptorWrites[i].pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(_device, 1, &uboDescriptorWrite, 0, nullptr);
 
         // Updating descriptor set for material textures
         // TODO: write once and copy the rest.
-        std::vector<VkWriteDescriptorSet> descriptorWrites(_shapesPerMaterial.size(), VkWriteDescriptorSet());
         size_t materialIdx = 0;
         for (const auto& entry : _shapesPerMaterial) {
             const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
@@ -1097,20 +1097,23 @@ int VulkanRenderer::_createDescriptorSets()
             imageInfo.sampler = materialImages[0].textureSampler;
 
             for (size_t materialTextureIndex = 0; materialTextureIndex < 5; ++materialTextureIndex) {
-                size_t descriptorSetIndex = i * _shapesPerMaterial.size() + materialIdx * 5 + materialTextureIndex;
-                descriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                descriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[descriptorSetIndex];
-                descriptorWrites[descriptorSetIndex].dstBinding = materialTextureIndex;
-                descriptorWrites[descriptorSetIndex].dstArrayElement = 0;
-                descriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                descriptorWrites[descriptorSetIndex].descriptorCount = 1;
-                descriptorWrites[descriptorSetIndex].pImageInfo = &imageInfo;
+                size_t descriptorSetIndex = i * _shapesPerMaterial.size() * 5 + materialIdx * 5 + materialTextureIndex;
+                materialsDescriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                materialsDescriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[i * _shapesPerMaterial.size() + materialIdx];
+                materialsDescriptorWrites[descriptorSetIndex].dstBinding = materialTextureIndex;
+                materialsDescriptorWrites[descriptorSetIndex].dstArrayElement = 0;
+                materialsDescriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                materialsDescriptorWrites[descriptorSetIndex].descriptorCount = 1;
+                materialsDescriptorWrites[descriptorSetIndex].pImageInfo = &imageInfo;
             }
 
             materialIdx++;
         }
 
     }
+
+    vkUpdateDescriptorSets(_device, uboDescriptorWrites.size(), uboDescriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(_device, materialsDescriptorWrites.size(), materialsDescriptorWrites.data(), 0, nullptr);
 
     return 0;
 }
