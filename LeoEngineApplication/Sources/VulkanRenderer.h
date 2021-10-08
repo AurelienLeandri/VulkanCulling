@@ -70,6 +70,7 @@ private:
 	int _createDescriptorPools();
 	int _createDescriptorSets();
 	int _createCommandBuffers();
+	int _createSyncObjects();
 
 	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 
@@ -122,5 +123,11 @@ private:
 
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
+
+	static const int _MAX_FRAMES_IN_FLIGHT = 2;
+	std::vector<VkSemaphore> _imageAvailableSemaphores;
+	std::vector<VkSemaphore> _renderFinishedSemaphores;
+	std::vector<VkFence> _inFlightFences;
+	std::vector<VkFence> _imagesInFlight;
 };
 

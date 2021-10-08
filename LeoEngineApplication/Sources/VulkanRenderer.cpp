@@ -24,6 +24,16 @@ VulkanRenderer::~VulkanRenderer()
 
 int VulkanRenderer::_cleanup()
 {
+    _imagesInFlight.clear();
+    for (size_t i = 0; i < _MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(_device, _renderFinishedSemaphores[i], nullptr);
+        vkDestroySemaphore(_device, _imageAvailableSemaphores[i], nullptr);
+        vkDestroyFence(_device, _inFlightFences[i], nullptr);
+    }
+    _renderFinishedSemaphores.clear();
+    _imageAvailableSemaphores.clear();
+    _inFlightFences.clear();
+
     vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
     _descriptorPool = VK_NULL_HANDLE;
     _materialDescriptorSets.clear();
@@ -157,6 +167,11 @@ int VulkanRenderer::init()
 
     if (_createCommandBuffers()) {
         std::cerr << "Could not create and setup drawing command buffers." << std::endl;
+        return -1;
+    }
+
+    if (_createSyncObjects()) {
+        std::cerr << "Could not create and setup fences and semaphores for synchronising rendering operation in the swap chain." << std::endl;
         return -1;
     }
 
@@ -822,6 +837,34 @@ int VulkanRenderer::_createGraphicsPipeline()
     return 0;
 }
 
+int VulkanRenderer::_createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule)
+{
+    std::ifstream file(glslFilePath, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        std::cerr << "Failed to open spir-v file " << "\"" << glslFilePath << "\"." << std::endl;
+        return -1;
+    }
+
+    std::vector<char> buffer((size_t)file.tellg());
+    file.seekg(0);
+    file.read(buffer.data(), buffer.size());
+
+    file.close();
+
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = buffer.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
+
+    if (vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule)) {
+        std::cerr << "Failed to create shader module." << std::endl;
+        return -1;
+    }
+
+    return 0;
+}
+
 void VulkanRenderer::_constructSceneRelatedStructures()
 {
     for (const leo::SceneObject& sceneObject : _scene->objects) {
@@ -1236,6 +1279,32 @@ int VulkanRenderer::_createCommandBuffers() {
     return 0;
 }
 
+int VulkanRenderer::_createSyncObjects() {
+    _imageAvailableSemaphores.resize(_MAX_FRAMES_IN_FLIGHT);
+    _renderFinishedSemaphores.resize(_MAX_FRAMES_IN_FLIGHT);
+    _inFlightFences.resize(_MAX_FRAMES_IN_FLIGHT);
+    _imagesInFlight.resize(_vulkan->getSwapChainSize(), VK_NULL_HANDLE);
+
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo = {};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < _MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_imageAvailableSemaphores[i]) ||
+            vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_renderFinishedSemaphores[i]) ||
+            vkCreateFence(_device, &fenceInfo, nullptr, &_inFlightFences[i]))
+        {
+            std::cerr << "Failed to create synchronization objects for a frame." << std::endl;
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 VkCommandBuffer VulkanRenderer::_beginSingleTimeCommands(VkCommandPool& commandPool) {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1254,35 +1323,6 @@ VkCommandBuffer VulkanRenderer::_beginSingleTimeCommands(VkCommandPool& commandP
 
     return commandBuffer;
 }
-
-int VulkanRenderer::_createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule)
-{
-    std::ifstream file(glslFilePath, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        std::cerr << "Failed to open spir-v file " << "\"" << glslFilePath << "\"." << std::endl;
-        return -1;
-    }
-
-    std::vector<char> buffer((size_t)file.tellg());
-    file.seekg(0);
-    file.read(buffer.data(), buffer.size());
-
-    file.close();
-
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = buffer.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
-
-    if (vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule)) {
-        std::cerr << "Failed to create shader module." << std::endl;
-        return -1;
-    }
-
-    return 0;
-}
-
 
 void VulkanRenderer::_endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool) {
     vkEndCommandBuffer(commandBuffer);
