@@ -30,9 +30,6 @@ namespace leo {
 		glm::vec3 _right;
 		glm::vec3 _front;
 
-		//glm::mat4 _viewMatrix = glm::mat4(1);
-		//glm::mat4 _projectionMatrix = glm::mat4(1);
-
 		float _fov;
 	};
 }

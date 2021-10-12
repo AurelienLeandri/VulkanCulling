@@ -49,6 +49,7 @@ int Application::_initMembers() {
 
     _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
     _renderer->setScene(_scene.get());
+    _renderer->setCamera(_camera.get());
     if (_renderer->init()) {
         std::cerr << "Error: Failed to initialize Vulkan renderer." << std::endl;
         return -1;

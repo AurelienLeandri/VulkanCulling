@@ -26,6 +26,7 @@ public:
 
 public:
 	void setScene(const leo::Scene* scene);
+	void setCamera(const leo::Camera* camera);
 	int init();
 	int iterate();
 
@@ -39,12 +40,9 @@ private:
 	};
 
 	struct _TransformsUBO {
+		alignas(16) glm::mat4 view;
 		alignas(16) glm::mat4 model;
 		alignas(16) glm::mat4 proj;
-	};
-
-	struct _PushConstants {
-		alignas(16) glm::mat4 view;
 	};
 
 	struct _BufferData {
@@ -73,6 +71,7 @@ private:
 	int _createDescriptorSets();
 	int _createCommandBuffers();
 	int _createSyncObjects();
+	void _updateUniformBuffer(uint32_t currentImage);
 
 	int _recreateSwapChainDependentResources();
 
@@ -93,6 +92,7 @@ private:
 	void _cleanupSwapChainDependentResources();
 
 private:
+	const leo::Camera* _camera = nullptr;
 	const leo::Scene* _scene = nullptr;
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;

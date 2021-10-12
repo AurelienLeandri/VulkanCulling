@@ -5,10 +5,14 @@
 #include <Scene/Lights/DirectionalLight.h>
 #include <Scene/Lights/PointLight.h>
 #include <Scene/Geometries/Mesh.h>
+#include <Scene/Transform.h>
+#include <Scene/Camera.h>
 
 #include <iostream>
 #include <array>
 #include <fstream>
+
+#include <glm/gtc/matrix_transform.hpp>
 
 VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
 	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice())
@@ -215,12 +219,6 @@ int VulkanRenderer::iterate()
         return -1;
     }
 
-    // TODO: Put the actual values
-    VkCommandBuffer pushConstantCommandBuffer = _beginSingleTimeCommands(_commandPool);
-    glm::mat4 m(1);
-    vkCmdPushConstants(pushConstantCommandBuffer, _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof (glm::mat4), &m);
-    _endSingleTimeCommands(pushConstantCommandBuffer, _commandPool);
-
     // Check if a previous frame is using this image (i.e. there is its fence to wait on)
     if (_imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
         vkWaitForFences(_device, 1, &_imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -228,7 +226,9 @@ int VulkanRenderer::iterate()
     // Mark the image as now being in use by this frame
     _imagesInFlight[imageIndex] = _inFlightFences[_currentFrame];
 
-    VkSubmitInfo submitInfo{};
+    _updateUniformBuffer(imageIndex);
+
+    VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
@@ -463,9 +463,26 @@ int VulkanRenderer::_allocateUniformBuffersToDeviceMemory()
             std::cerr << "Could not create uniform buffer" << std::endl;
             return -1;
         }
-    }
 
+        _updateUniformBuffer(i);
+    }
+    
     return 0;
+}
+
+void VulkanRenderer::_updateUniformBuffer(uint32_t currentImage) {
+    // TODO: use Push constant for small buffers that are frequently updated.
+    _TransformsUBO ubo;
+    ubo.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
+    ubo.model = glm::mat4(4);
+    ubo.model[3][3] = 1;
+    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
+    ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
+
+    void* data = nullptr;
+    vkMapMemory(_device, _transformsUBOsMemory[currentImage], 0, sizeof(_TransformsUBO), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(_device, _transformsUBOsMemory[currentImage]);
 }
 
 int VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -938,13 +955,8 @@ int VulkanRenderer::_createGraphicsPipeline()
     pipelineLayoutInfo.setLayoutCount = 2;
     std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _transformsDescriptorSetLayout, _materialDescriptorSetLayout };
     pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
-
-    VkPushConstantRange pushConstants = {};
-    pushConstants.size = sizeof (glm::mat4);
-    pushConstants.offset = 0;
-    pushConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstants;
+    pipelineLayoutInfo.pushConstantRangeCount = 0;
+    pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
     if (vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_pipelineLayout)) {
         std::cerr << "Failed to create pipeline layout." << std::endl;
@@ -1277,6 +1289,7 @@ int VulkanRenderer::_createDescriptorSets()
         // Updating descriptor set for transforms UBO
         // TODO: write once and copy the rest.
 
+        // TODO: should be one set/buffer/memory per shape as well, in case there is a different transform.
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = _transformsUBOs[i];
         bufferInfo.offset = 0;
@@ -1420,7 +1433,8 @@ int VulkanRenderer::_createCommandBuffers() {
                 vkCmdBindDescriptorSets(_commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
                     _pipelineLayout, 0, 2, descriptorSets.data(), 0, nullptr);
 
-                vkCmdDrawIndexed(_commandBuffers[imageIndex], static_cast<uint32_t>(indexBuffers[shapeIndex].nbElements), 1, 0, 0, 0);
+                //vkCmdDrawIndexed(_commandBuffers[imageIndex], static_cast<uint32_t>(indexBuffers[shapeIndex].nbElements), 1, 0, 0, 0);
+                vkCmdDrawIndexed(_commandBuffers[imageIndex], 3, 1, 0, 0, 0);
             }
 
             materialIndex++;
@@ -1500,4 +1514,9 @@ void VulkanRenderer::_endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCom
 void VulkanRenderer::setScene(const leo::Scene* scene)
 {
 	_scene = scene;
+}
+
+void VulkanRenderer::setCamera(const leo::Camera* camera)
+{
+    _camera = camera;
 }

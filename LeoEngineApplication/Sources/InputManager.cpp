@@ -66,7 +66,7 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
 
     glm::vec3 cameraFront = glm::normalize(glm::vec3(
         cos(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch)),
-        sin(glm::radians(_currentPitch)),
+        -sin(glm::radians(_currentPitch)),
         sin(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch))
     ));
 
@@ -92,10 +92,10 @@ void InputManager::_processKeyboard(CameraMovement direction, float deltaTime)
         _camera->setPosition(_camera->getPosition() + glm::vec3(cameraRight.x, 0, cameraRight.z) * velocity);
         break;
     case CameraMovement::UP:
-        _camera->setPosition(_camera->getPosition() + glm::vec3(0, velocity, 0));
+        _camera->setPosition(_camera->getPosition() - glm::vec3(0, velocity, 0));
         break;
     case CameraMovement::DOWN:
-        _camera->setPosition(_camera->getPosition() - glm::vec3(0, velocity, 0));
+        _camera->setPosition(_camera->getPosition() + glm::vec3(0, velocity, 0));
         break;
     }
 }
