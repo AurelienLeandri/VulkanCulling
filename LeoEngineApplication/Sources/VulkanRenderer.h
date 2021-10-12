@@ -14,6 +14,31 @@ namespace leo {
 	class Shape;
 }
 
+struct CameraBuffer {
+	glm::mat4 view;
+	glm::mat4 proj;
+	glm::mat4 viewProj;
+};
+
+struct AllocatedBuffer {
+	VkBuffer buffer = VK_NULL_HANDLE;
+	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
+};
+
+struct FrameData {
+	AllocatedBuffer cameraBuffer = {};
+	VkDescriptorSet cameraDescriptorSet = VK_NULL_HANDLE;
+	VkFramebuffer framebuffer = VK_NULL_HANDLE;
+	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+};
+
+struct RenderableObject {
+	AllocatedBuffer vertexBuffer = {};
+	AllocatedBuffer indexBuffer = {};
+	const leo::Shape* sceneShape = nullptr;
+	const leo::Material* material = nullptr;
+};
+
 
 class VulkanRenderer
 {
@@ -39,12 +64,6 @@ private:
 		uint32_t mipLevels = 0;
 	};
 
-	struct _TransformsUBO {
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 model;
-		alignas(16) glm::mat4 proj;
-	};
-
 	struct _BufferData {
 		VkBuffer buffer = VK_NULL_HANDLE;
 		VkDeviceMemory memory = VK_NULL_HANDLE;
@@ -59,19 +78,19 @@ private:
 private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPool();
-	int _loadBuffersToDeviceMemory();
-	int _allocateUniformBuffersToDeviceMemory();
 	int _loadImagesToDeviceMemory();
 	int _createDescriptorSetLayouts();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
 	int _createFramebufferImageResources();
 	int _createFramebuffers();
-	int _createDescriptorPools();
-	int _createDescriptorSets();
 	int _createCommandBuffers();
 	int _createSyncObjects();
-	void _updateUniformBuffer(uint32_t currentImage);
+	void _updateFrameLevelUniformBuffers(uint32_t currentImage);
+
+	int _createBuffers();
+	int _createDescriptorPools();
+	int _createDescriptorSets();
 
 	int _recreateSwapChainDependentResources();
 
@@ -92,43 +111,42 @@ private:
 	void _cleanupSwapChainDependentResources();
 
 private:
+	Options _options;
+
+	// Data from other objects
 	const leo::Camera* _camera = nullptr;
 	const leo::Scene* _scene = nullptr;
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;
-	Options _options;
-	std::map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
 
+	// Pools
 	VkCommandPool _commandPool = VK_NULL_HANDLE;
-
-	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
-
-	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _transformsDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
 
+	// Main pipeline
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _cameraDescriptorSetLayout = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
+	// Per-frame data
+	std::vector<FrameData> _framesData;
+
+	// Data shared between framebuffers
 	_ImageData _framebufferColor;
+	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 	_ImageData _framebufferDepth;
-	std::vector<VkFramebuffer> _framebuffers;
 
-	std::vector<VkBuffer> _transformsUBOs;
-	std::vector<VkDeviceMemory> _transformsUBOsMemory;
-
-	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image
-	std::vector<VkDescriptorSet> _transformsDescriptorSets;  // One entry per swapchain image
-
-	std::vector<VkCommandBuffer> _commandBuffers;
-
+	// Constant input data
+	std::map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _vertexBuffers;
 	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _indexBuffers;
-
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
+	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image
 
+	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
 	size_t _currentFrame = 0;
 	std::vector<VkSemaphore> _imageAvailableSemaphores;

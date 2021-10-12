@@ -21,12 +21,13 @@ layout (location = 1) out vec2 fragTexCoord;
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
-    mat4 model;
     mat4 proj;
+    mat4 viewProj;
 } transforms;
 
 void main() {
-	gl_Position = transforms.proj * transforms.view * transforms.model * vec4(positions[gl_VertexIndex], 1.0);
-    //fragNormal = inNormal;
-    //fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
+	gl_Position = transforms.viewProj * vec4(inPosition, 1.0);
+    // fragNormal = normalize(vec3(transpose(inverse(transforms.model)) * vec4(inNormal, 0.0)));
+    fragNormal = inNormal;
+    fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
 }

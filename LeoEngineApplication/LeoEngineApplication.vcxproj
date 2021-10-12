@@ -25,6 +25,7 @@
     <ClCompile Include="Sources\VulkanInstance.cpp" />
     <ClCompile Include="Sources\VulkanRenderer.cpp" />
     <ClCompile Include="Sources\Window.cpp" />
+    <ClCompile Include="Sources\VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Sources\Application.h" />
@@ -32,6 +33,7 @@
     <ClInclude Include="Sources\VulkanInstance.h" />
     <ClInclude Include="Sources\VulkanRenderer.h" />
     <ClInclude Include="Sources\Window.h" />
+    <ClInclude Include="Sources\VulkanUtils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

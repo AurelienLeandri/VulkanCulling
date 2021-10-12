@@ -59,7 +59,7 @@ int VulkanInstance::init()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VK_API_VERSION_1_1;
 
     instanceCreateInfo.pApplicationInfo = &appInfo;
 
@@ -637,6 +637,16 @@ uint32_t VulkanInstance::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFla
     }
 
     throw std::runtime_error("Failed to find suitable memory type");
+}
+
+VkPhysicalDevice& VulkanInstance::getPhysicalDevice()
+{
+    return _physicalDevice;
+}
+
+VkInstance& VulkanInstance::getInstance()
+{
+    return _instance;
 }
 
 const VulkanInstance::Properties& VulkanInstance::getProperties() const {

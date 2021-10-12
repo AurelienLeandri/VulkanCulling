@@ -59,6 +59,8 @@ public:
 	VkQueue& getGraphicsQueue();
 	VkQueue& getPresentationQueue();
 	VkSwapchainKHR& getSwapChain();
+	VkPhysicalDevice& getPhysicalDevice();
+	VkInstance& getInstance();
 	size_t getSwapChainSize() const;
 	void cleanupSwapChain();
 
