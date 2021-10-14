@@ -37,6 +37,7 @@ struct RenderableObject {
 	AllocatedBuffer indexBuffer = {};
 	const leo::Shape* sceneShape = nullptr;
 	const leo::Material* material = nullptr;
+	size_t nbElements = 0;
 };
 
 
@@ -62,12 +63,6 @@ private:
 		VkImageView view = VK_NULL_HANDLE;
 		VkSampler textureSampler = VK_NULL_HANDLE;
 		uint32_t mipLevels = 0;
-	};
-
-	struct _BufferData {
-		VkBuffer buffer = VK_NULL_HANDLE;
-		VkDeviceMemory memory = VK_NULL_HANDLE;
-		size_t nbElements = 0;
 	};
 
 	struct _DescriptorSets {
@@ -139,9 +134,9 @@ private:
 	_ImageData _framebufferDepth;
 
 	// Constant input data
-	std::map<const leo::Material*, std::vector<const leo::Shape*>> _shapesPerMaterial;
-	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _vertexBuffers;
-	std::unordered_map<const leo::Material*, std::vector<_BufferData>> _indexBuffers;
+	std::map<const leo::Material*, std::vector<RenderableObject*>> _objectsPerMaterial;
+	std::vector<RenderableObject> _renderableObjects;
+
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
 	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image

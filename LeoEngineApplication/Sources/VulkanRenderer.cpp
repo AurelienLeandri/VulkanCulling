@@ -59,16 +59,14 @@ int VulkanRenderer::_cleanup()
     _materialsImages.clear();
 
     // Cleanup of the geometry buffers
-    for (auto* buffers : { &_vertexBuffers, &_indexBuffers }) {
-        for (auto& entry : *buffers) {
-            for (const _BufferData& bufferData : entry.second) {
-                vkDestroyBuffer(_device, bufferData.buffer, nullptr);
-                vkFreeMemory(_device, bufferData.memory, nullptr);
-            }
-            entry.second.clear();
-        }
-        buffers->clear();
+    _objectsPerMaterial.clear();
+    for (RenderableObject& object : _renderableObjects) {
+        vkDestroyBuffer(_device, object.vertexBuffer.buffer, nullptr);
+        vkFreeMemory(_device, object.vertexBuffer.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, object.indexBuffer.buffer, nullptr);
+        vkFreeMemory(_device, object.indexBuffer.deviceMemory, nullptr);
     }
+    _renderableObjects.clear();
 
     vkDestroyCommandPool(_device, _commandPool, nullptr);
     _commandPool = VK_NULL_HANDLE;
@@ -267,25 +265,23 @@ int VulkanRenderer::iterate()
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
 
     size_t materialIndex = 0;
-    for (auto& entry : _shapesPerMaterial) {
+    for (auto& entry : _objectsPerMaterial) {
         const leo::Material* material = entry.first;
-        const std::vector<_BufferData>& vertexBuffers = _vertexBuffers[material];
-        const std::vector<_BufferData>& indexBuffers = _indexBuffers[material];
         VkDeviceSize offsets[] = { 0 };
 
-        for (size_t shapeIndex = 0; shapeIndex < vertexBuffers.size(); ++shapeIndex) {
-            vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &vertexBuffers[shapeIndex].buffer, offsets);
+        for (const RenderableObject* object : entry.second) {
+            vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &object->vertexBuffer.buffer, offsets);
 
-            vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, indexBuffers[shapeIndex].buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, object->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             std::array<VkDescriptorSet, 2> descriptorSets = {
                 _framesData[imageIndex].cameraDescriptorSet,
-                _materialDescriptorSets[imageIndex * _shapesPerMaterial.size() + materialIndex],
+                _materialDescriptorSets[imageIndex * _objectsPerMaterial.size() + materialIndex],
             };
             vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 _pipelineLayout, 0, 2, descriptorSets.data(), 0, nullptr);
 
-            vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(indexBuffers[shapeIndex].nbElements), 1, 0, 0, 0);
+            vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(object->nbElements), 1, 0, 0, 0);
         }
 
         materialIndex++;
@@ -397,95 +393,86 @@ int VulkanRenderer::_createBuffers()
     * Vertex and index buffers
     */
 
-    for (auto& entry : _shapesPerMaterial) {
-        const leo::Material* material = entry.first;
-        _vertexBuffers[material] = std::vector<_BufferData>();
-        for (const leo::Shape* shape : entry.second) {
-            if (shape->getType() == leo::Shape::Type::MESH) {
-                const leo::Mesh* mesh = static_cast<const leo::Mesh*>(shape);
+    for (RenderableObject& object : _renderableObjects) {
+        const leo::Material* material = object.material;
+        if (object.sceneShape->getType() == leo::Shape::Type::MESH) {
+            const leo::Mesh* mesh = static_cast<const leo::Mesh*>(object.sceneShape);
 
-                /*
-                * Vertex buffer
-                */
+            /*
+            * Vertex buffer
+            */
 
-                const std::vector<leo::Vertex>& vertices = mesh->vertices;
+            const std::vector<leo::Vertex>& vertices = mesh->vertices;
 
-                VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+            VkDeviceSize bufferSize = sizeof(leo::Vertex) * vertices.size();
 
-                VkBuffer stagingBuffer;
-                VkDeviceMemory stagingBufferMemory;
-                if (_createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    stagingBuffer, stagingBufferMemory))
-                {
-                    return -1;
-                }
-
-                void* data = nullptr;
-                vkMapMemory(_device, stagingBufferMemory, 0, bufferSize, 0, &data);
-                memcpy(data, vertices.data(), (size_t)bufferSize);
-                vkUnmapMemory(_device, stagingBufferMemory);
-
-                _vertexBuffers[material].push_back(_BufferData());
-                _BufferData& bufferData = _vertexBuffers[material].back();
-                bufferData.nbElements = vertices.size();
-
-                if (_createBuffer(bufferSize,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    bufferData.buffer, bufferData.memory))
-                {
-                    return -1;
-                }
-
-                _copyBuffer(stagingBuffer, bufferData.buffer, bufferSize);
-
-                vkDestroyBuffer(_device, stagingBuffer, nullptr);
-                stagingBuffer = VK_NULL_HANDLE;
-                vkFreeMemory(_device, stagingBufferMemory, nullptr);
-                stagingBufferMemory = VK_NULL_HANDLE;
-
-                /*
-                * Index buffer
-                */
-
-                const std::vector<uint32_t>& indices = mesh->indices;
-                VkDeviceSize indicesBufferSize = sizeof(indices[0]) * indices.size();
-
-                VkBuffer indexStagingBuffer;
-                VkDeviceMemory indexStagingBufferMemory;
-                if (_createBuffer(indicesBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexStagingBuffer, indexStagingBufferMemory))
-                {
-                    return -1;
-                }
-
-                void* indexData = nullptr;
-                vkMapMemory(_device, indexStagingBufferMemory, 0, indicesBufferSize, 0, &indexData);
-                memcpy(indexData, indices.data(), (size_t)indicesBufferSize);
-                vkUnmapMemory(_device, indexStagingBufferMemory);
-
-                _indexBuffers[material].push_back(_BufferData());
-                _BufferData& indexBufferData = _indexBuffers[material].back();
-                indexBufferData.nbElements = indices.size();
-
-                if (_createBuffer(indicesBufferSize,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferData.buffer, indexBufferData.memory))
-                {
-                    return -1;
-                }
-
-                _copyBuffer(indexStagingBuffer, indexBufferData.buffer, indicesBufferSize);
-
-                vkDestroyBuffer(_device, indexStagingBuffer, nullptr);
-                indexStagingBuffer = VK_NULL_HANDLE;
-                vkFreeMemory(_device, indexStagingBufferMemory, nullptr);
-                indexStagingBufferMemory = VK_NULL_HANDLE;
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            if (_createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingBuffer, stagingBufferMemory))
+            {
+                return -1;
             }
-            else {
-                // TODO: Spheres and single triangles?
+
+            void* data = nullptr;
+            vkMapMemory(_device, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
+            vkUnmapMemory(_device, stagingBufferMemory);
+
+            if (_createBuffer(bufferSize,
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                object.vertexBuffer.buffer, object.vertexBuffer.deviceMemory))
+            {
+                return -1;
             }
+
+            _copyBuffer(stagingBuffer, object.vertexBuffer.buffer, bufferSize);
+
+            vkDestroyBuffer(_device, stagingBuffer, nullptr);
+            stagingBuffer = VK_NULL_HANDLE;
+            vkFreeMemory(_device, stagingBufferMemory, nullptr);
+            stagingBufferMemory = VK_NULL_HANDLE;
+
+            /*
+            * Index buffer
+            */
+
+            const std::vector<uint32_t>& indices = mesh->indices;
+            VkDeviceSize indicesBufferSize = sizeof(indices[0]) * indices.size();
+
+            object.nbElements = indices.size();
+
+            VkBuffer indexStagingBuffer;
+            VkDeviceMemory indexStagingBufferMemory;
+            if (_createBuffer(indicesBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexStagingBuffer, indexStagingBufferMemory))
+            {
+                return -1;
+            }
+
+            void* indexData = nullptr;
+            vkMapMemory(_device, indexStagingBufferMemory, 0, indicesBufferSize, 0, &indexData);
+            memcpy(indexData, indices.data(), static_cast<size_t>(indicesBufferSize));
+            vkUnmapMemory(_device, indexStagingBufferMemory);
+
+            if (_createBuffer(indicesBufferSize,
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, object.indexBuffer.buffer, object.indexBuffer.deviceMemory))
+            {
+                return -1;
+            }
+
+            _copyBuffer(indexStagingBuffer, object.indexBuffer.buffer, indicesBufferSize);
+
+            vkDestroyBuffer(_device, indexStagingBuffer, nullptr);
+            indexStagingBuffer = VK_NULL_HANDLE;
+            vkFreeMemory(_device, indexStagingBufferMemory, nullptr);
+            indexStagingBufferMemory = VK_NULL_HANDLE;
+        }
+        else {
+            // TODO: Spheres and single triangles?
         }
     }
 
@@ -504,7 +491,6 @@ int VulkanRenderer::_createBuffers()
             std::cerr << "Could not create uniform buffer" << std::endl;
             return -1;
         }
-        _updateFrameLevelUniformBuffers(i);
     }
 
     return 0;
@@ -1076,13 +1062,19 @@ void VulkanRenderer::_constructSceneRelatedStructures()
         const leo::Material* material = sceneObject.material.get();
         const leo::Shape* shape = sceneObject.shape.get();
         const leo::Transform* transform = sceneObject.transform.get();  // No per scene object transform. No point in that since the scene doesnt move. We must pre-transform objects.
-        if (_shapesPerMaterial.find(material) == _shapesPerMaterial.end()) {
-            _shapesPerMaterial[material] = std::vector<const leo::Shape*>();
+        RenderableObject object = {};
+        object.material = material;
+        object.sceneShape = shape;
+        _renderableObjects.push_back(object);
+    }
+    for (RenderableObject& object : _renderableObjects) {
+        if (_objectsPerMaterial.find(object.material) == _objectsPerMaterial.end()) {
+            _objectsPerMaterial[object.material] = std::vector<RenderableObject*>();
         }
-        if (_materialsImages.find(material) == _materialsImages.end()) {
-            _materialsImages[material] = std::vector<_ImageData>(5);
+        if (_materialsImages.find(object.material) == _materialsImages.end()) {
+            _materialsImages[object.material] = std::vector<_ImageData>(5);
         }
-        _shapesPerMaterial[material].push_back(shape);
+        _objectsPerMaterial[object.material].push_back(&object);
     }
 }
 
@@ -1277,13 +1269,13 @@ int VulkanRenderer::_createDescriptorPools()
 
     poolSizes.push_back({});
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize * _shapesPerMaterial.size()) * 5;  // 5 textures in the material
+    poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainSize * _objectsPerMaterial.size()) * 5;  // 5 textures in the material
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize * (_shapesPerMaterial.size() + 1));  // One set per material plus one transform UBO, per swap chain image
+    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize * (_objectsPerMaterial.size() + 1));  // One set per material plus one transform UBO, per swap chain image
 
     if (vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool)) {
         std::cerr << "Failed to create descriptor pool." << std::endl;
@@ -1302,7 +1294,7 @@ int VulkanRenderer::_createDescriptorSets()
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = _descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize * _shapesPerMaterial.size());
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize * _objectsPerMaterial.size());
     std::vector<VkDescriptorSetLayout> layouts(allocInfo.descriptorSetCount, _materialDescriptorSetLayout);
     allocInfo.pSetLayouts = layouts.data();
 
@@ -1312,13 +1304,13 @@ int VulkanRenderer::_createDescriptorSets()
         return -1;
     }
 
-    std::vector<VkWriteDescriptorSet> materialsDescriptorWrites(swapChainSize * _shapesPerMaterial.size() * 5, VkWriteDescriptorSet());
+    std::vector<VkWriteDescriptorSet> materialsDescriptorWrites(swapChainSize * _objectsPerMaterial.size() * 5, VkWriteDescriptorSet());
 
     for (size_t i = 0; i < swapChainSize; ++i) {
         // Updating descriptor set for material textures
         // TODO: write once and copy the rest.
         size_t materialIdx = 0;
-        for (const auto& entry : _shapesPerMaterial) {
+        for (const auto& entry : _objectsPerMaterial) {
             const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
             const std::vector<_ImageData>& materialImages = _materialsImages[material];
 
@@ -1328,9 +1320,9 @@ int VulkanRenderer::_createDescriptorSets()
             imageInfo.sampler = materialImages[0].textureSampler;
 
             for (size_t materialTextureIndex = 0; materialTextureIndex < 5; ++materialTextureIndex) {
-                size_t descriptorSetIndex = i * _shapesPerMaterial.size() * 5 + materialIdx * 5 + materialTextureIndex;
+                size_t descriptorSetIndex = i * _objectsPerMaterial.size() * 5 + materialIdx * 5 + materialTextureIndex;
                 materialsDescriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                materialsDescriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[i * _shapesPerMaterial.size() + materialIdx];
+                materialsDescriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[i * _objectsPerMaterial.size() + materialIdx];
                 materialsDescriptorWrites[descriptorSetIndex].dstBinding = static_cast<uint32_t>(materialTextureIndex);
                 materialsDescriptorWrites[descriptorSetIndex].dstArrayElement = 0;
                 materialsDescriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

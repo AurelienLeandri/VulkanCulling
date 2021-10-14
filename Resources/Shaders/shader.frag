@@ -12,5 +12,6 @@ layout (set = 1, binding = 3) uniform sampler2D normalSampler;
 layout (set = 1, binding = 4) uniform sampler2D heightSampler;
 
 void main() {
-	outColor = texture(diffuseSampler, fragTexCoord);
+	//outColor = texture(diffuseSampler, fragTexCoord);
+	outColor = vec4(fragTexCoord, 0, 1);
 }
