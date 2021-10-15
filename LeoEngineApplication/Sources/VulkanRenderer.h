@@ -26,6 +26,10 @@ struct AllocatedBuffer {
 };
 
 struct FrameData {
+	VkSemaphore presentSemaphore = VK_NULL_HANDLE;
+	VkSemaphore renderSemaphore = VK_NULL_HANDLE;
+	VkFence renderFinishedFence = VK_NULL_HANDLE;
+
 	AllocatedBuffer cameraBuffer = {};
 	VkDescriptorSet cameraDescriptorSet = VK_NULL_HANDLE;
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
@@ -145,9 +149,5 @@ private:
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
 	size_t _currentFrame = 0;
-	std::vector<VkSemaphore> _imageAvailableSemaphores;
-	std::vector<VkSemaphore> _renderFinishedSemaphores;
-	std::vector<VkFence> _inFlightFences;
-	std::vector<VkFence> _imagesInFlight;
 };
 
