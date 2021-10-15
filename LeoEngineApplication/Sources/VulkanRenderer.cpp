@@ -68,9 +68,6 @@ int VulkanRenderer::_cleanup()
     }
     _renderableObjects.clear();
 
-    vkDestroyCommandPool(_device, _commandPool, nullptr);
-    _commandPool = VK_NULL_HANDLE;
-
     vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
     _materialDescriptorSetLayout = VK_NULL_HANDLE;
 
@@ -105,7 +102,8 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
         vkDestroyBuffer(_device, frameData.cameraBuffer.buffer, nullptr);
         vkFreeMemory(_device, frameData.cameraBuffer.deviceMemory, nullptr);
         vkDestroyFramebuffer(_device, frameData.framebuffer, nullptr);
-        vkFreeCommandBuffers(_device, _commandPool, 1, &frameData.commandBuffer);
+        vkFreeCommandBuffers(_device, frameData.commandPool, 1, &frameData.commandBuffer);
+        vkDestroyCommandPool(_device, frameData.commandPool, nullptr);
     }
     _framesData.clear();
 
@@ -150,7 +148,7 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    if (_createCommandPool()) {
+    if (_createCommandPools()) {
         std::cerr << "Could not initialize command pool." << std::endl;
         return -1;
     }
@@ -373,15 +371,23 @@ int VulkanRenderer::_recreateSwapChainDependentResources() {
 }
 
 
-int VulkanRenderer::_createCommandPool()
+int VulkanRenderer::_createCommandPools()
 {
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan->getQueueFamilyIndices();
 
     VkCommandPoolCreateInfo poolInfo = VulkanUtils::createCommandPoolInfo(queueFamilyIndices.graphicsFamily.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-    if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPool)) {
+    // TODO: maybe make a command pool for transfer operations only, for switching layouts, transfering data and stuff.
+    if (vkCreateCommandPool(_device, &poolInfo, nullptr, &_mainCommandPool)) {
         std::cerr << "Failed to create command pool." << std::endl;
         return -1;
+    }
+
+    for (FrameData& frameData : _framesData) {
+        if (vkCreateCommandPool(_device, &poolInfo, nullptr, &frameData.commandPool)) {
+            std::cerr << "Failed to create command pool." << std::endl;
+            return -1;
+        }
     }
 
     return 0;
@@ -551,13 +557,13 @@ int VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 }
 
 int VulkanRenderer::_copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_commandPool);
+    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
 
     VkBufferCopy copyRegion{};
     copyRegion.size = size;
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-    _endSingleTimeCommands(commandBuffer, _commandPool);
+    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
 
     return 0;
 }
@@ -682,7 +688,7 @@ int VulkanRenderer::_loadImagesToDeviceMemory() {
 
 int VulkanRenderer::_transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_commandPool);
+    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
 
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -723,7 +729,7 @@ int VulkanRenderer::_transitionImageLayout(_ImageData& imageData, VkFormat forma
 
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-    _endSingleTimeCommands(commandBuffer, _commandPool);
+    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
 
     return 0;
 }
@@ -733,7 +739,7 @@ void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
     // instead of calling beginSingleTimeCommands and endSingleTimeCommands each time.
     // Could also be done for uniforms and other stuff that creates single-time command buffers several times.
     // For example pass the commandBuffer as parameter and initialize it before doing all the createBuffer/Image, copyBuffer/image stuff.
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_commandPool);
+    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
 
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
@@ -748,14 +754,14 @@ void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
 
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    _endSingleTimeCommands(commandBuffer, _commandPool);
+    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
 }
 
 void VulkanRenderer::_generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight) {
     // Check if image format supports linear blitting
     _vulkan->findSupportedFormat({ imageFormat }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
 
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_commandPool);
+    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
 
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -827,7 +833,7 @@ void VulkanRenderer::_generateMipmaps(_ImageData& imageData, VkFormat imageForma
         0, nullptr,
         1, &barrier);
 
-    _endSingleTimeCommands(commandBuffer, _commandPool);
+    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
 }
 
 int VulkanRenderer::_createGraphicsPipeline()
@@ -1406,7 +1412,7 @@ int VulkanRenderer::_createFramebuffers()
 
 int VulkanRenderer::_createCommandBuffers() {
     for (FrameData& frame : _framesData) {
-        VkCommandBufferAllocateInfo allocInfo = VulkanUtils::createCommandBufferAllocateInfo(_commandPool, 1);
+        VkCommandBufferAllocateInfo allocInfo = VulkanUtils::createCommandBufferAllocateInfo(frame.commandPool, 1);
 
         if (vkAllocateCommandBuffers(_device, &allocInfo, &frame.commandBuffer)) {
             std::cerr << "Failed to allocate command buffers." << std::endl;

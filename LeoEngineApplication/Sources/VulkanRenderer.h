@@ -29,6 +29,7 @@ struct FrameData {
 	AllocatedBuffer cameraBuffer = {};
 	VkDescriptorSet cameraDescriptorSet = VK_NULL_HANDLE;
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
+	VkCommandPool commandPool = VK_NULL_HANDLE;
 	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
 };
 
@@ -72,7 +73,7 @@ private:
 
 private:
 	void _constructSceneRelatedStructures();
-	int _createCommandPool();
+	int _createCommandPools();
 	int _loadImagesToDeviceMemory();
 	int _createDescriptorSetLayouts();
 	int _createRenderPass();
@@ -115,8 +116,8 @@ private:
 	VkDevice _device = VK_NULL_HANDLE;
 
 	// Pools
-	VkCommandPool _commandPool = VK_NULL_HANDLE;
 	VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
+	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
 
 	// Main pipeline
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
