@@ -1,4 +1,4 @@
-#version 450
+#version 460
 
 vec3 positions[3] = vec3[](
     vec3(0.0, -0.5, 0.0),
@@ -25,8 +25,16 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 viewProj;
 } transforms;
 
+struct ObjectData{
+	mat4 model;
+};
+
+layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
+	ObjectData objects[];
+} objectBuffer;
+
 void main() {
-	gl_Position = transforms.viewProj * vec4(inPosition, 1.0);
+	gl_Position = transforms.viewProj * objectBuffer.objects[gl_BaseInstance].model * vec4(inPosition, 1.0);
     // fragNormal = normalize(vec3(transpose(inverse(transforms.model)) * vec4(inNormal, 0.0)));
     fragNormal = inNormal;
     fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);

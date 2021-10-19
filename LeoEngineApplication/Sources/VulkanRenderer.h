@@ -12,6 +12,7 @@ namespace leo {
 	class Scene;
 	class Material;
 	class Shape;
+	class Transform;
 }
 
 struct GPUCameraData {
@@ -48,10 +49,12 @@ struct FrameData {
 };
 
 struct RenderableObject {
+	size_t index = 0;
 	AllocatedBuffer vertexBuffer = {};
 	AllocatedBuffer indexBuffer = {};
 	const leo::Shape* sceneShape = nullptr;
 	const leo::Material* material = nullptr;
+	const leo::Transform* transform = nullptr;
 	size_t nbElements = 0;
 };
 
@@ -88,7 +91,7 @@ private:
 private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPools();
-	int _loadImagesToDeviceMemory();
+	int _createInputImages();
 	int _createDescriptorSetLayouts();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
@@ -138,10 +141,14 @@ private:
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
 	// Per-frame data
 	std::vector<FrameData> _framesData;
+
+	// Descriptors shared between frames
+	VkDescriptorSet _objectsDataDescriptorSet = VK_NULL_HANDLE;
 
 	// Buffers
 	AllocatedBuffer _cameraDataBuffer;
@@ -163,6 +170,7 @@ private:
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
+	static const int _MAX_NUMBER_OBJECTS = 10000;
 	size_t _currentFrame = 0;
 };
 
