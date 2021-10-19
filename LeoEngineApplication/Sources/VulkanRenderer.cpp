@@ -90,8 +90,6 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
 
     // Destroying UBOs
     for (FrameData& frameData : _framesData) {
-        vkDestroyBuffer(_device, frameData.cameraBuffer.buffer, nullptr);
-        vkFreeMemory(_device, frameData.cameraBuffer.deviceMemory, nullptr);
         vkDestroyFramebuffer(_device, frameData.framebuffer, nullptr);
         vkFreeCommandBuffers(_device, frameData.commandPool, 1, &frameData.commandBuffer);
         vkDestroyCommandPool(_device, frameData.commandPool, nullptr);
@@ -103,6 +101,10 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
 
     vkDestroyBuffer(_device, _sceneDataBuffer.buffer, nullptr);
     vkFreeMemory(_device, _sceneDataBuffer.deviceMemory, nullptr);
+    _sceneDataBuffer = {};
+    vkDestroyBuffer(_device, _cameraDataBuffer.buffer, nullptr);
+    vkFreeMemory(_device, _cameraDataBuffer.deviceMemory, nullptr);
+    _cameraDataBuffer = {};
 
     // Cleanup of the framebuffers shared data
     vkDestroyImageView(_device, _framebufferColor.view, nullptr);
@@ -479,29 +481,39 @@ int VulkanRenderer::_createBuffers()
     */
 
     size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
-    VkDeviceSize cameraBufferSize = sizeof (GPUCameraData);
+    VkDeviceSize cameraBufferSize = nbSwapChainImages * _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
 
-    for (size_t i = 0; i < nbSwapChainImages; i++) {
-        if (_createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            _framesData[i].cameraBuffer.buffer, _framesData[i].cameraBuffer.deviceMemory))
-        {
-            std::cerr << "Could not create uniform buffer" << std::endl;
-            return -1;
-        }
+    if (_createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        _cameraDataBuffer.buffer, _cameraDataBuffer.deviceMemory))
+    {
+        std::cerr << "Could not create uniform buffer" << std::endl;
+        return -1;
     }
 
     /*
-    * Creating Scene data buffer
+    * Creating scene data buffer
     */
-    size_t bufferSize = _MAX_FRAMES_IN_FLIGHT * _vulkan->padUniformBufferSize(sizeof (GPUSceneData));
-    if (_createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+
+    size_t sceneDataBufferSize = sizeof (GPUSceneData);
+    if (_createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _sceneDataBuffer.buffer, _sceneDataBuffer.deviceMemory))
     {
         std::cerr << "Could not create uniform buffer" << std::endl;
         return -1;
     }
+
+    // TODO: Put actual values (maybe from options and/or leo::Scene)
+    GPUSceneData sceneData;
+    sceneData.ambientColor = { 1, 0, 0, 0 };
+    sceneData.sunlightColor = { 0, 1, 0, 0 };
+    sceneData.sunlightDirection = { 0, 0, 0, 1 };
+
+    void* data = nullptr;
+    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof(GPUSceneData), 0, &data);
+    memcpy(data, &sceneData, sizeof(GPUSceneData));
+    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
 
     return 0;
 }
@@ -524,23 +536,10 @@ void VulkanRenderer::_updateFrameLevelUniformBuffers(uint32_t currentImage) {
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
     void* data = nullptr;
-    vkMapMemory(_device, _framesData[currentImage].cameraBuffer.deviceMemory, 0, sizeof (GPUCameraData), 0, &data);
+    size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
+    vkMapMemory(_device, _cameraDataBuffer.deviceMemory, cameraBufferPadding * currentImage, sizeof (GPUCameraData), 0, &data);
     memcpy(data, &cameraData, sizeof (GPUCameraData));
-    vkUnmapMemory(_device, _framesData[currentImage].cameraBuffer.deviceMemory);
-
-    /*
-    * Scene data
-    */
-
-    GPUSceneData sceneData;
-    sceneData.ambientColor = { 1, 0, 0, 0 };
-    sceneData.sunlightColor = { 0, 1, 0, 0 };
-    sceneData.sunlightDirection = { 0, 0, 0, 1 };
-
-    data = nullptr;
-    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof (GPUSceneData), 0, &data);
-    memcpy(data, &sceneData, sizeof (GPUSceneData));
-    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
+    vkUnmapMemory(_device, _cameraDataBuffer.deviceMemory);
 }
 
 int VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -1383,6 +1382,8 @@ int VulkanRenderer::_createDescriptorSets()
     std::vector<VkWriteDescriptorSet> descriptorWrites(swapChainSize * 2, VkWriteDescriptorSet());
     std::vector<VkDescriptorBufferInfo> bufferInfos(swapChainSize * 2, VkDescriptorBufferInfo());
 
+    size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
+
     for (size_t frameNumber = 0; frameNumber < swapChainSize; ++frameNumber) {
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1396,8 +1397,8 @@ int VulkanRenderer::_createDescriptorSets()
             return -1;
         }
 
-        bufferInfos[frameNumber * 2].buffer = _framesData[frameNumber].cameraBuffer.buffer;
-        bufferInfos[frameNumber * 2].offset = 0;
+        bufferInfos[frameNumber * 2].buffer = _cameraDataBuffer.buffer;
+        bufferInfos[frameNumber * 2].offset = cameraBufferPadding * frameNumber;
         bufferInfos[frameNumber * 2].range = sizeof (GPUCameraData);
 
         bufferInfos[frameNumber * 2 + 1].buffer = _sceneDataBuffer.buffer;

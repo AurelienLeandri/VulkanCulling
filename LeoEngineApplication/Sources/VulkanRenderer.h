@@ -26,6 +26,11 @@ struct GPUSceneData {
 	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
+
+struct GPUObjectData {
+	glm::mat4 modelMatrix;
+};
+
 struct AllocatedBuffer {
 	VkBuffer buffer = VK_NULL_HANDLE;
 	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
@@ -36,7 +41,6 @@ struct FrameData {
 	VkSemaphore renderSemaphore = VK_NULL_HANDLE;
 	VkFence renderFinishedFence = VK_NULL_HANDLE;
 
-	AllocatedBuffer cameraBuffer = {};
 	VkDescriptorSet globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 	VkCommandPool commandPool = VK_NULL_HANDLE;
@@ -139,8 +143,10 @@ private:
 	// Per-frame data
 	std::vector<FrameData> _framesData;
 
-	// Scene Buffer
+	// Buffers
+	AllocatedBuffer _cameraDataBuffer;
 	AllocatedBuffer _sceneDataBuffer;
+	AllocatedBuffer _objectsDataBuffer;
 
 	// Data shared between framebuffers
 	_ImageData _framebufferColor;
