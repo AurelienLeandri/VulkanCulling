@@ -162,9 +162,8 @@ int VulkanInstance::init()
 
     _physicalDevice = *candidateDevice;
     _properties.maxNbMsaaSamples = _getMaxUsableSampleCount();
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(_physicalDevice, &properties);
-    _properties.maxSamplerAnisotropy = properties.limits.maxSamplerAnisotropy;
+    vkGetPhysicalDeviceProperties(_physicalDevice, &_physicalDeviceProperties);
+    _properties.maxSamplerAnisotropy = _physicalDeviceProperties.limits.maxSamplerAnisotropy;
 
     _queueFamilyIndices = candidateIndices;
     _swapChainSupportDetails = candidateSwapChainSupportDetails;
@@ -569,6 +568,21 @@ int VulkanInstance::createImage(
     vkBindImageMemory(_device, image, imageMemory, 0);
 
     return 0;
+}
+
+/*
+* Props to Sascha Willems.
+* https://github.com/SaschaWillems/Vulkan/tree/master/examples/dynamicuniformbuffer
+*/
+size_t VulkanInstance::padUniformBufferSize(size_t originalSize)
+{
+    // Calculate required alignment based on minimum device offset alignment
+    size_t minUboAlignment = _physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+    size_t alignedSize = originalSize;
+    if (minUboAlignment > 0) {
+        alignedSize = (alignedSize + minUboAlignment - 1) & ~(minUboAlignment - 1);
+    }
+    return alignedSize;
 }
 
 int VulkanInstance::createImageView(

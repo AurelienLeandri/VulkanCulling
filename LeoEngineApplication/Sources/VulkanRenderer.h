@@ -14,10 +14,16 @@ namespace leo {
 	class Shape;
 }
 
-struct CameraBuffer {
+struct GPUCameraData {
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::mat4 viewProj;
+};
+
+struct GPUSceneData {
+	glm::vec4 ambientColor = { 0, 0, 0, 0 };
+	glm::vec4 sunlightDirection = { 0, -1, 0, 0 };
+	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
 struct AllocatedBuffer {
@@ -31,7 +37,7 @@ struct FrameData {
 	VkFence renderFinishedFence = VK_NULL_HANDLE;
 
 	AllocatedBuffer cameraBuffer = {};
-	VkDescriptorSet cameraDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSet globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
@@ -127,11 +133,14 @@ private:
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _cameraDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
 	// Per-frame data
 	std::vector<FrameData> _framesData;
+
+	// Scene Buffer
+	AllocatedBuffer _sceneDataBuffer;
 
 	// Data shared between framebuffers
 	_ImageData _framebufferColor;

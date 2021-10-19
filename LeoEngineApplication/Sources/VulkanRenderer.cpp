@@ -60,8 +60,8 @@ int VulkanRenderer::_cleanup()
     vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
     _materialDescriptorSetLayout = VK_NULL_HANDLE;
 
-    vkDestroyDescriptorSetLayout(_device, _cameraDescriptorSetLayout, nullptr);
-    _cameraDescriptorSetLayout = VK_NULL_HANDLE;
+    vkDestroyDescriptorSetLayout(_device, _sceneDataDescriptorSetLayout, nullptr);
+    _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
 
     return 0;
 }
@@ -100,6 +100,9 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
         vkDestroyFence(_device, frameData.renderFinishedFence, nullptr);
     }
     _framesData.clear();
+
+    vkDestroyBuffer(_device, _sceneDataBuffer.buffer, nullptr);
+    vkFreeMemory(_device, _sceneDataBuffer.deviceMemory, nullptr);
 
     // Cleanup of the framebuffers shared data
     vkDestroyImageView(_device, _framebufferColor.view, nullptr);
@@ -262,7 +265,7 @@ int VulkanRenderer::iterate()
             vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, object->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             std::array<VkDescriptorSet, 2> descriptorSets = {
-                _framesData[imageIndex].cameraDescriptorSet,
+                _framesData[imageIndex].globalDataDescriptorSet,
                 _materialDescriptorSets[imageIndex * _objectsPerMaterial.size() + materialIndex],
             };
             vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -476,7 +479,7 @@ int VulkanRenderer::_createBuffers()
     */
 
     size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
-    VkDeviceSize cameraBufferSize = sizeof (CameraBuffer);
+    VkDeviceSize cameraBufferSize = sizeof (GPUCameraData);
 
     for (size_t i = 0; i < nbSwapChainImages; i++) {
         if (_createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -488,27 +491,56 @@ int VulkanRenderer::_createBuffers()
         }
     }
 
+    /*
+    * Creating Scene data buffer
+    */
+    size_t bufferSize = _MAX_FRAMES_IN_FLIGHT * _vulkan->padUniformBufferSize(sizeof (GPUSceneData));
+    if (_createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        _sceneDataBuffer.buffer, _sceneDataBuffer.deviceMemory))
+    {
+        std::cerr << "Could not create uniform buffer" << std::endl;
+        return -1;
+    }
+
     return 0;
 }
 
 void VulkanRenderer::_updateFrameLevelUniformBuffers(uint32_t currentImage) {
-    // TODO: Real values for model
-    CameraBuffer cameraBuffer;
-    cameraBuffer.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
     /*
-    // FIXME
+    * Camera data
+    */
+
+    GPUCameraData cameraData;
+    cameraData.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
+    // TODO: Real values for model
+    /*
     ubo.model = glm::mat4(0.01f);
     ubo.model[3][3] = 1;
     ubo.model[1][1] *= -1;
     */
     const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
-    cameraBuffer.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
-    cameraBuffer.viewProj = cameraBuffer.proj * cameraBuffer.view;
+    cameraData.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
+    cameraData.viewProj = cameraData.proj * cameraData.view;
 
     void* data = nullptr;
-    vkMapMemory(_device, _framesData[currentImage].cameraBuffer.deviceMemory, 0, sizeof (CameraBuffer), 0, &data);
-    memcpy(data, &cameraBuffer, sizeof (CameraBuffer));
+    vkMapMemory(_device, _framesData[currentImage].cameraBuffer.deviceMemory, 0, sizeof (GPUCameraData), 0, &data);
+    memcpy(data, &cameraData, sizeof (GPUCameraData));
     vkUnmapMemory(_device, _framesData[currentImage].cameraBuffer.deviceMemory);
+
+    /*
+    * Scene data
+    */
+
+    GPUSceneData sceneData;
+    sceneData.ambientColor = { 1, 0, 0, 0 };
+    sceneData.sunlightColor = { 0, 1, 0, 0 };
+    sceneData.sunlightDirection = { 0, 0, 0, 1 };
+
+    data = nullptr;
+    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof (GPUSceneData), 0, &data);
+    memcpy(data, &sceneData, sizeof (GPUSceneData));
+    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
 }
 
 int VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -978,8 +1010,8 @@ int VulkanRenderer::_createGraphicsPipeline()
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 2;
-    std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _cameraDescriptorSetLayout, _materialDescriptorSetLayout };
+    std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _sceneDataDescriptorSetLayout, _materialDescriptorSetLayout };
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(pSetLayouts.size());
     pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
@@ -1076,7 +1108,7 @@ void VulkanRenderer::_constructSceneRelatedStructures()
 int VulkanRenderer::_createDescriptorSetLayouts()
 {
     /*
-    * Transforms
+    * Camera transforms
     */
 
     VkDescriptorSetLayoutBinding uboTransformsLayoutBinding = {};
@@ -1086,13 +1118,25 @@ int VulkanRenderer::_createDescriptorSetLayouts()
     uboTransformsLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboTransformsLayoutBinding.pImmutableSamplers = nullptr;
 
+    /*
+    * Scene data
+    */
 
-    VkDescriptorSetLayoutCreateInfo uboTransformsLayoutInfo = {};
-    uboTransformsLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    uboTransformsLayoutInfo.bindingCount = 1;
-    uboTransformsLayoutInfo.pBindings = &uboTransformsLayoutBinding;
+    VkDescriptorSetLayoutBinding sceneDataLayoutBinding = {};
+    sceneDataLayoutBinding.binding = 1;
+    sceneDataLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    sceneDataLayoutBinding.descriptorCount = 1;
+    sceneDataLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    sceneDataLayoutBinding.pImmutableSamplers = nullptr;
 
-    if (vkCreateDescriptorSetLayout(_device, &uboTransformsLayoutInfo, nullptr, &_cameraDescriptorSetLayout)) {
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboTransformsLayoutBinding, sceneDataLayoutBinding };
+
+    VkDescriptorSetLayoutCreateInfo setLayoutInfo = {};
+    setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    setLayoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(_device, &setLayoutInfo, nullptr, &_sceneDataDescriptorSetLayout)) {
         std::cerr << "Failed to create transforms descriptor set layout." << std::endl;
         return -1;
     }
@@ -1103,20 +1147,20 @@ int VulkanRenderer::_createDescriptorSetLayouts()
 
     static const uint32_t nbTexturesInMaterial = 5;
 
-    std::array<VkDescriptorSetLayoutBinding, nbTexturesInMaterial> bindings = { {} };
+    std::array<VkDescriptorSetLayoutBinding, nbTexturesInMaterial> materialBindings = { {} };
 
     for (uint32_t i = 0; i < nbTexturesInMaterial; ++i) {
-        bindings[i].binding = i;
-        bindings[i].descriptorCount = 1;
-        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        bindings[i].pImmutableSamplers = nullptr;
-        bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        materialBindings[i].binding = i;
+        materialBindings[i].descriptorCount = 1;
+        materialBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        materialBindings[i].pImmutableSamplers = nullptr;
+        materialBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
     VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
     materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    materialLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    materialLayoutInfo.pBindings = bindings.data();
+    materialLayoutInfo.bindingCount = static_cast<uint32_t>(materialBindings.size());
+    materialLayoutInfo.pBindings = materialBindings.data();
 
     if (vkCreateDescriptorSetLayout(_device, &materialLayoutInfo, nullptr, &_materialDescriptorSetLayout)) {
         std::cerr << "Failed to create material descriptor set layout." << std::endl;
@@ -1333,38 +1377,51 @@ int VulkanRenderer::_createDescriptorSets()
     vkUpdateDescriptorSets(_device, static_cast<uint32_t>(materialsDescriptorWrites.size()), materialsDescriptorWrites.data(), 0, nullptr);
 
     /*
-    * Creating descriptor sets for camera transforms
+    * Creating descriptor sets
     */
     
-    std::vector<VkWriteDescriptorSet> cameraDescriptorWrites(swapChainSize, VkWriteDescriptorSet());
-    std::vector<VkDescriptorBufferInfo> cameraBufferInfos(swapChainSize, VkDescriptorBufferInfo());
+    std::vector<VkWriteDescriptorSet> descriptorWrites(swapChainSize * 2, VkWriteDescriptorSet());
+    std::vector<VkDescriptorBufferInfo> bufferInfos(swapChainSize * 2, VkDescriptorBufferInfo());
 
-    for (size_t i = 0; i < swapChainSize; ++i) {
+    for (size_t frameNumber = 0; frameNumber < swapChainSize; ++frameNumber) {
         VkDescriptorSetAllocateInfo allocInfo = {};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = _descriptorPool;
         allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &_cameraDescriptorSetLayout;
 
-        if (vkAllocateDescriptorSets(_device, &allocInfo, &_framesData[i].cameraDescriptorSet)) {
+        allocInfo.pSetLayouts = &_sceneDataDescriptorSetLayout;
+
+        if (vkAllocateDescriptorSets(_device, &allocInfo, &_framesData[frameNumber].globalDataDescriptorSet)) {
             std::cerr << "Failed to allocate descriptor sets." << std::endl;
             return -1;
         }
 
-        cameraBufferInfos[i].buffer = _framesData[i].cameraBuffer.buffer;
-        cameraBufferInfos[i].offset = 0;
-        cameraBufferInfos[i].range = sizeof (CameraBuffer);
+        bufferInfos[frameNumber * 2].buffer = _framesData[frameNumber].cameraBuffer.buffer;
+        bufferInfos[frameNumber * 2].offset = 0;
+        bufferInfos[frameNumber * 2].range = sizeof (GPUCameraData);
 
-        cameraDescriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        cameraDescriptorWrites[i].dstSet = _framesData[i].cameraDescriptorSet;
-        cameraDescriptorWrites[i].dstBinding = 0;
-        cameraDescriptorWrites[i].dstArrayElement = 0;
-        cameraDescriptorWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        cameraDescriptorWrites[i].descriptorCount = 1;
-        cameraDescriptorWrites[i].pBufferInfo = &cameraBufferInfos[i];
+        bufferInfos[frameNumber * 2 + 1].buffer = _sceneDataBuffer.buffer;
+        bufferInfos[frameNumber * 2 + 1].offset = 0;
+        bufferInfos[frameNumber * 2 + 1].range = sizeof (GPUSceneData);
+
+        descriptorWrites[frameNumber * 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[frameNumber * 2].dstSet = _framesData[frameNumber].globalDataDescriptorSet;
+        descriptorWrites[frameNumber * 2].dstBinding = 0;
+        descriptorWrites[frameNumber * 2].dstArrayElement = 0;
+        descriptorWrites[frameNumber * 2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[frameNumber * 2].descriptorCount = 1;
+        descriptorWrites[frameNumber * 2].pBufferInfo = &bufferInfos[frameNumber * 2];
+
+        descriptorWrites[frameNumber * 2 + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[frameNumber * 2 + 1].dstSet = _framesData[frameNumber].globalDataDescriptorSet;
+        descriptorWrites[frameNumber * 2 + 1].dstBinding = 1;
+        descriptorWrites[frameNumber * 2 + 1].dstArrayElement = 0;
+        descriptorWrites[frameNumber * 2 + 1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[frameNumber * 2 + 1].descriptorCount = 1;
+        descriptorWrites[frameNumber * 2 + 1].pBufferInfo = &bufferInfos[frameNumber * 2 + 1];
     }
 
-    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(cameraDescriptorWrites.size()), cameraDescriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
     return 0;
 }

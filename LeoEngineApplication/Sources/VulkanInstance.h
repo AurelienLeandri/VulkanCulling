@@ -50,6 +50,7 @@ public:
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
 		VkImageTiling tiling, VkFormatFeatureFlags features) const;
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
+	size_t padUniformBufferSize(size_t originalSize);
 
 	// Accessors
 	const Properties& getProperties() const;
@@ -88,6 +89,7 @@ private:
 
 	// Device
 	VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
+	VkPhysicalDeviceProperties _physicalDeviceProperties = {};
 	QueueFamilyIndices _queueFamilyIndices;
 	SwapChainSupportDetails _swapChainSupportDetails;
 	VkDevice _device = VK_NULL_HANDLE;
