@@ -18,7 +18,7 @@ layout (set = 2, binding = 3) uniform sampler2D normalSampler;
 layout (set = 2, binding = 4) uniform sampler2D heightSampler;
 
 void main() {
-    outColor = sceneData.ambientColor + sceneData.sunlightDirection + sceneData.sunlightColor;
+    //outColor = sceneData.ambientColor + sceneData.sunlightDirection + sceneData.sunlightColor;
 	//outColor = texture(diffuseSampler, fragTexCoord);
-	//outColor = vec4(fragTexCoord, 0, 1);
+	outColor = vec4(fragTexCoord, 0, 1);
 }

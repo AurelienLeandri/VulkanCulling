@@ -76,6 +76,7 @@ int Application::loadScene(const std::string& filePath)
         leo::SceneLoader::loadScene(filePath.c_str(), _scene.get(), _camera.get());
     }
     catch (leo::SceneLoaderException e) {
+        std::cerr << e.what() << std::endl;
         return -1;
     }
 

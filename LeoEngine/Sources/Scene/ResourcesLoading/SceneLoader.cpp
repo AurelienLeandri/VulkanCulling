@@ -160,7 +160,7 @@ namespace leo {
 			}
 
 			std::shared_ptr<const Transform> transform;
-			entry >> modelName;
+			entry >> transformName;
 			if (!entry.fail() && transformName.size()) {
 				if (transforms.find(transformName) == transforms.end()) {
 					throw SceneLoaderException("No transform was created under the given name. Specify a transform entry with that name beforehand.", lineNb);

@@ -214,7 +214,7 @@ int VulkanRenderer::iterate()
         return -1;
     }
 
-    _updateFrameLevelUniformBuffers(imageIndex);
+    _updateFrameLevelUniformBuffers(_currentFrame);
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -262,15 +262,15 @@ int VulkanRenderer::iterate()
 
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
 
+    // Global data descriptor set
+    uint32_t uniformOffset = _vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame;
+    vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        _pipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
+
     size_t materialIndex = 0;
     for (auto& entry : _objectsPerMaterial) {
         const leo::Material* material = entry.first;
         VkDeviceSize offsets[] = { 0 };
-
-        // Global data descriptor set
-        uint32_t uniformOffset = _vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame;
-        vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            _pipelineLayout, 0, 1, &_framesData[imageIndex].globalDataDescriptorSet, 1, &uniformOffset);
 
         for (const RenderableObject* object : entry.second) {
             vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &object->vertexBuffer.buffer, offsets);
@@ -1438,48 +1438,46 @@ int VulkanRenderer::_createDescriptorSets()
     * Creating global data sets
     */
 
-    std::vector<VkWriteDescriptorSet> descriptorWrites(swapChainSize * 2, VkWriteDescriptorSet());
-    std::vector<VkDescriptorBufferInfo> bufferInfos(swapChainSize * 2, VkDescriptorBufferInfo());
+    std::vector<VkWriteDescriptorSet> descriptorWrites(2, VkWriteDescriptorSet());
+    std::vector<VkDescriptorBufferInfo> bufferInfos(2, VkDescriptorBufferInfo());
 
     size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
 
-    for (size_t frameNumber = 0; frameNumber < swapChainSize; ++frameNumber) {
-        VkDescriptorSetAllocateInfo globalDescriptorSetAllocInfo = {};
-        globalDescriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        globalDescriptorSetAllocInfo.descriptorPool = _descriptorPool;
-        globalDescriptorSetAllocInfo.descriptorSetCount = 1;
+    VkDescriptorSetAllocateInfo globalDescriptorSetAllocInfo = {};
+    globalDescriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    globalDescriptorSetAllocInfo.descriptorPool = _descriptorPool;
+    globalDescriptorSetAllocInfo.descriptorSetCount = 1;
 
-        globalDescriptorSetAllocInfo.pSetLayouts = &_sceneDataDescriptorSetLayout;
+    globalDescriptorSetAllocInfo.pSetLayouts = &_sceneDataDescriptorSetLayout;
 
-        if (vkAllocateDescriptorSets(_device, &globalDescriptorSetAllocInfo, &_framesData[frameNumber].globalDataDescriptorSet)) {
-            std::cerr << "Failed to allocate descriptor sets." << std::endl;
-            return -1;
-        }
-
-        bufferInfos[frameNumber * 2].buffer = _cameraDataBuffer.buffer;
-        bufferInfos[frameNumber * 2].offset = 0;
-        bufferInfos[frameNumber * 2].range = sizeof(GPUCameraData);
-
-        bufferInfos[frameNumber * 2 + 1].buffer = _sceneDataBuffer.buffer;
-        bufferInfos[frameNumber * 2 + 1].offset = 0;
-        bufferInfos[frameNumber * 2 + 1].range = sizeof(GPUSceneData);
-
-        descriptorWrites[frameNumber * 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[frameNumber * 2].dstSet = _framesData[frameNumber].globalDataDescriptorSet;
-        descriptorWrites[frameNumber * 2].dstBinding = 0;
-        descriptorWrites[frameNumber * 2].dstArrayElement = 0;
-        descriptorWrites[frameNumber * 2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        descriptorWrites[frameNumber * 2].descriptorCount = 1;
-        descriptorWrites[frameNumber * 2].pBufferInfo = &bufferInfos[frameNumber * 2];
-
-        descriptorWrites[frameNumber * 2 + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[frameNumber * 2 + 1].dstSet = _framesData[frameNumber].globalDataDescriptorSet;
-        descriptorWrites[frameNumber * 2 + 1].dstBinding = 1;
-        descriptorWrites[frameNumber * 2 + 1].dstArrayElement = 0;
-        descriptorWrites[frameNumber * 2 + 1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[frameNumber * 2 + 1].descriptorCount = 1;
-        descriptorWrites[frameNumber * 2 + 1].pBufferInfo = &bufferInfos[frameNumber * 2 + 1];
+    if (vkAllocateDescriptorSets(_device, &globalDescriptorSetAllocInfo, &_globalDataDescriptorSet)) {
+        std::cerr << "Failed to allocate descriptor sets." << std::endl;
+        return -1;
     }
+
+    bufferInfos[0].buffer = _cameraDataBuffer.buffer;
+    bufferInfos[0].offset = 0;
+    bufferInfos[0].range = sizeof(GPUCameraData);
+
+    bufferInfos[1].buffer = _sceneDataBuffer.buffer;
+    bufferInfos[1].offset = 0;
+    bufferInfos[1].range = sizeof(GPUSceneData);
+
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = _globalDataDescriptorSet;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &bufferInfos[0];
+
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = _globalDataDescriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &bufferInfos[1];
 
     vkUpdateDescriptorSets(_device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 

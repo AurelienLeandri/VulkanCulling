@@ -42,7 +42,6 @@ struct FrameData {
 	VkSemaphore renderSemaphore = VK_NULL_HANDLE;
 	VkFence renderFinishedFence = VK_NULL_HANDLE;
 
-	VkDescriptorSet globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
@@ -148,6 +147,7 @@ private:
 	std::vector<FrameData> _framesData;
 
 	// Descriptors shared between frames
+	VkDescriptorSet _globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSet _objectsDataDescriptorSet = VK_NULL_HANDLE;
 
 	// Buffers
