@@ -11,7 +11,13 @@ layout(set = 0, binding = 1) uniform SceneData {
 	vec4 sunlightColor;
 } sceneData;
 
+layout(set = 2, binding = 0) uniform sampler2D test0;
+layout(set = 2, binding = 1) uniform sampler2D test1;
+layout(set = 2, binding = 2) uniform sampler2D test2;
+layout(set = 2, binding = 3) uniform sampler2D test3;
+layout(set = 2, binding = 4) uniform sampler2D test4;
+
 void main() {
-	//outColor = texture(diffuseSampler, fragTexCoord);
-	outColor = vec4(fragTexCoord, 0, 1);
+	outColor = texture(test0, fragTexCoord);
+	//outColor = vec4(fragTexCoord, 0, 1);
 }

@@ -45,11 +45,11 @@ int DescriptorAllocator::allocate(VkDescriptorSet& set, VkDescriptorSetLayout la
 	VkResult allocationResult = vkAllocateDescriptorSets(_device, &allocInfo, &set);
 	switch (allocationResult) {
 	case VK_SUCCESS:
-		return true;
+		return 0;
 	case VK_ERROR_FRAGMENTED_POOL:
 	case VK_ERROR_OUT_OF_POOL_MEMORY:
 		// Need to allocate from another pool
-		_currentPool = _getPool();
+		allocInfo.descriptorPool = _currentPool = _getPool();
 		_poolsInUse.push_back(_currentPool);
 		return vkAllocateDescriptorSets(_device, &allocInfo, &set) ? -1 : 0;  // WTF if that fails
 	default:
@@ -248,8 +248,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
 	layout = _cache.createDescriptorLayout(layoutInfo);
 
 	//allocate descriptor
-	bool success = _allocator.allocate(set, layout);
-	if (!success) { return false; };
+	if (_allocator.allocate(set, layout)) { return false; };
 
 	//write descriptor
 	for (VkWriteDescriptorSet& w : _writes) {

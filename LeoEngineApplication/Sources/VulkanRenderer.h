@@ -100,7 +100,7 @@ private:
 	int _createSyncObjects();
 	void _updateFrameLevelUniformBuffers(uint32_t currentImage);
 
-	int _createBuffers();
+	int _createInputBuffers();
 	int _createDescriptors();
 
 	int _recreateSwapChainDependentResources();
@@ -148,6 +148,8 @@ private:
 	VkDescriptorSet _globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSet _objectsDataDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _materialDescriptorSetLayout;
+	std::unordered_map<const leo::Material*, VkDescriptorSet> _materialDescriptorSets;
 
 	// Buffers
 	AllocatedBuffer _cameraDataBuffer;

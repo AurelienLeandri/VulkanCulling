@@ -133,7 +133,7 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    if (_createBuffers()) {
+    if (_createInputBuffers()) {
         std::cerr << "Could not initialize input buffers." << std::endl;
         return -1;
     }
@@ -257,6 +257,10 @@ int VulkanRenderer::iterate()
         const leo::Material* material = entry.first;
         VkDeviceSize offsets[] = { 0 };
 
+        // Materials data descriptor set
+        vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            _pipelineLayout, 2, 1, &_materialDescriptorSets[material], 0, nullptr);
+
         for (const RenderableObject* object : entry.second) {
             vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &object->vertexBuffer.buffer, offsets);
 
@@ -339,7 +343,7 @@ int VulkanRenderer::_recreateSwapChainDependentResources() {
         return -1;
     }
 
-    if (_createBuffers()) {
+    if (_createInputBuffers()) {
         std::cerr << "Could not initialize input buffers." << std::endl;
         return -1;
     }
@@ -375,7 +379,7 @@ int VulkanRenderer::_createCommandPools()
     return 0;
 }
 
-int VulkanRenderer::_createBuffers()
+int VulkanRenderer::_createInputBuffers()
 {
     /*
     * Vertex and index buffers
@@ -1015,7 +1019,7 @@ int VulkanRenderer::_createGraphicsPipeline()
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _globalDataDescriptorSetLayout, _objectsDataDescriptorSetLayout };
+    std::array<VkDescriptorSetLayout, 3> pSetLayouts = { _globalDataDescriptorSetLayout, _objectsDataDescriptorSetLayout, _materialDescriptorSetLayout };
     pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(pSetLayouts.size());
     pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
@@ -1244,12 +1248,17 @@ int VulkanRenderer::_createFramebufferImageResources()
 int VulkanRenderer::_createDescriptors()
 {
     DescriptorAllocator::Options globalDescriptorAllocatorOptions = {};
+    globalDescriptorAllocatorOptions.poolBaseSize = 10;
     globalDescriptorAllocatorOptions.poolSizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.f },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, _objectsPerMaterial.size() * 5.f },
     };
     _globalDescriptorAllocator.init(globalDescriptorAllocatorOptions);
+
+    DescriptorBuilder builder = DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator);
+
 
     /*
     * Global data (set 0)
@@ -1282,6 +1291,28 @@ int VulkanRenderer::_createDescriptors()
     DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
         .bindBuffer(0, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
         .build(_objectsDataDescriptorSet, _objectsDataDescriptorSetLayout);
+
+    /*
+    * Per-material data (set 2)
+    */
+
+    for (auto& entry : _objectsPerMaterial) {  // We iterate over _objectsPerMaterial just to get all materials.
+        const leo::Material* material = entry.first;
+        _materialDescriptorSets[material] = VK_NULL_HANDLE;
+        const std::vector<_ImageData>& images = _materialsImages[material];
+        DescriptorBuilder builder = DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator);
+        for (int i = 0; i < 5; ++i) {
+            VkDescriptorImageInfo imageInfo = {};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = images[i].view;
+            imageInfo.sampler = images[i].textureSampler;
+
+            builder.bindImage(i, imageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+        }
+
+        VkDescriptorSet& set = _materialDescriptorSets[material];
+        builder.build(set, _materialDescriptorSetLayout);
+    }
 
     return 0;
 }
