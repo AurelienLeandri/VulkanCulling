@@ -555,7 +555,7 @@ void VulkanRenderer::_updateFrameLevelUniformBuffers(uint32_t currentImage) {
     * Camera data
     */
 
-    GPUCameraData cameraData;
+    GPUCameraData cameraData = {};
     cameraData.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
     // TODO: Real values for model
     /*
@@ -681,7 +681,7 @@ int VulkanRenderer::_createInputImages() {
 
             VkBuffer stagingBuffer;
             VkDeviceMemory stagingBufferMemory;
-            VkDeviceSize imageSize = texWidth * texHeight * nbChannels;
+            VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
             _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
             void* data = nullptr;

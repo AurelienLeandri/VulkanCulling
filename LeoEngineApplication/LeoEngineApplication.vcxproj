@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Sources\DescriptorUtils.cpp" />
     <ClCompile Include="Sources\Application.cpp" />
     <ClCompile Include="Sources\InputManager.cpp" />
     <ClCompile Include="Sources\main.cpp" />
@@ -28,6 +29,7 @@
     <ClCompile Include="Sources\VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Sources\DescriptorUtils.h" />
     <ClInclude Include="Sources\Application.h" />
     <ClInclude Include="Sources\InputManager.h" />
     <ClInclude Include="Sources\VulkanInstance.h" />
