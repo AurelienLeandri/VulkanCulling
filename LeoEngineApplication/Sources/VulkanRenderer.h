@@ -148,7 +148,7 @@ private:
 	VkDescriptorSet _globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSet _objectsDataDescriptorSet = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _materialDescriptorSetLayout;
+	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
 	std::unordered_map<const leo::Material*, VkDescriptorSet> _materialDescriptorSets;
 
 	// Buffers
@@ -160,6 +160,10 @@ private:
 	_ImageData _framebufferColor;
 	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 	_ImageData _framebufferDepth;
+
+	_ImageData _testImage;
+	VkDescriptorSet _testTextureDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _testDescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Constant input data
 	std::map<const leo::Material*, std::vector<RenderableObject*>> _objectsPerMaterial;

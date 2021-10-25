@@ -2,18 +2,18 @@
 
 namespace leo {
 
-	const std::shared_ptr<const ImageTexture> ImageTexture::white = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{1, 1, 1});
-	const std::shared_ptr<const ImageTexture> ImageTexture::black = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{ 0, 0, 0 });
-	const std::shared_ptr<const ImageTexture> ImageTexture::blue = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new float[3]{ 0, 0, 1 });
+	const std::shared_ptr<const ImageTexture> ImageTexture::white = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new unsigned char[3]{255, 255, 255});
+	const std::shared_ptr<const ImageTexture> ImageTexture::black = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new unsigned char[3]{ 0, 0, 0 });
+	const std::shared_ptr<const ImageTexture> ImageTexture::blue = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new unsigned char[3]{ 0, 0, 255 });
 
-	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout, float* data) :
+	ImageTexture::ImageTexture(size_t width, size_t height, Type type, Layout layout, unsigned char* data) :
 		Texture(Texture::Type::IMAGE),
 		width(width),
 		height(height),
 		nbChannels(getNbChannelsFromLayout(layout)),
 		type(type),
 		layout(layout),
-		data(data ? data : new float[width * height * nbChannels])
+		data(data ? data : new unsigned char[width * height * nbChannels])
 	{
 	}
 

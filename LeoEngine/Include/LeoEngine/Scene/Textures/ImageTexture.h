@@ -21,7 +21,7 @@ namespace leo {
 		};
 
 	public:
-		ImageTexture(size_t width, size_t height, Type type, Layout layout, float* data = nullptr);
+		ImageTexture(size_t width, size_t height, Type type, Layout layout, unsigned char* data = nullptr);
 		~ImageTexture();
 
 	public:
@@ -36,7 +36,7 @@ namespace leo {
 		const size_t nbChannels = 0;
 		const Type type = Type::INVALID;
 		const Layout layout = Layout::INVALID;
-		const float* data = nullptr;
+		const unsigned char* data = nullptr;
 
 	public:
 		static const std::shared_ptr<const ImageTexture> white;

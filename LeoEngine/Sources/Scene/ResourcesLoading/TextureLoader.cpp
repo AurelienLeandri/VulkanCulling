@@ -9,7 +9,7 @@ namespace leo {
     namespace {
         ImageTexture::Layout pickLayout(TextureLoader::LoadingOptions options, int nbChannels);
         bool isImageInfoValid(ImageTexture::Layout& layout, int nbChannels);
-        void rgbToLuminance(const float* src, float* dest, int width, int height, int srcNbCHannels);
+        void rgbToLuminance(const unsigned char* src, unsigned char* dest, int width, int height, int srcNbCHannels);
     }
 
     std::unordered_map<std::string, std::shared_ptr<ImageTexture>> TextureLoader::_fileTexturesCache;
@@ -23,7 +23,7 @@ namespace leo {
 
         stbi_set_flip_vertically_on_load(false);
         int width = 0, height = 0, nbChannels = 0;
-        float* data = stbi_loadf(filePath, &width, &height, &nbChannels, options.desiredChannels);
+        unsigned char* data = stbi_load(filePath, &width, &height, &nbChannels, options.desiredChannels);
 
         if (!data) {
             return nullptr;
@@ -41,7 +41,7 @@ namespace leo {
 
         if (layout == ImageTexture::Layout::LUMINANCE) {
             if (nbChannels == 3) {  // Convert the first three channels of each texel to luminance
-                float* luminanceData = new float[(size_t)width * height];
+                unsigned char* luminanceData = new unsigned char[(size_t)width * height];
                 rgbToLuminance(data, luminanceData, width, height, nbChannels);
                 stbi_image_free(data);
                 data = luminanceData;
@@ -93,9 +93,9 @@ namespace leo {
             }
         }
 
-        void rgbToLuminance(const float* src, float* dest, int width, int height, int srcNbCHannels) {
+        void rgbToLuminance(const unsigned char* src, unsigned char* dest, int width, int height, int srcNbCHannels) {
             for (int i = 0; i < width * height * srcNbCHannels; i += srcNbCHannels) {
-                dest[i / 3] = src[i] * 0.3f + src[i + 1] * 0.59f + src[i + 2] * 0.11f;
+                dest[i / 3] = (unsigned char)((float)src[i] * 0.3f + (float)src[i + 1] * 0.59f + (float)src[i + 2] * 0.11f);
             }
         }
     }

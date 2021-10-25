@@ -11,13 +11,15 @@ layout(set = 0, binding = 1) uniform SceneData {
 	vec4 sunlightColor;
 } sceneData;
 
-layout(set = 2, binding = 0) uniform sampler2D test0;
-layout(set = 2, binding = 1) uniform sampler2D test1;
-layout(set = 2, binding = 2) uniform sampler2D test2;
-layout(set = 2, binding = 3) uniform sampler2D test3;
-layout(set = 2, binding = 4) uniform sampler2D test4;
+// Material
+layout(set = 2, binding = 0) uniform sampler2D diffuseTexture;
+layout(set = 2, binding = 1) uniform sampler2D specularTexture;
+layout(set = 2, binding = 2) uniform sampler2D ambientTexture;
+layout(set = 2, binding = 3) uniform sampler2D normalTexture;
+layout(set = 2, binding = 4) uniform sampler2D heightTexture;
+
+layout(set = 3, binding = 0) uniform sampler2D testTexture;
 
 void main() {
-	outColor = texture(test0, fragTexCoord);
-	//outColor = vec4(fragTexCoord, 0, 1);
+	outColor = texture(diffuseTexture, fragTexCoord);
 }

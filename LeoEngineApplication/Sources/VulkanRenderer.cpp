@@ -16,6 +16,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <stb_image.h>
+
 VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
 	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice()), _globalDescriptorAllocator(_device), _descriptorLayoutCache(_device)
 {
@@ -252,6 +254,9 @@ int VulkanRenderer::iterate()
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         _pipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
 
+    vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        _pipelineLayout, 3, 1, &_testTextureDescriptorSet, 0, nullptr);
+
     size_t materialIndex = 0;
     for (auto& entry : _objectsPerMaterial) {
         const leo::Material* material = entry.first;
@@ -262,13 +267,13 @@ int VulkanRenderer::iterate()
             _pipelineLayout, 2, 1, &_materialDescriptorSets[material], 0, nullptr);
 
         for (const RenderableObject* object : entry.second) {
-            vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &object->vertexBuffer.buffer, offsets);
-
-            vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, object->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
             // Objects data descriptor set
             vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 _pipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
+
+            vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &object->vertexBuffer.buffer, offsets);
+
+            vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, object->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(object->nbElements), 1, 0, 0, static_cast<uint32_t>(object->index));
         }
@@ -1019,7 +1024,7 @@ int VulkanRenderer::_createGraphicsPipeline()
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    std::array<VkDescriptorSetLayout, 3> pSetLayouts = { _globalDataDescriptorSetLayout, _objectsDataDescriptorSetLayout, _materialDescriptorSetLayout };
+    std::array<VkDescriptorSetLayout, 4> pSetLayouts = { _globalDataDescriptorSetLayout, _objectsDataDescriptorSetLayout, _materialDescriptorSetLayout, _testDescriptorSetLayout };
     pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(pSetLayouts.size());
     pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
@@ -1301,18 +1306,30 @@ int VulkanRenderer::_createDescriptors()
         _materialDescriptorSets[material] = VK_NULL_HANDLE;
         const std::vector<_ImageData>& images = _materialsImages[material];
         DescriptorBuilder builder = DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator);
+        std::array<VkDescriptorImageInfo, 5> imageInfos = { {} };
         for (int i = 0; i < 5; ++i) {
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = images[i].view;
-            imageInfo.sampler = images[i].textureSampler;
+            imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfos[i].imageView = images[i].view;
+            imageInfos[i].sampler = images[i].textureSampler;
 
-            builder.bindImage(i, imageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+            builder.bindImage(i, imageInfos[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
         }
 
-        VkDescriptorSet& set = _materialDescriptorSets[material];
-        builder.build(set, _materialDescriptorSetLayout);
+        builder.build(_materialDescriptorSets[material], _materialDescriptorSetLayout);
     }
+
+    /*
+    * Test texture
+    */
+
+    VkDescriptorImageInfo testImageInfo = {};
+    testImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    testImageInfo.imageView = _materialsImages[_renderableObjects[0].material][3].view;
+    testImageInfo.sampler = _materialsImages[_renderableObjects[0].material][3].textureSampler;
+
+    DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
+        .bindImage(0, testImageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .build(_testTextureDescriptorSet, _testDescriptorSetLayout);
 
     return 0;
 }

@@ -271,8 +271,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set)
 	layoutInfo.bindingCount = _bindings.size();
 
 	//allocate descriptor
-	bool success = _allocator.allocate(set, _cache.createDescriptorLayout(layoutInfo));
-	if (!success) { return false; };
+	if (_allocator.allocate(set, _cache.createDescriptorLayout(layoutInfo))) { return false; }
 
 	//write descriptor
 	for (VkWriteDescriptorSet& w : _writes) {
