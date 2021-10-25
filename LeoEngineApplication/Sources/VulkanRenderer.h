@@ -2,6 +2,8 @@
 
 #include "VulkanInstance.h"
 
+#include "DescriptorUtils.h"
+
 #include <memory>
 #include <unordered_map>
 #include <map>
@@ -83,7 +85,6 @@ private:
 	};
 
 	struct _DescriptorSets {
-		VkDescriptorSet _materialDescriptorSet;
 		VkDescriptorSet _transformsDescriptorSet;
 	};
 
@@ -91,7 +92,6 @@ private:
 	void _constructSceneRelatedStructures();
 	int _createCommandPools();
 	int _createInputImages();
-	int _createDescriptorSetLayouts();
 	int _createRenderPass();
 	int _createGraphicsPipeline();
 	int _createFramebufferImageResources();
@@ -101,8 +101,7 @@ private:
 	void _updateFrameLevelUniformBuffers(uint32_t currentImage);
 
 	int _createBuffers();
-	int _createDescriptorPools();
-	int _createDescriptorSets();
+	int _createDescriptors();
 
 	int _recreateSwapChainDependentResources();
 
@@ -132,22 +131,22 @@ private:
 	VkDevice _device = VK_NULL_HANDLE;
 
 	// Pools
-	VkDescriptorPool _descriptorPool = VK_NULL_HANDLE;
 	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
 
 	// Main pipeline
 	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _materialDescriptorSetLayout = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
 	// Per-frame data
 	std::vector<FrameData> _framesData;
 
 	// Descriptors shared between frames
+	DescriptorAllocator _globalDescriptorAllocator;
+	DescriptorLayoutCache _descriptorLayoutCache;
+	VkDescriptorSetLayout _globalDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSet _globalDataDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSet _objectsDataDescriptorSet = VK_NULL_HANDLE;
 
 	// Buffers
@@ -166,7 +165,6 @@ private:
 
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
-	std::vector<VkDescriptorSet> _materialDescriptorSets;  // One entry per swapchain image
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;

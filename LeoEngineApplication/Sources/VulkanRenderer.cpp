@@ -17,7 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
-	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice())
+	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice()), _globalDescriptorAllocator(_device), _descriptorLayoutCache(_device)
 {
     _framesData.resize(_vulkan->getSwapChainSize());
 }
@@ -57,15 +57,6 @@ int VulkanRenderer::_cleanup()
     }
     _renderableObjects.clear();
 
-    vkDestroyDescriptorSetLayout(_device, _materialDescriptorSetLayout, nullptr);
-    _materialDescriptorSetLayout = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorSetLayout(_device, _sceneDataDescriptorSetLayout, nullptr);
-    _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorSetLayout(_device, _objectsDataDescriptorSetLayout, nullptr);
-    _sceneDataDescriptorSetLayout = VK_NULL_HANDLE;
-
     return 0;
 }
 
@@ -83,11 +74,6 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
     _pipelineLayout = VK_NULL_HANDLE;
     vkDestroyRenderPass(_device, _renderPass, nullptr);
     _renderPass = VK_NULL_HANDLE;
-
-    // Destroy the descriptor sets
-    vkDestroyDescriptorPool(_device, _descriptorPool, nullptr);
-    _descriptorPool = VK_NULL_HANDLE;
-    _materialDescriptorSets.clear();
 
     vkDestroyCommandPool(_device, _mainCommandPool, nullptr);
 
@@ -111,6 +97,10 @@ void VulkanRenderer::_cleanupSwapChainDependentResources()
     vkDestroyBuffer(_device, _objectsDataBuffer.buffer, nullptr);
     vkFreeMemory(_device, _objectsDataBuffer.deviceMemory, nullptr);
     _objectsDataBuffer = {};
+
+    // Destroy descriptors
+    _globalDescriptorAllocator.cleanup();
+    _descriptorLayoutCache.cleanup();
 
     // Cleanup of the framebuffers shared data
     vkDestroyImageView(_device, _framebufferColor.view, nullptr);
@@ -138,28 +128,8 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    if (_createRenderPass()) {
-        std::cerr << "Could not create render pass" << std::endl;
-        return -1;
-    }
-
-    if (_createDescriptorSetLayouts()) {
-        std::cerr << "Could not create descriptor set layout." << std::endl;
-        return -1;
-    }
-
-    if (_createGraphicsPipeline()) {
-        std::cerr << "Could not create graphics pipeline." << std::endl;
-        return -1;
-    }
-
     if (_createCommandPools()) {
         std::cerr << "Could not initialize command pool." << std::endl;
-        return -1;
-    }
-
-    if (_createFramebufferImageResources() || _createFramebuffers()) {
-        std::cerr << "Failed to create framebuffers" << std::endl;
         return -1;
     }
 
@@ -173,8 +143,23 @@ int VulkanRenderer::init()
         return -1;
     }
 
-    if (_createDescriptorPools() || _createDescriptorSets()) {
+    if (_createDescriptors()) {
         std::cerr << "Could not create descriptors data." << std::endl;
+        return -1;
+    }
+
+    if (_createRenderPass()) {
+        std::cerr << "Could not create render pass." << std::endl;
+        return -1;
+    }
+
+    if (_createGraphicsPipeline()) {
+        std::cerr << "Could not create graphics pipeline." << std::endl;
+        return -1;
+    }
+
+    if (_createFramebufferImageResources() || _createFramebuffers()) {
+        std::cerr << "Failed to create framebuffers" << std::endl;
         return -1;
     }
 
@@ -214,7 +199,7 @@ int VulkanRenderer::iterate()
         return -1;
     }
 
-    _updateFrameLevelUniformBuffers(_currentFrame);
+    _updateFrameLevelUniformBuffers(static_cast<uint32_t>(_currentFrame));
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -263,7 +248,7 @@ int VulkanRenderer::iterate()
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
 
     // Global data descriptor set
-    uint32_t uniformOffset = _vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame;
+    uint32_t uniformOffset = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame);
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         _pipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
 
@@ -281,7 +266,7 @@ int VulkanRenderer::iterate()
             vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                 _pipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
 
-            vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(object->nbElements), 1, 0, 0, object->index);
+            vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(object->nbElements), 1, 0, 0, static_cast<uint32_t>(object->index));
         }
 
         materialIndex++;
@@ -334,6 +319,11 @@ int VulkanRenderer::_recreateSwapChainDependentResources() {
         return -1;
     }
 
+    if (_createDescriptors()) {
+        std::cerr << "Could not create descriptors data." << std::endl;
+        return -1;
+    }
+
     if (_createGraphicsPipeline()) {
         std::cerr << "Could not create graphics pipeline." << std::endl;
         return -1;
@@ -351,16 +341,6 @@ int VulkanRenderer::_recreateSwapChainDependentResources() {
 
     if (_createBuffers()) {
         std::cerr << "Could not initialize input buffers." << std::endl;
-        return -1;
-    }
-
-    if (_createDescriptorPools()) {
-        std::cerr << "Could not create descriptors data." << std::endl;
-        return -1;
-    }
-
-    if (_createDescriptorSets()) {
-        std::cerr << "Could not create descriptors data." << std::endl;
         return -1;
     }
 
@@ -557,12 +537,6 @@ void VulkanRenderer::_updateFrameLevelUniformBuffers(uint32_t currentImage) {
 
     GPUCameraData cameraData = {};
     cameraData.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
-    // TODO: Real values for model
-    /*
-    ubo.model = glm::mat4(0.01f);
-    ubo.model[3][3] = 1;
-    ubo.model[1][1] *= -1;
-    */
     const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
     cameraData.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
     cameraData.viewProj = cameraData.proj * cameraData.view;
@@ -1041,7 +1015,7 @@ int VulkanRenderer::_createGraphicsPipeline()
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    std::array<VkDescriptorSetLayout, 3> pSetLayouts = { _sceneDataDescriptorSetLayout, _objectsDataDescriptorSetLayout, _materialDescriptorSetLayout };
+    std::array<VkDescriptorSetLayout, 2> pSetLayouts = { _globalDataDescriptorSetLayout, _objectsDataDescriptorSetLayout };
     pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(pSetLayouts.size());
     pipelineLayoutInfo.pSetLayouts = pSetLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
@@ -1137,91 +1111,6 @@ void VulkanRenderer::_constructSceneRelatedStructures()
         }
         _objectsPerMaterial[object.material].push_back(&object);
     }
-}
-
-int VulkanRenderer::_createDescriptorSetLayouts()
-{
-    /*
-    * Global data (set 0)
-    */
-
-    // Camera transforms
-    VkDescriptorSetLayoutBinding uboTransformsLayoutBinding = {};
-    uboTransformsLayoutBinding.binding = 0;
-    uboTransformsLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    uboTransformsLayoutBinding.descriptorCount = 1;
-    uboTransformsLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboTransformsLayoutBinding.pImmutableSamplers = nullptr;
-
-    // Scene data
-    VkDescriptorSetLayoutBinding sceneDataLayoutBinding = {};
-    sceneDataLayoutBinding.binding = 1;
-    sceneDataLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    sceneDataLayoutBinding.descriptorCount = 1;
-    sceneDataLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    sceneDataLayoutBinding.pImmutableSamplers = nullptr;
-
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboTransformsLayoutBinding, sceneDataLayoutBinding };
-
-    VkDescriptorSetLayoutCreateInfo globalSetLayoutInfo = {};
-    globalSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    globalSetLayoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    globalSetLayoutInfo.pBindings = bindings.data();
-
-    if (vkCreateDescriptorSetLayout(_device, &globalSetLayoutInfo, nullptr, &_sceneDataDescriptorSetLayout)) {
-        std::cerr << "Failed to create descriptor set layout." << std::endl;
-        return -1;
-    }
-
-    /*
-    * Per-object data (set 1)
-    */
-
-    // Model matrices
-    VkDescriptorSetLayoutBinding modelMatricesLayoutBinding = {};
-    modelMatricesLayoutBinding.binding = 0;
-    modelMatricesLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    modelMatricesLayoutBinding.descriptorCount = 1;
-    modelMatricesLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    modelMatricesLayoutBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutCreateInfo objectSetLayoutInfo = {};
-    objectSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    objectSetLayoutInfo.bindingCount = 1;
-    objectSetLayoutInfo.pBindings = &modelMatricesLayoutBinding;
-
-    if (vkCreateDescriptorSetLayout(_device, &objectSetLayoutInfo, nullptr, &_objectsDataDescriptorSetLayout)) {
-        std::cerr << "Failed to create descriptor set layout." << std::endl;
-        return -1;
-    }
-
-    /*
-    * Material layout
-    */
-
-    static const uint32_t nbTexturesInMaterial = 5;
-
-    std::array<VkDescriptorSetLayoutBinding, nbTexturesInMaterial> materialBindings = { {} };
-
-    for (uint32_t i = 0; i < nbTexturesInMaterial; ++i) {
-        materialBindings[i].binding = i;
-        materialBindings[i].descriptorCount = 1;
-        materialBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        materialBindings[i].pImmutableSamplers = nullptr;
-        materialBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
-
-    VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
-    materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    materialLayoutInfo.bindingCount = static_cast<uint32_t>(materialBindings.size());
-    materialLayoutInfo.pBindings = materialBindings.data();
-
-    if (vkCreateDescriptorSetLayout(_device, &materialLayoutInfo, nullptr, &_materialDescriptorSetLayout)) {
-        std::cerr << "Failed to create descriptor set layout." << std::endl;
-        return -1;
-    }
-
-    return 0;
 }
 
 int VulkanRenderer::_createRenderPass()
@@ -1352,166 +1241,47 @@ int VulkanRenderer::_createFramebufferImageResources()
     return 0;
 }
 
-int VulkanRenderer::_createDescriptorPools()
+int VulkanRenderer::_createDescriptors()
 {
-    size_t swapChainSize = _vulkan->getSwapChainSize();
-    std::array<VkDescriptorPoolSize, 4> poolSizes = { {} };
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = 10;
-
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    poolSizes[1].descriptorCount = 10;
-
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[2].descriptorCount = 10;
-
-    poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[3].descriptorCount = static_cast<uint32_t>(swapChainSize * _objectsPerMaterial.size()) * 5;  // 5 textures in the material
-
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(swapChainSize * (_objectsPerMaterial.size() + 2));  // One set per material plus one transform UBO, per swap chain image
-
-    if (vkCreateDescriptorPool(_device, &poolInfo, nullptr, &_descriptorPool)) {
-        std::cerr << "Failed to create descriptor pool." << std::endl;
-        return -1;
-    }
-
-    return 0;
-}
-
-int VulkanRenderer::_createDescriptorSets()
-{
-    size_t swapChainSize = _vulkan->getSwapChainSize();
-
-    // Materials
-
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = _descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainSize * _objectsPerMaterial.size());
-    std::vector<VkDescriptorSetLayout> layouts(allocInfo.descriptorSetCount, _materialDescriptorSetLayout);
-    allocInfo.pSetLayouts = layouts.data();
-
-    _materialDescriptorSets.resize(allocInfo.descriptorSetCount);
-    if (vkAllocateDescriptorSets(_device, &allocInfo, _materialDescriptorSets.data())) {
-        std::cerr << "Failed to allocate descriptor sets." << std::endl;
-        return -1;
-    }
-
-    std::vector<VkWriteDescriptorSet> materialsDescriptorWrites(swapChainSize * _objectsPerMaterial.size() * 5, VkWriteDescriptorSet());
-
-    for (size_t i = 0; i < swapChainSize; ++i) {
-        // Updating descriptor set for material textures
-        // TODO: write once and copy the rest.
-        size_t materialIdx = 0;
-        for (const auto& entry : _objectsPerMaterial) {
-            const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
-            const std::vector<_ImageData>& materialImages = _materialsImages[material];
-
-            VkDescriptorImageInfo imageInfo = {};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = materialImages[0].view;
-            imageInfo.sampler = materialImages[0].textureSampler;
-
-            for (size_t materialTextureIndex = 0; materialTextureIndex < 5; ++materialTextureIndex) {
-                size_t descriptorSetIndex = i * _objectsPerMaterial.size() * 5 + materialIdx * 5 + materialTextureIndex;
-                materialsDescriptorWrites[descriptorSetIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                materialsDescriptorWrites[descriptorSetIndex].dstSet = _materialDescriptorSets[i * _objectsPerMaterial.size() + materialIdx];
-                materialsDescriptorWrites[descriptorSetIndex].dstBinding = static_cast<uint32_t>(materialTextureIndex);
-                materialsDescriptorWrites[descriptorSetIndex].dstArrayElement = 0;
-                materialsDescriptorWrites[descriptorSetIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                materialsDescriptorWrites[descriptorSetIndex].descriptorCount = 1;
-                materialsDescriptorWrites[descriptorSetIndex].pImageInfo = &imageInfo;
-            }
-
-            materialIdx++;
-        }
-
-    }
-
-    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(materialsDescriptorWrites.size()), materialsDescriptorWrites.data(), 0, nullptr);
+    DescriptorAllocator::Options globalDescriptorAllocatorOptions = {};
+    globalDescriptorAllocatorOptions.poolSizes = {
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.f },
+    };
+    _globalDescriptorAllocator.init(globalDescriptorAllocatorOptions);
 
     /*
-    * Creating global data sets
+    * Global data (set 0)
     */
 
-    std::vector<VkWriteDescriptorSet> descriptorWrites(2, VkWriteDescriptorSet());
-    std::vector<VkDescriptorBufferInfo> bufferInfos(2, VkDescriptorBufferInfo());
+    VkDescriptorBufferInfo cameraBufferInfo = {};
+    cameraBufferInfo.buffer = _cameraDataBuffer.buffer;
+    cameraBufferInfo.offset = 0;
+    cameraBufferInfo.range = sizeof(GPUCameraData);
 
-    size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
+    VkDescriptorBufferInfo sceneBufferInfo = {};
+    sceneBufferInfo.buffer = _sceneDataBuffer.buffer;
+    sceneBufferInfo.offset = 0;
+    sceneBufferInfo.range = sizeof(GPUSceneData);
 
-    VkDescriptorSetAllocateInfo globalDescriptorSetAllocInfo = {};
-    globalDescriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    globalDescriptorSetAllocInfo.descriptorPool = _descriptorPool;
-    globalDescriptorSetAllocInfo.descriptorSetCount = 1;
-
-    globalDescriptorSetAllocInfo.pSetLayouts = &_sceneDataDescriptorSetLayout;
-
-    if (vkAllocateDescriptorSets(_device, &globalDescriptorSetAllocInfo, &_globalDataDescriptorSet)) {
-        std::cerr << "Failed to allocate descriptor sets." << std::endl;
-        return -1;
-    }
-
-    bufferInfos[0].buffer = _cameraDataBuffer.buffer;
-    bufferInfos[0].offset = 0;
-    bufferInfos[0].range = sizeof(GPUCameraData);
-
-    bufferInfos[1].buffer = _sceneDataBuffer.buffer;
-    bufferInfos[1].offset = 0;
-    bufferInfos[1].range = sizeof(GPUSceneData);
-
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = _globalDataDescriptorSet;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &bufferInfos[0];
-
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = _globalDataDescriptorSet;
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &bufferInfos[1];
-
-    vkUpdateDescriptorSets(_device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+    DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
+        .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT)
+        .bindBuffer(1, sceneBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+        .build(_globalDataDescriptorSet, _globalDataDescriptorSetLayout);
 
     /*
-    * Creating object data sets
+    * Per-object data (set 1)
     */
-
-    VkDescriptorSetAllocateInfo objectsDescriptorSetAllocInfo = {};
-    objectsDescriptorSetAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    objectsDescriptorSetAllocInfo.descriptorPool = _descriptorPool;
-    objectsDescriptorSetAllocInfo.descriptorSetCount = 1;
-
-    objectsDescriptorSetAllocInfo.pSetLayouts = &_objectsDataDescriptorSetLayout;
-
-    if (VkResult fdp = vkAllocateDescriptorSets(_device, &objectsDescriptorSetAllocInfo, &_objectsDataDescriptorSet)) {
-        std::cerr << "Failed to allocate descriptor sets." << std::endl;
-        return -1;
-    }
 
     VkDescriptorBufferInfo objectsDataBufferInfo = {};
     objectsDataBufferInfo.buffer = _objectsDataBuffer.buffer;
     objectsDataBufferInfo.offset = 0;
     objectsDataBufferInfo.range = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
 
-    VkWriteDescriptorSet objectsDataDescriptorWrite = {};
-    objectsDataDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    objectsDataDescriptorWrite.dstSet = _objectsDataDescriptorSet;
-    objectsDataDescriptorWrite.dstBinding = 0;
-    objectsDataDescriptorWrite.dstArrayElement = 0;
-    objectsDataDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    objectsDataDescriptorWrite.descriptorCount = 1;
-    objectsDataDescriptorWrite.pBufferInfo = &objectsDataBufferInfo;
-
-    vkUpdateDescriptorSets(_device, 1, &objectsDataDescriptorWrite, 0, nullptr);
+    DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
+        .bindBuffer(0, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+        .build(_objectsDataDescriptorSet, _objectsDataDescriptorSetLayout);
 
     return 0;
 }
