@@ -1,0 +1,29 @@
+#include "DebugUtils.h"
+
+#include <sstream>
+
+VulkanRendererException::VulkanRendererException(VkResult error, const char* message) :
+	_error(error), _message(message)
+{
+}
+
+VulkanRendererException::VulkanRendererException(const char* message) :
+	_error(VK_SUCCESS), _message(message)
+{
+}
+
+const char* VulkanRendererException::what() const noexcept
+{
+	std::stringstream ss;
+	if (_error) {
+		ss << "Vulkan error: " << _error << ".";
+		if (_message) {
+			ss << " ";
+		}
+	}
+	if (_message) {
+		ss << _message;
+	}
+	ss << std::endl;
+	return ss.str().c_str();
+}

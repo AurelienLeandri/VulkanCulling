@@ -39,14 +39,14 @@ public:
 	VulkanInstance& operator=(const VulkanInstance&& other) = delete;
 
 public:
-	int init();
+	void init();
 	void recreateSwapChain();
 	void waitForIdleDevice() const;
 
 	// Utility
-	int createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
+	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
 		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-	int createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView) const;
+	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView) const;
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
 		VkImageTiling tiling, VkFormatFeatureFlags features) const;
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
@@ -66,7 +66,7 @@ public:
 	void cleanupSwapChain();
 
 private:
-	int _cleanup();
+	void _cleanup();
 
 	// Device
 	int _ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndices& indices, SwapChainSupportDetails& swapChainSupportDetails);
@@ -75,7 +75,7 @@ private:
 	SwapChainSupportDetails _querySwapChainSupportDetails(VkPhysicalDevice device);
 
 	// Swap chain
-	int _createSwapChain();
+	void _createSwapChain();
 	VkSurfaceFormatKHR _chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR _chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D _chooseSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);

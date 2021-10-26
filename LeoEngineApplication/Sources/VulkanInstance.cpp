@@ -1,5 +1,7 @@
 #include "VulkanInstance.h"
 
+#include "DebugUtils.h"
+
 #include <exception>
 #include <iostream>
 #include <vector>
@@ -44,7 +46,7 @@ VulkanInstance::VulkanInstance(GLFWwindow* window) :
 {
 }
 
-int VulkanInstance::init()
+void VulkanInstance::init()
 {
     /*
     * Intance
@@ -66,19 +68,13 @@ int VulkanInstance::init()
     // Get the extension from GLFW so that Vulkan can interface with the window system
     std::vector<const char*> requiredInstanceExtensions;
     getRequiredInstanceExtensionsNames(requiredInstanceExtensions);
-    if (!checkRequiredInstanceExtensionsSupport(requiredInstanceExtensions)) {
-        std::cerr << "Error: Some required extensions are not supported by the Vulkan implementation." << std::endl;
-        return -1;
-    }
+    checkRequiredInstanceExtensionsSupport(requiredInstanceExtensions);
     instanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(requiredInstanceExtensions.size());
     instanceCreateInfo.ppEnabledExtensionNames = requiredInstanceExtensions.data();
 
     // Validation layers
     if (enableValidationLayers) {
-        if (!checkValidationLayerSupport(validationLayers)) {
-            std::cerr << "Error: Could not setup validation layers. Some required layers are not found." << std::endl;
-            return -1;
-        }
+        checkValidationLayerSupport(validationLayers);
         instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 
@@ -92,10 +88,7 @@ int VulkanInstance::init()
         instanceCreateInfo.ppEnabledLayerNames = nullptr;
     }
 
-    if (vkCreateInstance(&instanceCreateInfo, nullptr, &_instance)) {
-        std::cerr << "Error: Failed to create instance." << std::endl;
-        return -1;
-    }
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &_instance));
 
     /*
     * Debug messenger
@@ -106,14 +99,10 @@ int VulkanInstance::init()
         populateDebugMessengerCreateInfo(debugMsgCreateInfo);
 
         if (auto vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT")) {
-            if (vkCreateDebugUtilsMessengerEXT(_instance, &debugMsgCreateInfo, nullptr, &_debugMessenger)) {
-                std::cerr << "Error: Failed to create required VkDebugUtilsMessengerEXT." << std::endl;
-                return -1;
-            }
+            VK_CHECK(vkCreateDebugUtilsMessengerEXT(_instance, &debugMsgCreateInfo, nullptr, &_debugMessenger));
         }
         else {
-            std::cerr << "Error: Failed to load extension function vkCreateDebugUtilsMessengerEXT." << std::endl;
-            return -1;
+            throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
         }
     }
 
@@ -122,8 +111,7 @@ int VulkanInstance::init()
     */
 
     if (glfwCreateWindowSurface(_instance, _window, nullptr, &_surface)) {
-        std::cerr << "Error: Failed to create window surface!" << std::endl;
-        return -1;
+        throw VulkanRendererException("Failed to create window surface.");
     }
 
     /*
@@ -133,8 +121,7 @@ int VulkanInstance::init()
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
     if (!deviceCount) {
-        std::cerr << "Error: Failed to find GPUs with Vulkan support." << std::endl;
-        return -1;
+        throw VulkanRendererException("Failed to find GPUs with Vulkan support.");
     }
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
@@ -156,8 +143,7 @@ int VulkanInstance::init()
     }
 
     if (!candidateDevice) {
-        std::cerr << "Error: Failed to find a suitable device." << std::endl;
-        return -1;
+        throw VulkanRendererException("Failed to find a suitable device.");
     }
 
     _physicalDevice = *candidateDevice;
@@ -210,10 +196,7 @@ int VulkanInstance::init()
         logicalDeviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
     }
 
-    if (vkCreateDevice(_physicalDevice, &logicalDeviceCreateInfo, nullptr, &_device)) {
-        std::cerr << "Error: Failed to create logical device." << std::endl;
-        return -1;
-    }
+    VK_CHECK(vkCreateDevice(_physicalDevice, &logicalDeviceCreateInfo, nullptr, &_device));
 
     vkGetDeviceQueue(_device, _queueFamilyIndices.graphicsFamily.value(), 0, &_graphicsQueue);
     vkGetDeviceQueue(_device, _queueFamilyIndices.presentationFamily.value(), 0, &_presentationQueue);
@@ -223,18 +206,14 @@ int VulkanInstance::init()
     */
 
     _createSwapChain();
-
-    return 0;
 }
 
 VulkanInstance::~VulkanInstance()
 {
-    if (_cleanup()) {
-        std::cerr << "Error: Cleanup of Vulkan instance entirely of partially failed" << std::endl;
-    }
+    _cleanup();
 }
 
-int VulkanInstance::_cleanup()
+void VulkanInstance::_cleanup()
 {
     cleanupSwapChain();
 
@@ -249,8 +228,7 @@ int VulkanInstance::_cleanup()
             _debugMessenger = VK_NULL_HANDLE;
         }
         else {
-            std::cerr << "Failed to load extension function vkDestroyDebugUtilsMessengerEXT" << std::endl;
-            return -1;
+            throw VulkanRendererException("Failed to load extension function vkDestroyDebugUtilsMessengerEXT");
         }
     }
 
@@ -259,8 +237,6 @@ int VulkanInstance::_cleanup()
 
     vkDestroyInstance(_instance, nullptr);
     _instance = VK_NULL_HANDLE;
-
-    return 0;
 }
 
 bool VulkanInstance::QueueFamilyIndices::hasMandatoryFamilies()
@@ -413,7 +389,7 @@ VulkanInstance::SwapChainSupportDetails VulkanInstance::_querySwapChainSupportDe
     return details;
 }
 
-int VulkanInstance::_createSwapChain()
+void VulkanInstance::_createSwapChain()
 {
     _swapChainSupportDetails = _querySwapChainSupportDetails(_physicalDevice);
 
@@ -452,10 +428,7 @@ int VulkanInstance::_createSwapChain()
     swapChainCreateInfo.clipped = VK_TRUE;
     swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    if (vkCreateSwapchainKHR(_device, &swapChainCreateInfo, nullptr, &_swapChain)) {
-        std::cerr << "Error: Failed to create the swap chain." << std::endl;
-        return -1;
-    }
+    VK_CHECK(vkCreateSwapchainKHR(_device, &swapChainCreateInfo, nullptr, &_swapChain));
 
     vkGetSwapchainImagesKHR(_device, _swapChain, &imageCount, nullptr);
     _swapChainImages.resize(imageCount);
@@ -471,13 +444,8 @@ int VulkanInstance::_createSwapChain()
     _swapChainImageViews.resize(_swapChainImages.size());
 
     for (uint32_t i = 0; i < _swapChainImages.size(); i++) {
-        if (createImageView(_swapChainImages[i], _properties.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _swapChainImageViews[i])) {
-            std::cerr << "Could not create swap chain image view for image at index " << i << "." << std::endl;
-            return -1;
-        }
+        createImageView(_swapChainImages[i], _properties.swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _swapChainImageViews[i]);
     }
-
-    return 0;
 }
 
 VkSurfaceFormatKHR VulkanInstance::_chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
@@ -520,7 +488,7 @@ VkExtent2D VulkanInstance::_chooseSwapChainExtent(const VkSurfaceCapabilitiesKHR
     }
 }
 
-int VulkanInstance::createImage(
+void VulkanInstance::createImage(
     uint32_t width,
     uint32_t height,
     uint32_t mipLevels,
@@ -547,10 +515,7 @@ int VulkanInstance::createImage(
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateImage(_device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-        std::cerr << "Failed to create image." << std::endl;
-        return -1;
-    }
+    VK_CHECK(vkCreateImage(_device, &imageInfo, nullptr, &image));
 
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(_device, image, &memRequirements);
@@ -560,14 +525,9 @@ int VulkanInstance::createImage(
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory)) {
-        std::cerr << "Failed to allocate image memory." << std::endl;
-        return -1;
-    }
+    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory));
 
     vkBindImageMemory(_device, image, imageMemory, 0);
-
-    return 0;
 }
 
 /*
@@ -585,7 +545,7 @@ size_t VulkanInstance::padUniformBufferSize(size_t originalSize)
     return alignedSize;
 }
 
-int VulkanInstance::createImageView(
+void VulkanInstance::createImageView(
     VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView) const
 {
     VkImageViewCreateInfo viewInfo = {};
@@ -599,12 +559,7 @@ int VulkanInstance::createImageView(
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (vkCreateImageView(_device, &viewInfo, nullptr, &imageView)) {
-        std::cerr << "Error: Failed to create texture image view." << std::endl;
-        return -1;
-    }
-
-    return 0;
+    VK_CHECK(vkCreateImageView(_device, &viewInfo, nullptr, &imageView));
 }
 
 VkSampleCountFlagBits VulkanInstance::_getMaxUsableSampleCount() const {
@@ -636,7 +591,7 @@ VkFormat VulkanInstance::findSupportedFormat(const std::vector<VkFormat>& candid
         }
     }
 
-    std::cerr << "Failed to find supported format" << std::endl;
+    throw VulkanRendererException("Failed to find supported format.");
     return VkFormat::VK_FORMAT_UNDEFINED;
 }
 
@@ -650,7 +605,7 @@ uint32_t VulkanInstance::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFla
         }
     }
 
-    throw std::runtime_error("Failed to find suitable memory type");
+    throw VulkanRendererException("Failed to find suitable memory type.");
 }
 
 VkPhysicalDevice& VulkanInstance::getPhysicalDevice()
@@ -735,8 +690,7 @@ namespace {
             }
         }
         if (extensionNotFound) {
-            std::cerr << "Error: Required instance extension \"" << extensionNotFound << "\" not found." << std::endl;
-            return false;
+            throw VulkanRendererException((std::string("Required instance extension \"") + extensionNotFound + "\" not found.").c_str());
         }
 
         return true;
@@ -759,9 +713,7 @@ namespace {
                 }
             }
             if (!found) {
-                std::cerr << "Error: Required validation layer " << requiredLayers[i] << " not found.";
-                result = false;
-                break;
+                throw VulkanRendererException((std::string("Required validation layer ")+ requiredLayers[i] + " not found.").c_str());
             }
         }
         return result;
@@ -783,7 +735,7 @@ namespace {
     {
 
         if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+            throw VulkanRendererException((std::string("Validation layer: ") + pCallbackData->pMessage).c_str());
         }
 
         return VK_FALSE;

@@ -72,8 +72,8 @@ public:
 public:
 	void setScene(const leo::Scene* scene);
 	void setCamera(const leo::Camera* camera);
-	int init();
-	int iterate();
+	void init();
+	void iterate();
 
 private:
 	struct _ImageData {
@@ -90,35 +90,35 @@ private:
 
 private:
 	void _constructSceneRelatedStructures();
-	int _createCommandPools();
-	int _createInputImages();
-	int _createRenderPass();
-	int _createGraphicsPipeline();
-	int _createFramebufferImageResources();
-	int _createFramebuffers();
-	int _createCommandBuffers();
-	int _createSyncObjects();
+	void _createCommandPools();
+	void _createInputImages();
+	void _createRenderPass();
+	void _createGraphicsPipeline();
+	void _createFramebufferImageResources();
+	void _createFramebuffers();
+	void _createCommandBuffers();
+	void _createSyncObjects();
 	void _updateFrameLevelUniformBuffers(uint32_t currentImage);
 
-	int _createInputBuffers();
-	int _createDescriptors();
+	void _createInputBuffers();
+	void _createDescriptors();
 
-	int _recreateSwapChainDependentResources();
+	void _recreateSwapChainDependentResources();
 
-	int _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
+	void _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
 
-	int _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-	int _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
-	int _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	void _generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
 
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
 
-	int _cleanup();
+	void _cleanup();
 	void _cleanupSwapChainDependentResources();
 
 private:

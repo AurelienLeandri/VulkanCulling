@@ -10,11 +10,12 @@
 #include <Scene/Lights/DirectionalLight.h>
 
 #include "VulkanRenderer.h"
+#include "DebugUtils.h"
 #include "Window.h"
 
 Application::Application()
 {
-    _window = std::make_unique<Window>(800, 600);
+    _window = std::make_unique<Window>(1600, 1200);
     _inputManager = std::make_unique<InputManager>(*this);
 }
 
@@ -42,7 +43,10 @@ int Application::_initMembers() {
     _inputManager->init();
 
     _vulkan = std::make_unique<VulkanInstance>(_window->window);
-    if (_vulkan->init()) {
+    try {
+        _vulkan->init();
+    } catch (const VulkanRendererException& e) {
+        std::cerr << e.what() << std::endl;
         std::cerr << "Error: Failed to initialize Vulkan instance." << std::endl;
         return -1;
     }
@@ -50,7 +54,10 @@ int Application::_initMembers() {
     _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
     _renderer->setScene(_scene.get());
     _renderer->setCamera(_camera.get());
-    if (_renderer->init()) {
+    try {
+        _renderer->init();
+    } catch (const VulkanRendererException& e) {
+        std::cerr << e.what() << std::endl;
         std::cerr << "Error: Failed to initialize Vulkan renderer." << std::endl;
         return -1;
     }
@@ -90,9 +97,14 @@ int Application::loadScene(const std::string& filePath)
 int Application::start()
 {
     //_renderer->start();
-
-    while (_inputManager->processInput()) {
-        _renderer->iterate();
+    try {
+        while (_inputManager->processInput()) {
+            _renderer->iterate();
+        }
+    } catch (const VulkanRendererException& e) {
+        std::cerr << e.what() << std::endl;
+        std::cerr << "Error during frame update." << std::endl;
+        return -1;
     }
 
     return 0;
