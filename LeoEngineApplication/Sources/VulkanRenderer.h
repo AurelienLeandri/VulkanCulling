@@ -13,6 +13,8 @@
 namespace leo {
 	class Scene;
 	class Material;
+	class PerformanceMaterial;
+	class Mesh;
 	class Shape;
 	class Transform;
 }
@@ -57,6 +59,24 @@ struct RenderableObject {
 	const leo::Material* material = nullptr;
 	const leo::Transform* transform = nullptr;
 	size_t nbElements = 0;
+};
+
+struct ObjectsBatch {
+	AllocatedBuffer vertexBuffer = {};
+	AllocatedBuffer indexBuffer = {};
+	const leo::PerformanceMaterial* material = nullptr;
+	const leo::Mesh* mesh = nullptr;
+	uint32_t nbObjects = 0;
+	uint32_t primitivesPerObject = 0;
+	uint32_t stride = 0;
+	uint32_t offset = 0;
+};
+
+struct GlobalBuffers {
+	AllocatedBuffer cameraBuffer = {};
+	AllocatedBuffer sceneBuffer = {};
+	AllocatedBuffer materialsBuffer = {};
+	AllocatedBuffer objectsDataBuffer = {};
 };
 
 
@@ -110,7 +130,7 @@ private:
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
+	void _createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
 	void _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	void _generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
@@ -166,11 +186,11 @@ private:
 	VkDescriptorSetLayout _testDescriptorSetLayout = VK_NULL_HANDLE;
 
 	// Constant input data
-	std::map<const leo::Material*, std::vector<RenderableObject*>> _objectsPerMaterial;
-	std::vector<RenderableObject> _renderableObjects;
+	std::vector<ObjectsBatch> _objectsBatches;
 
 	// Order within each vector: diffuse, specular, ambient, normals, height
 	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
+	size_t _nbMaterials = 0;
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;

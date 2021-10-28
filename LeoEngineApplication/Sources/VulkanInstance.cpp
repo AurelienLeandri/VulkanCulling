@@ -735,7 +735,8 @@ namespace {
     {
 
         if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            throw VulkanRendererException((std::string("Validation layer: ") + pCallbackData->pMessage).c_str());
+            std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
+            return VK_FALSE;
         }
 
         return VK_FALSE;
