@@ -56,6 +56,10 @@ void VulkanRenderer::_cleanup()
         vkFreeMemory(_device, batch.indexBuffer.deviceMemory, nullptr);
     }
     _objectsBatches.clear();
+
+    vkDestroyBuffer(_device, _indirectCommandBuffer.buffer, nullptr);
+    vkFreeMemory(_device, _indirectCommandBuffer.deviceMemory, nullptr);
+    _indirectCommandBuffer = {};
 }
 
 
@@ -212,6 +216,8 @@ void VulkanRenderer::iterate()
         _pipelineLayout, 3, 1, &_testTextureDescriptorSet, 0, nullptr);
 
     uint32_t objectIndex = 0;
+    uint32_t offset = 0;
+    uint32_t stride = sizeof(VkDrawIndexedIndirectCommand);
     for (const ObjectsBatch& batch : _objectsBatches) {
         const leo::Material* material = batch.material;
         VkDeviceSize offsets[] = { 0 };
@@ -228,9 +234,10 @@ void VulkanRenderer::iterate()
 
         vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(_framesData[imageIndex].commandBuffer, batch.primitivesPerObject, 1, 0, 0, objectIndex);
+        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _indirectCommandBuffer.buffer, offset, 1, stride);
 
         objectIndex++;
+        offset += stride;
     }
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
@@ -344,6 +351,25 @@ void VulkanRenderer::_createInputBuffers()
     }
 
     vkUnmapMemory(_device, _objectsDataBuffer.deviceMemory);
+
+
+    /*
+    * Indirect Command buffer
+    */
+
+    std::vector<VkDrawIndexedIndirectCommand> commandBufferData(_objectsBatches.size(), VkDrawIndexedIndirectCommand{});
+    for (int i = 0; i < _objectsBatches.size(); ++i) {
+        VkDrawIndexedIndirectCommand& command = commandBufferData[i];
+        const ObjectsBatch& batch = _objectsBatches[i];
+        command.firstInstance = i;
+        command.instanceCount = 1;
+        command.indexCount = batch.primitivesPerObject;
+    }
+    _createGPUBuffer(commandBufferData.size() * sizeof(VkDrawIndexedIndirectCommand),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        commandBufferData.data(),
+        _indirectCommandBuffer
+    );
 }
 
 void VulkanRenderer::_updateFrameLevelUniformBuffers(uint32_t currentImage) {

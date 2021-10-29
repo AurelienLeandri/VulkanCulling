@@ -175,6 +175,7 @@ private:
 	AllocatedBuffer _cameraDataBuffer;
 	AllocatedBuffer _sceneDataBuffer;
 	AllocatedBuffer _objectsDataBuffer;
+	AllocatedBuffer _indirectCommandBuffer;
 
 	// Data shared between framebuffers
 	_ImageData _framebufferColor;
