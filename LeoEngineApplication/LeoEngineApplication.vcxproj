@@ -19,21 +19,28 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Sources\Shaders.cpp" />
+    <ClCompile Include="Sources\Materials.cpp" />
     <ClCompile Include="Sources\DebugUtils.cpp" />
     <ClCompile Include="Sources\DescriptorUtils.cpp" />
     <ClCompile Include="Sources\Application.cpp" />
     <ClCompile Include="Sources\InputManager.cpp" />
     <ClCompile Include="Sources\main.cpp" />
+    <ClCompile Include="Sources\spirv-reflect\spirv_reflect.c" />
     <ClCompile Include="Sources\VulkanInstance.cpp" />
     <ClCompile Include="Sources\VulkanRenderer.cpp" />
     <ClCompile Include="Sources\Window.cpp" />
     <ClCompile Include="Sources\VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Sources\Shaders.h" />
+    <ClInclude Include="Sources\Materials.h" />
     <ClInclude Include="Sources\DebugUtils.h" />
     <ClInclude Include="Sources\DescriptorUtils.h" />
     <ClInclude Include="Sources\Application.h" />
     <ClInclude Include="Sources\InputManager.h" />
+    <ClInclude Include="Sources\spirv-reflect\include\spirv\unified1\spirv.h" />
+    <ClInclude Include="Sources\spirv-reflect\spirv_reflect.h" />
     <ClInclude Include="Sources\VulkanInstance.h" />
     <ClInclude Include="Sources\VulkanRenderer.h" />
     <ClInclude Include="Sources\Window.h" />
@@ -116,7 +123,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include\LeoEngine;$(ProjectDir)\ThirdParty\Headers;$(SolutionDir)\ThirdParty\Headers;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -134,7 +141,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include\LeoEngine;$(ProjectDir)\ThirdParty\Headers;$(SolutionDir)\ThirdParty\Headers;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -152,7 +159,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include\LeoEngine;$(ProjectDir)\ThirdParty\Headers;$(SolutionDir)\ThirdParty\Headers;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -170,7 +177,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)LeoEngine\Include\LeoEngine;$(ProjectDir)\ThirdParty\Headers;$(SolutionDir)\ThirdParty\Headers;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>

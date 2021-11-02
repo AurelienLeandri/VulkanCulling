@@ -21,7 +21,7 @@
 #include <stb_image.h>
 
 VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
-	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice()), _globalDescriptorAllocator(_device), _descriptorLayoutCache(_device)
+	_vulkan(vulkan), _options(options), _device(vulkan->getLogicalDevice()), _globalDescriptorAllocator(_device), _descriptorLayoutCache(_device), _shaderBuilder(_device)
 {
     _framesData.resize(_vulkan->getSwapChainSize());
 }
@@ -708,8 +708,8 @@ void VulkanRenderer::_createGraphicsPipeline()
     */
 
     VkShaderModule vertexShaderModule, fragmentShaderModule;
-    _createShaderModule("../Resources/Shaders/vert.spv", vertexShaderModule);
-    _createShaderModule("../Resources/Shaders/frag.spv", fragmentShaderModule);
+    _shaderBuilder.createShaderModule("../Resources/Shaders/vert.spv", vertexShaderModule);
+    _shaderBuilder.createShaderModule("../Resources/Shaders/frag.spv", fragmentShaderModule);
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -883,28 +883,6 @@ void VulkanRenderer::_createGraphicsPipeline()
     fragmentShaderModule = VK_NULL_HANDLE;
     vkDestroyShaderModule(device, vertexShaderModule, nullptr);
     vertexShaderModule = VK_NULL_HANDLE;
-}
-
-void VulkanRenderer::_createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule)
-{
-    std::ifstream file(glslFilePath, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw VulkanRendererException((std::string("Failed to open spir-v file \"") + glslFilePath + "\".").c_str());
-    }
-
-    std::vector<char> buffer((size_t)file.tellg());
-    file.seekg(0);
-    file.read(buffer.data(), buffer.size());
-
-    file.close();
-
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = buffer.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
-
-    VK_CHECK(vkCreateShaderModule(_device, &createInfo, nullptr, &shaderModule));
 }
 
 void VulkanRenderer::_constructSceneRelatedStructures()

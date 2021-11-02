@@ -3,6 +3,7 @@
 #include "VulkanInstance.h"
 
 #include "DescriptorUtils.h"
+#include "Shaders.h"
 
 #include <memory>
 #include <unordered_map>
@@ -125,8 +126,6 @@ private:
 
 	void _recreateSwapChainDependentResources();
 
-	void _createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule);
-
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -149,6 +148,9 @@ private:
 	const leo::Scene* _scene = nullptr;
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;
+
+	// Builders and helpers
+	ShaderBuilder _shaderBuilder;
 
 	// Pools
 	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
