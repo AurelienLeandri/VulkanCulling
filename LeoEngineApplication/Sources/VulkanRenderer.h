@@ -4,6 +4,7 @@
 
 #include "DescriptorUtils.h"
 #include "Shaders.h"
+#include "Materials.h"
 
 #include <memory>
 #include <unordered_map>
@@ -18,6 +19,7 @@ namespace leo {
 	class Mesh;
 	class Shape;
 	class Transform;
+	class ImageTexture;
 }
 
 struct GPUCameraData {
@@ -40,6 +42,14 @@ struct GPUObjectData {
 struct AllocatedBuffer {
 	VkBuffer buffer = VK_NULL_HANDLE;
 	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
+};
+
+struct AllocatedImage {
+	VkImage image = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+	VkImageView view = VK_NULL_HANDLE;
+	VkSampler textureSampler = VK_NULL_HANDLE;
+	uint32_t mipLevels = 0;
 };
 
 struct FrameData {
@@ -97,19 +107,6 @@ public:
 	void iterate();
 
 private:
-	struct _ImageData {
-		VkImage image = VK_NULL_HANDLE;
-		VkDeviceMemory memory = VK_NULL_HANDLE;
-		VkImageView view = VK_NULL_HANDLE;
-		VkSampler textureSampler = VK_NULL_HANDLE;
-		uint32_t mipLevels = 0;
-	};
-
-	struct _DescriptorSets {
-		VkDescriptorSet _transformsDescriptorSet;
-	};
-
-private:
 	void _constructSceneRelatedStructures();
 	void _createCommandPools();
 	void _createInputImages();
@@ -130,9 +127,9 @@ private:
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void _createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
-	void _transitionImageLayout(_ImageData& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void _transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-	void _generateMipmaps(_ImageData& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
+	void _generateMipmaps(AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
 
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
@@ -150,7 +147,7 @@ private:
 	VkDevice _device = VK_NULL_HANDLE;
 
 	// Builders and helpers
-	ShaderBuilder _shaderBuilder;
+	MaterialBuilder _materialBuilder;
 
 	// Pools
 	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
@@ -180,11 +177,11 @@ private:
 	AllocatedBuffer _indirectCommandBuffer;
 
 	// Data shared between framebuffers
-	_ImageData _framebufferColor;
+	AllocatedImage _framebufferColor;
 	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
-	_ImageData _framebufferDepth;
+	AllocatedImage _framebufferDepth;
 
-	_ImageData _testImage;
+	AllocatedImage _testImage;
 	VkDescriptorSet _testTextureDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _testDescriptorSetLayout = VK_NULL_HANDLE;
 
@@ -192,12 +189,17 @@ private:
 	std::vector<ObjectsBatch> _objectsBatches;
 
 	// Order within each vector: diffuse, specular, ambient, normals, height
-	std::unordered_map<const leo::Material*, std::vector<_ImageData>> _materialsImages;
+	std::unordered_map<const leo::Material*, std::vector<AllocatedImage>> _materialsImages;
 	size_t _nbMaterials = 0;
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
 	static const int _MAX_NUMBER_OBJECTS = 10000;
 	size_t _currentFrame = 0;
+
+	// Scene data
+	std::vector<AllocatedImage> _images;
+	std::unordered_map<std::string, AllocatedImage> _sceneTextures;
+	void _loadTexture(const leo::ImageTexture& texture);
 };
 

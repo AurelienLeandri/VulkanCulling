@@ -4,6 +4,35 @@
 
 #include <vulkan/vulkan.h>
 
+#include <vector>
+#include <array>
+
+// NOTE: Pipeline builder from VkGuide
+// https://vkguide.dev/
+
+class GraphicsShaderPass;
+
+class PipelineBuilder {
+public:
+	VkPipeline buildPipeline(VkDevice device, VkRenderPass pass);
+	void setShaders(const GraphicsShaderPass& shaderPass);
+
+public:
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	VkViewport viewport = {};
+	VkRect2D scissor = {};
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	VkPipelineLayout pipelineLayout = {};
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	VkVertexInputBindingDescription vertexBinding = {};
+	std::array<VkVertexInputAttributeDescription, 3> vertexAttributes;
+
+private:
+	std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
+};
+
 class VulkanUtils
 {
 
