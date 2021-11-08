@@ -18,8 +18,6 @@ layout(set = 2, binding = 2) uniform sampler2D ambientTexture;
 layout(set = 2, binding = 3) uniform sampler2D normalTexture;
 layout(set = 2, binding = 4) uniform sampler2D heightTexture;
 
-layout(set = 3, binding = 0) uniform sampler2D testTexture;
-
 void main() {
 	outColor = texture(diffuseTexture, fragTexCoord);
 }

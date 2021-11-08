@@ -42,24 +42,6 @@ void VulkanRenderer::_cleanup()
 
     _cleanupSwapChainDependentResources();
 
-    // Cleanup of the images
-    for (auto& entry : _materialsImages) {
-        for (auto& imageData : entry.second) {
-            vkDestroyImage(_device, imageData.image, nullptr);
-            vkFreeMemory(_device, imageData.memory, nullptr);
-            vkDestroySampler(_device, imageData.textureSampler, nullptr);
-            vkDestroyImageView(_device, imageData.view, nullptr);
-        }
-        entry.second.clear();
-    }
-    _materialsImages.clear();
-
-    for (ObjectsBatch& batch : _objectsBatches) {
-        vkDestroyBuffer(_device, batch.vertexBuffer.buffer, nullptr);
-        vkFreeMemory(_device, batch.vertexBuffer.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, batch.indexBuffer.buffer, nullptr);
-        vkFreeMemory(_device, batch.indexBuffer.deviceMemory, nullptr);
-    }
     _objectsBatches.clear();
 
     vkDestroyBuffer(_device, _indirectCommandBuffer.buffer, nullptr);
@@ -215,34 +197,40 @@ void VulkanRenderer::iterate()
 
     vkCmdBeginRenderPass(_framesData[imageIndex].commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+    VkPipelineLayout graphicsPipelineLayout = _objectsBatches[0].material->getTemplate()->getShaderPass(GraphicsShaderPassType::FORWARD)->getPipelineLayout();
 
     // Global data descriptor set
     uint32_t uniformOffset = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame);
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        _pipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
+        graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
 
-    vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        _pipelineLayout, 3, 1, &_testTextureDescriptorSet, 0, nullptr);
+    VkPipeline currentPipeline = VK_NULL_HANDLE;
 
     uint32_t objectIndex = 0;
     uint32_t offset = 0;
     uint32_t stride = sizeof(VkDrawIndexedIndirectCommand);
     for (const ObjectsBatch& batch : _objectsBatches) {
-        const leo::Material* material = batch.material;
+        const Material* material = batch.material;
+
+        VkPipeline materialPipeline = material->getTemplate()->getShaderPass(GraphicsShaderPassType::FORWARD)->getPipeline();
+        if (currentPipeline != materialPipeline) {
+            currentPipeline = materialPipeline;
+            vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
+        }
+
         VkDeviceSize offsets[] = { 0 };
 
         // Materials data descriptor set
         vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            _pipelineLayout, 2, 1, &_materialDescriptorSets[material], 0, nullptr);
+            graphicsPipelineLayout, 2, 1, &material->descriptorSets.at(GraphicsShaderPassType::FORWARD), 0, nullptr);
 
         // Objects data descriptor set
         vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            _pipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
+            graphicsPipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
 
-        vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &batch.vertexBuffer.buffer, offsets);
+        vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &batch.shape->vertexBuffer.buffer, offsets);
 
-        vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
         vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _indirectCommandBuffer.buffer, offset, 1, stride);
 
@@ -463,105 +451,6 @@ void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 }
 
 void VulkanRenderer::_createInputImages() {
-    for (auto& entry : _materialsImages) {
-        const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(entry.first);
-        std::vector<AllocatedImage>& vulkanImages = entry.second;
-
-        static const size_t nbTexturesInMaterial = 5;
-        std::array<const leo::ImageTexture*, nbTexturesInMaterial> materialTextures = {
-            material->diffuseTexture.get(), material->specularTexture.get(), material->ambientTexture.get(), material->normalsTexture.get(), material->heightTexture.get()
-        };
-
-        for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
-            AllocatedImage& vulkanImageData = vulkanImages[i];
-            const leo::ImageTexture* materialTexture = materialTextures[i];
-
-            uint32_t texWidth = static_cast<uint32_t>(materialTexture->width);
-            uint32_t texHeight = static_cast<uint32_t>(materialTexture->height);
-
-            vulkanImageData.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-
-            uint32_t nbChannels = 0;
-            VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
-            switch (materialTexture->layout) {
-            case leo::ImageTexture::Layout::R:
-                imageFormat = VK_FORMAT_R8_UNORM;
-                nbChannels = 1;
-                break;
-            case leo::ImageTexture::Layout::RGBA:
-                if (i == 3) { // Normals texture
-                    imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
-                }
-                else {
-                    imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
-                }
-                nbChannels = 4;
-                break;
-            default:
-                break;
-            }
-
-            if (!nbChannels || imageFormat == VkFormat::VK_FORMAT_UNDEFINED) {
-                throw VulkanRendererException("A texture on a material has a format that is not expected. Something is very very wrong.");
-            }
-
-            // Image handle and memory
-
-            _vulkan->createImage(texWidth, texHeight, vulkanImageData.mipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vulkanImageData.image, vulkanImageData.memory);
-
-            _transitionImageLayout(vulkanImageData, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
-            VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
-            _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-            void* data = nullptr;
-            vkMapMemory(_device, stagingBufferMemory, 0, imageSize, 0, &data);
-            memcpy(data, materialTexture->data, static_cast<size_t>(imageSize));
-            vkUnmapMemory(_device, stagingBufferMemory);
-
-            _copyBufferToImage(stagingBuffer, vulkanImageData.image, texWidth, texHeight);
-
-            _generateMipmaps(vulkanImageData, imageFormat, texWidth, texHeight);
-
-            vkDestroyBuffer(_device, stagingBuffer, nullptr);
-            stagingBuffer = VK_NULL_HANDLE;
-            vkFreeMemory(_device, stagingBufferMemory, nullptr);
-            stagingBufferMemory = VK_NULL_HANDLE;
-
-            // Image view
-
-            _vulkan->createImageView(vulkanImageData.image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, vulkanImageData.mipLevels, vulkanImageData.view);
-
-            // Texture sampler
-
-            VkSamplerCreateInfo samplerInfo = {};
-            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            samplerInfo.magFilter = VK_FILTER_LINEAR;
-            samplerInfo.minFilter = VK_FILTER_LINEAR;
-            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            samplerInfo.anisotropyEnable = VK_TRUE;
-
-            samplerInfo.maxAnisotropy = _vulkan->getProperties().maxSamplerAnisotropy;
-
-            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-            samplerInfo.unnormalizedCoordinates = VK_FALSE;
-            samplerInfo.compareEnable = VK_FALSE;
-            samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-            samplerInfo.minLod = 0.0f;
-            samplerInfo.maxLod = static_cast<float>(vulkanImageData.mipLevels);
-            samplerInfo.mipLodBias = 0.0f;
-
-            VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &vulkanImageData.textureSampler));
-        }
-    }
 }
 
 void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -895,11 +784,17 @@ void VulkanRenderer::_constructSceneRelatedStructures()
 {
     std::map<const leo::Material*, Material*> loadedMaterialsCache;
     std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
-    std::map<const leo::Material*, std::map<const leo::Shape*, uint32_t>> nbObjectsPerBatch;
+    std::map<const leo::Shape*, ShapeData*> shapeDataCache;
+    std::map<const Material*, std::map<const ShapeData*, uint32_t>> nbObjectsPerBatch;
     for (const leo::SceneObject& sceneObject : _scene->objects) {
         const leo::PerformanceMaterial* sceneMaterial = static_cast<const leo::PerformanceMaterial*>(sceneObject.material.get());
-        const leo::Shape* shape = sceneObject.shape.get();
+        const leo::Shape* sceneShape = sceneObject.shape.get();
         Material* loadedMaterial = nullptr;
+        ShapeData* loadedShape = nullptr;
+
+        /*
+        * Load material data on the device
+        */
         if (loadedMaterialsCache.find(sceneMaterial) == loadedMaterialsCache.end()) {
             loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
 
@@ -912,7 +807,8 @@ void VulkanRenderer::_constructSceneRelatedStructures()
                 const leo::ImageTexture* sceneTexture = materialTextures[i];
                 AllocatedImage* loadedImage = nullptr;
                 if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
-                    loadedImage = &_images.emplace_back();
+                    _images.push_back(std::make_unique<AllocatedImage>());
+                    loadedImage = _images.back().get();
 
                     uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                     uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
@@ -1014,57 +910,62 @@ void VulkanRenderer::_constructSceneRelatedStructures()
         else {
             loadedMaterial = loadedMaterialsCache[sceneMaterial];
         }
-        if (nbObjectsPerBatch.find(sceneMaterial) == nbObjectsPerBatch.end()) {
-            nbObjectsPerBatch[sceneMaterial] = {};
+
+        /*
+        * Load shape data on the device
+        */
+        if (shapeDataCache.find(sceneShape) == shapeDataCache.end()) {
+            _shapeData.push_back(std::make_unique<ShapeData>());
+            loadedShape = _shapeData.back().get();
+            
+            const leo::Mesh* mesh = static_cast<const leo::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
+
+            // Vertex buffer
+            _createGPUBuffer(sizeof(leo::Vertex)* mesh->vertices.size(),
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
+                loadedShape->vertexBuffer);
+
+            // Index buffer
+            _createGPUBuffer(sizeof(mesh->indices[0])* mesh->indices.size(),
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
+                loadedShape->indexBuffer);
+
+            loadedShape->nbElements = static_cast<uint32_t>(mesh->indices.size());
         }
-        if (nbObjectsPerBatch[sceneMaterial].find(shape) == nbObjectsPerBatch[sceneMaterial].end()) {
-            nbObjectsPerBatch[sceneMaterial][shape] = 0;
+        else {
+            loadedShape = shapeDataCache[sceneShape];
         }
-        nbObjectsPerBatch[sceneMaterial][shape]++;
+
+        /*
+        * Incrementing the counter for the given pair of material and shape data.
+        */
+        if (nbObjectsPerBatch.find(loadedMaterial) == nbObjectsPerBatch.end()) {
+            nbObjectsPerBatch[loadedMaterial] = {};
+        }
+        if (nbObjectsPerBatch[loadedMaterial].find(loadedShape) == nbObjectsPerBatch[loadedMaterial].end()) {
+            nbObjectsPerBatch[loadedMaterial][loadedShape] = 0;
+        }
+        nbObjectsPerBatch[loadedMaterial][loadedShape]++;
     }
     _nbMaterials = nbObjectsPerBatch.size();
 
     for (const auto& materialShapesPair : nbObjectsPerBatch) {
-        const leo::PerformanceMaterial* material = static_cast<const leo::PerformanceMaterial*>(materialShapesPair.first);  // TODO: assuming material is Performance for now
+        const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
-            const leo::Mesh* mesh = static_cast<const leo::Mesh*>(shapeNbPair.first);  // TODO: assuming the shape is a mesh for now
+            const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
             uint32_t nbObjects = shapeNbPair.second;
-            AllocatedBuffer vertexBuffer{};
-            AllocatedBuffer indexBuffer{};
-
-            // Vertex buffer
-            _createGPUBuffer(sizeof(leo::Vertex) * mesh->vertices.size(),
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
-                vertexBuffer);
-
-            // Index buffer
-            _createGPUBuffer(sizeof(mesh->indices[0]) * mesh->indices.size(),
-                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
-                indexBuffer);
 
             _objectsBatches.push_back({
-                vertexBuffer,  // vertexBuffer
-                indexBuffer,  // indexBuffer
                 material,  // material
-                mesh,  // mesh
+                shape,  // shape
                 nbObjects,  // nbObjects
-                static_cast<uint32_t>(mesh->indices.size()), // primitivesPerObject
+                shape->nbElements, // primitivesPerObject
                 0,  // stride
                 0,  // offset
                 });
         }
     }
-
-    for (ObjectsBatch& batch : _objectsBatches) {
-        if (_materialsImages.find(batch.material) == _materialsImages.end()) {
-            _materialsImages[batch.material] = std::vector<AllocatedImage>(5);
-        }
-    }
 }
-
-void VulkanRenderer::_loadTexture(const leo::ImageTexture& texture) {
-}
-
 
 void VulkanRenderer::_createRenderPass()
 {
@@ -1226,19 +1127,6 @@ void VulkanRenderer::_createDescriptors()
     DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
         .bindBuffer(0, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
         .build(_objectsDataDescriptorSet, _objectsDataDescriptorSetLayout);
-
-    /*
-    * Test texture
-    */
-
-    VkDescriptorImageInfo testImageInfo = {};
-    testImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    testImageInfo.imageView = _materialsImages.begin()->second[3].view;
-    testImageInfo.sampler = _materialsImages.begin()->second[3].textureSampler;
-
-    DescriptorBuilder::begin(_device, _descriptorLayoutCache, _globalDescriptorAllocator)
-        .bindImage(0, testImageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build(_testTextureDescriptorSet, _testDescriptorSetLayout);
 }
 
 void VulkanRenderer::_createFramebuffers()

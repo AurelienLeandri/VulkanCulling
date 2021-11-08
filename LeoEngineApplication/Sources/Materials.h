@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 #include <vulkan/vulkan.h>
 
@@ -23,10 +24,12 @@ public:
 		VkDevice device = VK_NULL_HANDLE;
 		ShaderBuilder* shaderBuilder = nullptr;
 		std::unordered_map<VkShaderStageFlagBits, const char*> shaderPaths;
+		std::unordered_map<std::string, VkDescriptorType> descriptorTypeOverwrites;
 	};
 
 	void init(const Parameters& parameters);
 	void setPipeline(VkPipeline pipeline);
+	const VkPipeline getPipeline() const;
 	VkPipelineLayout getPipelineLayout() const;
 
 	const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& getShaderModules() const;
@@ -59,7 +62,7 @@ public:
 private:
 	VkDevice _device;
 
-	std::unordered_map<GraphicsShaderPassType, GraphicsShaderPass> _shaderPasses;
+	std::unordered_map<GraphicsShaderPassType, std::unique_ptr<GraphicsShaderPass>> _shaderPasses;
 };
 
 struct MaterialTexture {
@@ -79,11 +82,11 @@ public:
 	Material(MaterialBuilder* builder, const MaterialTemplate* materialTemplate);
 
 	void initDescriptorSet();
+	const MaterialTemplate* getTemplate() const;
 
 public:
 	std::array<MaterialTexture, 5> textures = { {} };
 	std::unordered_map<GraphicsShaderPassType, VkDescriptorSet> descriptorSets;
-	MaterialTemplate* materialTemplate;
 
 private:
 	MaterialBuilder* _builder;
@@ -113,6 +116,6 @@ private:
 	ShaderBuilder _shaderBuilder;
 	DescriptorAllocator _descriptorAllocator;
 	DescriptorLayoutCache _descriptorLayoutCache;
-	std::vector<Material> _materials;
+	std::vector<std::unique_ptr<Material>> _materials;
 };
 

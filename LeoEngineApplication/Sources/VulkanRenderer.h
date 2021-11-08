@@ -52,6 +52,12 @@ struct AllocatedImage {
 	uint32_t mipLevels = 0;
 };
 
+struct ShapeData {
+	AllocatedBuffer vertexBuffer;
+	AllocatedBuffer indexBuffer;
+	uint32_t nbElements = 0;
+};
+
 struct FrameData {
 	VkSemaphore presentSemaphore = VK_NULL_HANDLE;
 	VkSemaphore renderSemaphore = VK_NULL_HANDLE;
@@ -73,10 +79,8 @@ struct RenderableObject {
 };
 
 struct ObjectsBatch {
-	AllocatedBuffer vertexBuffer = {};
-	AllocatedBuffer indexBuffer = {};
-	const leo::PerformanceMaterial* material = nullptr;
-	const leo::Mesh* mesh = nullptr;
+	const Material* material = nullptr;
+	const ShapeData* shape = nullptr;
 	uint32_t nbObjects = 0;
 	uint32_t primitivesPerObject = 0;
 	uint32_t stride = 0;
@@ -181,25 +185,17 @@ private:
 	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 	AllocatedImage _framebufferDepth;
 
-	AllocatedImage _testImage;
-	VkDescriptorSet _testTextureDescriptorSet = VK_NULL_HANDLE;
-	VkDescriptorSetLayout _testDescriptorSetLayout = VK_NULL_HANDLE;
-
-	// Constant input data
-	std::vector<ObjectsBatch> _objectsBatches;
-
-	// Order within each vector: diffuse, specular, ambient, normals, height
-	std::unordered_map<const leo::Material*, std::vector<AllocatedImage>> _materialsImages;
-	size_t _nbMaterials = 0;
-
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
 	static const int _MAX_NUMBER_OBJECTS = 10000;
 	size_t _currentFrame = 0;
 
 	// Scene data
-	std::vector<AllocatedImage> _images;
-	std::unordered_map<std::string, AllocatedImage> _sceneTextures;
-	void _loadTexture(const leo::ImageTexture& texture);
+	std::vector<std::unique_ptr<AllocatedImage>> _images;
+	std::vector<std::unique_ptr<ShapeData>> _shapeData;
+
+	// Indexes and utility containers to group similar objects in the scene
+	std::vector<ObjectsBatch> _objectsBatches;
+	size_t _nbMaterials = 0;
 };
 

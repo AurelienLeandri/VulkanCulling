@@ -14,15 +14,15 @@ void MaterialTemplate::init(const Parameters& parameters)
 {
 	_device = parameters.device;
 	for (const auto& [passType, passParameters] : parameters.passesParameters) {
-		_shaderPasses[passType] = {};
-		_shaderPasses[passType].init(passParameters);
+		_shaderPasses[passType] = std::make_unique<GraphicsShaderPass>();
+		_shaderPasses[passType]->init(passParameters);
 
 	}
 }
 
 const GraphicsShaderPass* MaterialTemplate::getShaderPass(GraphicsShaderPassType passType) const
 {
-	return &_shaderPasses.at(passType);
+	return _shaderPasses.at(passType).get();
 }
 
 GraphicsShaderPass* MaterialTemplate::getShaderPass(GraphicsShaderPassType passType)
@@ -31,7 +31,7 @@ GraphicsShaderPass* MaterialTemplate::getShaderPass(GraphicsShaderPassType passT
 		return nullptr;
 	}
 
-	return &_shaderPasses[passType];
+	return _shaderPasses[passType].get();
 }
 
 void GraphicsShaderPass::init(const Parameters& parameters)
@@ -89,7 +89,12 @@ void GraphicsShaderPass::init(const Parameters& parameters)
 				if (!bindingDuplicate) {
 					bindings[bindingIdx] = {};
 					bindings[bindingIdx].binding = bindingIdx;
-					bindings[bindingIdx].descriptorType = static_cast<VkDescriptorType>(reflBinding.descriptor_type); // OVERRIDE
+					if (parameters.descriptorTypeOverwrites.find(reflBinding.name) != parameters.descriptorTypeOverwrites.end()) {
+						bindings[bindingIdx].descriptorType = parameters.descriptorTypeOverwrites.at(reflBinding.name);
+					}
+					else {
+						bindings[bindingIdx].descriptorType = static_cast<VkDescriptorType>(reflBinding.descriptor_type);
+					}
 					bindings[bindingIdx].descriptorCount = 1;
 					for (uint32_t dimIdx = 0; dimIdx < reflBinding.array.dims_count; ++dimIdx) {
 						bindings[bindingIdx].descriptorCount *= reflBinding.array.dims[dimIdx];
@@ -153,6 +158,11 @@ void GraphicsShaderPass::init(const Parameters& parameters)
 void GraphicsShaderPass::setPipeline(VkPipeline pipeline)
 {
 	_pipeline = pipeline;
+}
+
+const VkPipeline GraphicsShaderPass::getPipeline() const
+{
+	return _pipeline;
 }
 
 VkPipelineLayout GraphicsShaderPass::getPipelineLayout() const
@@ -278,6 +288,7 @@ void MaterialBuilder::init(Parameters parameters)
 	forwardPassParams.shaderBuilder = &_shaderBuilder;
 	forwardPassParams.shaderPaths[VK_SHADER_STAGE_VERTEX_BIT] = "../Resources/Shaders/vert.spv";
 	forwardPassParams.shaderPaths[VK_SHADER_STAGE_FRAGMENT_BIT] = "../Resources/Shaders/frag.spv";
+	forwardPassParams.descriptorTypeOverwrites["transforms"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	performanceMaterialTemplateParams.passesParameters[GraphicsShaderPassType::FORWARD] = forwardPassParams;
 	_forwardPassTemplate.init(performanceMaterialTemplateParams);
 	_forwardPipelineBuilder.pipelineLayout = _forwardPassTemplate.getShaderPass(GraphicsShaderPassType::FORWARD)->getPipelineLayout();
@@ -289,8 +300,8 @@ void MaterialBuilder::init(Parameters parameters)
 
 Material* MaterialBuilder::createMaterial(MaterialType type)
 {
-	_materials.emplace_back(this, &_forwardPassTemplate);
-	return &_materials.back();
+	_materials.push_back(std::make_unique<Material>(this, &_forwardPassTemplate));
+	return _materials.back().get();
 }
 
 void MaterialBuilder::setupMaterialDescriptorSet(Material& material)
@@ -317,4 +328,9 @@ void Material::initDescriptorSet()
 {
 	_builder->setupMaterialDescriptorSet(*this);
 	
+}
+
+const MaterialTemplate* Material::getTemplate() const
+{
+	return _materialTemplate;
 }
