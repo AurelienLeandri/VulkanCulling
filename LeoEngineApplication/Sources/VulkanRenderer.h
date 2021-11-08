@@ -115,7 +115,6 @@ private:
 	void _createCommandPools();
 	void _createInputImages();
 	void _createRenderPass();
-	void _createGraphicsPipeline();
 	void _createFramebufferImageResources();
 	void _createFramebuffers();
 	void _createCommandBuffers();
@@ -157,9 +156,7 @@ private:
 	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
 
 	// Main pipeline
-	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 	VkRenderPass _renderPass = VK_NULL_HANDLE;
-	VkPipeline _graphicsPipeline = VK_NULL_HANDLE;
 
 	// Per-frame data
 	std::vector<FrameData> _framesData;

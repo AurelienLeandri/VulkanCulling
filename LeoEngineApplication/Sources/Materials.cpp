@@ -3,6 +3,7 @@
 #include "DebugUtils.h"
 #include "Scene/Geometries/Vertex.h"
 #include "DescriptorUtils.h"
+#include "VulkanInstance.h"
 
 #include "spirv-reflect/spirv_reflect.h"
 
@@ -175,8 +176,8 @@ const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& GraphicsShaderP
 	return _shaderModules;
 }
 
-MaterialBuilder::MaterialBuilder(VkDevice device)
-	: _device(device), _shaderBuilder(_device), _descriptorAllocator(_device), _descriptorLayoutCache(_device)
+MaterialBuilder::MaterialBuilder(VkDevice device, const VulkanInstance* instance)
+	: _device(device), _vulkan(instance), _shaderBuilder(_device), _descriptorAllocator(_device), _descriptorLayoutCache(_device)
 {
 	DescriptorAllocator::Options descriptorAllocatorOptions = {};
 	descriptorAllocatorOptions.poolBaseSize = 10;
@@ -246,32 +247,40 @@ void MaterialBuilder::init(Parameters parameters)
 	multisamplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisamplingInfo.pNext = nullptr;
 
-	multisamplingInfo.sampleShadingEnable = VK_FALSE;
+	multisamplingInfo.sampleShadingEnable = VK_TRUE;
 	multisamplingInfo.rasterizationSamples = _parameters.multisamplingNbSamples;
-	multisamplingInfo.minSampleShading = 1.0f;
+	multisamplingInfo.minSampleShading = 0.2f;
 	multisamplingInfo.pSampleMask = nullptr;
 	multisamplingInfo.alphaToCoverageEnable = VK_FALSE;
 	multisamplingInfo.alphaToOneEnable = VK_FALSE;
 	_forwardPipelineBuilder.multisampling = multisamplingInfo;
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_TRUE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 	_forwardPipelineBuilder.colorBlendAttachment = colorBlendAttachment;
 
-	VkPipelineDepthStencilStateCreateInfo depthStencilInfo = {};
-	depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilInfo.pNext = nullptr;
-	depthStencilInfo.depthTestEnable = VK_TRUE;
-	depthStencilInfo.depthWriteEnable = VK_TRUE;
-	depthStencilInfo.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
-	depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
-	depthStencilInfo.minDepthBounds = 0.0f; // Optional
-	depthStencilInfo.maxDepthBounds = 1.0f; // Optional
-	depthStencilInfo.stencilTestEnable = VK_FALSE;
-	_forwardPipelineBuilder.depthStencil = depthStencilInfo;
+	_forwardPipelineBuilder.depthStencil = VulkanUtils::createDepthStencilCreateInfo(true, true, VK_COMPARE_OP_LESS);
 
+	const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
+
+	VkViewport viewport{};
+	_forwardPipelineBuilder.viewport.x = 0.0f;
+	_forwardPipelineBuilder.viewport.y = 0.0f;
+	_forwardPipelineBuilder.viewport.width = static_cast<float>(instanceProperties.swapChainExtent.width);
+	_forwardPipelineBuilder.viewport.height = static_cast<float>(instanceProperties.swapChainExtent.height);
+	_forwardPipelineBuilder.viewport.minDepth = 0.0f;
+	_forwardPipelineBuilder.viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor{};
+	_forwardPipelineBuilder.scissor.offset = { 0, 0 };
+	_forwardPipelineBuilder.scissor.extent = instanceProperties.swapChainExtent;
 
 	/*
 	* Performance material template

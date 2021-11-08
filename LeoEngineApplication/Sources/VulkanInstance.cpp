@@ -88,7 +88,7 @@ void VulkanInstance::init()
         instanceCreateInfo.ppEnabledLayerNames = nullptr;
     }
 
-    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &_instance));
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &_vulkan));
 
     /*
     * Debug messenger
@@ -98,8 +98,8 @@ void VulkanInstance::init()
         VkDebugUtilsMessengerCreateInfoEXT debugMsgCreateInfo = {};
         populateDebugMessengerCreateInfo(debugMsgCreateInfo);
 
-        if (auto vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT")) {
-            VK_CHECK(vkCreateDebugUtilsMessengerEXT(_instance, &debugMsgCreateInfo, nullptr, &_debugMessenger));
+        if (auto vkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_vulkan, "vkCreateDebugUtilsMessengerEXT")) {
+            VK_CHECK(vkCreateDebugUtilsMessengerEXT(_vulkan, &debugMsgCreateInfo, nullptr, &_debugMessenger));
         }
         else {
             throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
@@ -110,7 +110,7 @@ void VulkanInstance::init()
     * Surface
     */
 
-    if (glfwCreateWindowSurface(_instance, _window, nullptr, &_surface)) {
+    if (glfwCreateWindowSurface(_vulkan, _window, nullptr, &_surface)) {
         throw VulkanRendererException("Failed to create window surface.");
     }
 
@@ -119,12 +119,12 @@ void VulkanInstance::init()
     */
 
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(_vulkan, &deviceCount, nullptr);
     if (!deviceCount) {
         throw VulkanRendererException("Failed to find GPUs with Vulkan support.");
     }
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(_vulkan, &deviceCount, devices.data());
 
     const VkPhysicalDevice* candidateDevice = nullptr;
     int maxScore = 0;
@@ -223,8 +223,8 @@ void VulkanInstance::_cleanup()
     _device = VK_NULL_HANDLE;
 
     if (_debugMessenger) {
-        if (auto vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")) {
-            vkDestroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
+        if (auto vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_vulkan, "vkDestroyDebugUtilsMessengerEXT")) {
+            vkDestroyDebugUtilsMessengerEXT(_vulkan, _debugMessenger, nullptr);
             _debugMessenger = VK_NULL_HANDLE;
         }
         else {
@@ -232,11 +232,11 @@ void VulkanInstance::_cleanup()
         }
     }
 
-    vkDestroySurfaceKHR(_instance, _surface, nullptr);
+    vkDestroySurfaceKHR(_vulkan, _surface, nullptr);
     _surface = VK_NULL_HANDLE;
 
-    vkDestroyInstance(_instance, nullptr);
-    _instance = VK_NULL_HANDLE;
+    vkDestroyInstance(_vulkan, nullptr);
+    _vulkan = VK_NULL_HANDLE;
 }
 
 bool VulkanInstance::QueueFamilyIndices::hasMandatoryFamilies()
@@ -615,7 +615,7 @@ VkPhysicalDevice& VulkanInstance::getPhysicalDevice()
 
 VkInstance& VulkanInstance::getInstance()
 {
-    return _instance;
+    return _vulkan;
 }
 
 const VulkanInstance::Properties& VulkanInstance::getProperties() const {

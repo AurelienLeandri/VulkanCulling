@@ -12,6 +12,7 @@
 
 class DescriptorAllocator;
 class DescriptorLayoutCache;
+class VulkanInstance;
 
 enum class GraphicsShaderPassType {
 	FORWARD,
@@ -102,13 +103,14 @@ public:
 	};
 
 public:
-	MaterialBuilder(VkDevice device);
+	MaterialBuilder(VkDevice device, const VulkanInstance* instance);
 
 	void init(Parameters parameters = {});
 	Material* createMaterial(MaterialType type);
 	void setupMaterialDescriptorSet(Material& material);
 
 private:
+	const VulkanInstance* _vulkan;
 	PipelineBuilder _forwardPipelineBuilder;
 	Parameters _parameters;
 	VkDevice _device;

@@ -83,7 +83,7 @@ private:
 
 private:
 	GLFWwindow* _window = nullptr;
-	VkInstance _instance = VK_NULL_HANDLE;
+	VkInstance _vulkan = VK_NULL_HANDLE;
 	VkDebugUtilsMessengerEXT _debugMessenger = VK_NULL_HANDLE;
 	VkSurfaceKHR _surface = VK_NULL_HANDLE;
 
