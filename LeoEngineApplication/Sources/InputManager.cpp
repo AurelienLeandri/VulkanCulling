@@ -13,16 +13,20 @@ InputManager::InputManager(Application& application) :
 {
 }
 
-void InputManager::init()
+void InputManager::init(GLFWwindow* window)
 {
-    _camera = _application._camera.get();
-    _window = _application._window->window;
+    _window = window;
     glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetWindowUserPointer(_window, &_application);
     glfwSetFramebufferSizeCallback(_window, _framebufferResizeCallback);
     glfwSetCursorPosCallback(_window, _mouseCallback);
 
     _frameClock = std::clock();
+}
+
+void InputManager::setCamera(leo::Camera* camera)
+{
+    _camera = camera;
 }
 
 bool InputManager::processInput()

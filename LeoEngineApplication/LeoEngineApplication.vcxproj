@@ -19,7 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Sources\Shaders.cpp" />
+    <ClCompile Include="Sources\GraphicShaderPass.cpp" />
+    <ClCompile Include="Sources\MaterialBuilder.cpp" />
+    <ClCompile Include="Sources\MaterialTemplate.cpp" />
+    <ClCompile Include="Sources\PipelineBuilder.cpp" />
+    <ClCompile Include="Sources\ShaderBuilder.cpp" />
     <ClCompile Include="Sources\Materials.cpp" />
     <ClCompile Include="Sources\DebugUtils.cpp" />
     <ClCompile Include="Sources\DescriptorUtils.cpp" />
@@ -33,7 +37,11 @@
     <ClCompile Include="Sources\VulkanUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Sources\Shaders.h" />
+    <ClInclude Include="Sources\GraphicShaderPass.h" />
+    <ClInclude Include="Sources\MaterialBuilder.h" />
+    <ClInclude Include="Sources\MaterialTemplate.h" />
+    <ClInclude Include="Sources\PipelineBuilder.h" />
+    <ClInclude Include="Sources\ShaderBuilder.h" />
     <ClInclude Include="Sources\Materials.h" />
     <ClInclude Include="Sources\DebugUtils.h" />
     <ClInclude Include="Sources\DescriptorUtils.h" />

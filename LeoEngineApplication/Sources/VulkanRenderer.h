@@ -3,8 +3,7 @@
 #include "VulkanInstance.h"
 
 #include "DescriptorUtils.h"
-#include "Shaders.h"
-#include "Materials.h"
+#include "MaterialBuilder.h"
 
 #include <memory>
 #include <unordered_map>
@@ -105,26 +104,23 @@ public:
 	~VulkanRenderer();
 
 public:
-	void setScene(const leo::Scene* scene);
 	void setCamera(const leo::Camera* camera);
 	void init();
+	void loadSceneToDevice(const leo::Scene* scene);
 	void iterate();
 
 private:
-	void _constructSceneRelatedStructures();
 	void _createCommandPools();
-	void _createInputImages();
 	void _createRenderPass();
-	void _createFramebufferImageResources();
+	void _createFramebuffersImage();
 	void _createFramebuffers();
 	void _createCommandBuffers();
 	void _createSyncObjects();
-	void _updateFrameLevelUniformBuffers(uint32_t currentImage);
+	void _updateCamera(uint32_t currentImage);
 
-	void _createInputBuffers();
-	void _createDescriptors();
-
-	void _recreateSwapChainDependentResources();
+	void _createGlobalBuffers();
+	void _fillConstantGlobalBuffers(const leo::Scene* scene);
+	void _createGlobalDescriptors();
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -138,14 +134,12 @@ private:
 	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
 
 	void _cleanup();
-	void _cleanupSwapChainDependentResources();
 
 private:
 	Options _options;
 
 	// Data from other objects
 	const leo::Camera* _camera = nullptr;
-	const leo::Scene* _scene = nullptr;
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;
 
@@ -163,7 +157,7 @@ private:
 
 	// Descriptors shared between frames
 	DescriptorAllocator _globalDescriptorAllocator;
-	DescriptorLayoutCache _descriptorLayoutCache;
+	DescriptorLayoutCache _globalDescriptorLayoutCache;
 	VkDescriptorSetLayout _globalDataDescriptorSetLayout = VK_NULL_HANDLE;
 	VkDescriptorSet _globalDataDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
@@ -188,7 +182,7 @@ private:
 	size_t _currentFrame = 0;
 
 	// Scene data
-	std::vector<std::unique_ptr<AllocatedImage>> _images;
+	std::vector<std::unique_ptr<AllocatedImage>> _materialImagesData;
 	std::vector<std::unique_ptr<ShapeData>> _shapeData;
 
 	// Indexes and utility containers to group similar objects in the scene

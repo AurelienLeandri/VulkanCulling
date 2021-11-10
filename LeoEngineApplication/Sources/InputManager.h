@@ -29,7 +29,8 @@ public:
 	InputManager(Application& application);
 
 public:
-	void init();
+	void init(GLFWwindow* window);
+	void setCamera(leo::Camera* camera);
 	bool processInput();
 	void processMouseMovement(float xoffset, float yoffset);
 

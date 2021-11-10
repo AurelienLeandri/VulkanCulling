@@ -36,7 +36,6 @@ private:
 	std::unique_ptr<InputManager> _inputManager;
 	std::unique_ptr<VulkanInstance> _vulkan;
 	std::unique_ptr<leo::Camera> _camera;
-	std::unique_ptr<leo::Scene> _scene;
 	std::unique_ptr<Window> _window;
 
 	friend class InputManager;

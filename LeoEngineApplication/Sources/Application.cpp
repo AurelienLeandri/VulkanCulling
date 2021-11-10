@@ -40,7 +40,9 @@ int Application::_initMembers() {
         return -1;
     }
 
-    _inputManager->init();
+    _inputManager->init(_window->window);
+    _camera = std::make_unique<leo::Camera>();
+    _inputManager->setCamera(_camera.get());
 
     _vulkan = std::make_unique<VulkanInstance>(_window->window);
     try {
@@ -52,8 +54,6 @@ int Application::_initMembers() {
     }
 
     _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
-    _renderer->setScene(_scene.get());
-    _renderer->setCamera(_camera.get());
     try {
         _renderer->init();
     } catch (const VulkanRendererException& e) {
@@ -71,16 +71,14 @@ void Application::_cleanUp()
     _vulkan.reset();
     _window.reset();
     _camera.reset();
-    _scene.reset();
 }
 
 int Application::loadScene(const std::string& filePath)
 {
-    _scene = std::make_unique<leo::Scene>();
-    _camera = std::make_unique<leo::Camera>();
+    leo::Scene scene;
 
     try {
-        leo::SceneLoader::loadScene(filePath.c_str(), _scene.get(), _camera.get());
+        leo::SceneLoader::loadScene(filePath.c_str(), &scene, _camera.get());
     }
     catch (leo::SceneLoaderException e) {
         std::cerr << e.what() << std::endl;
@@ -88,8 +86,10 @@ int Application::loadScene(const std::string& filePath)
     }
 
     // TODO: load lights from scene file
-    _scene->lights.push_back(std::make_shared<leo::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
+    scene.lights.push_back(std::make_shared<leo::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
 
+    _renderer->setCamera(_camera.get());
+    _renderer->loadSceneToDevice(&scene);
 
     return 0;
 }
