@@ -228,10 +228,10 @@ void VulkanRenderer::iterate()
 
         vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _indirectCommandBuffer.buffer, offset, 1, stride);
+        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _indirectCommandBuffer.buffer, offset, batch.nbObjects, stride);
 
         objectIndex++;
-        offset += stride;
+        offset += stride * batch.nbObjects;
     }
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
@@ -659,6 +659,8 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             }
 
             _materialBuilder.setupMaterialDescriptorSets(*loadedMaterial);
+
+            loadedMaterialsCache[sceneMaterial] = loadedMaterial;
         }
         else {
             loadedMaterial = loadedMaterialsCache[sceneMaterial];
@@ -684,6 +686,8 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                 loadedShape->indexBuffer);
 
             loadedShape->nbElements = static_cast<uint32_t>(mesh->indices.size());
+
+            shapeDataCache[sceneShape] = loadedShape;
         }
         else {
             loadedShape = shapeDataCache[sceneShape];
@@ -752,13 +756,20 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Indirect Command buffer
     */
 
-    std::vector<VkDrawIndexedIndirectCommand> commandBufferData(_objectsBatches.size(), VkDrawIndexedIndirectCommand{});
+    std::vector<VkDrawIndexedIndirectCommand> commandBufferData(scene->objects.size(), VkDrawIndexedIndirectCommand{});
+    size_t offset = 0;
+    uint32_t aaa = 0;
     for (int i = 0; i < _objectsBatches.size(); ++i) {
-        VkDrawIndexedIndirectCommand& command = commandBufferData[i];
-        const ObjectsBatch& batch = _objectsBatches[i];
-        command.firstInstance = i;
-        command.instanceCount = 1;
-        command.indexCount = batch.primitivesPerObject;
+        size_t stride = 0;
+        for (int j = 0; j < _objectsBatches[i].nbObjects; ++j) {
+            VkDrawIndexedIndirectCommand& command = commandBufferData[offset + stride];
+            command.firstInstance = offset + stride;  // Used to access i in the model matrix since we dont use instancing.
+            command.instanceCount = 1;
+            command.indexCount = _objectsBatches[i].primitivesPerObject;
+            stride++;
+        }
+        aaa += _objectsBatches[i].primitivesPerObject;
+        offset += stride;
     }
     _createGPUBuffer(commandBufferData.size() * sizeof(VkDrawIndexedIndirectCommand),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,

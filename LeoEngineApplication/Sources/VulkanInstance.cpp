@@ -179,6 +179,7 @@ void VulkanInstance::init()
     // Antialiazing on shading, for example textures with sudden color changes.
     // Has a performance cost.
     deviceFeatures.sampleRateShading = VK_TRUE;
+    deviceFeatures.multiDrawIndirect = VK_TRUE;
 
     VkDeviceCreateInfo logicalDeviceCreateInfo = {};
     logicalDeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
