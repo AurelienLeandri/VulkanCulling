@@ -12,7 +12,9 @@ int main() {
 	}
 
 	std::cout << "Loading scene" << std::endl;
-	if (application.loadScene("../Resources/Models/Sponza/Sponza.scene")) {
+	//const char* scenePath = "../Resources/Models/Sponza/Sponza.scene";
+	const char* scenePath = "../Resources/Models/Sponza/super_sponza.scene";
+	if (application.loadScene(scenePath)) {
 		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
 		return 1;
 	}

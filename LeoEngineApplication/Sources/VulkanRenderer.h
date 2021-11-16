@@ -178,7 +178,7 @@ private:
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
-	static const int _MAX_NUMBER_OBJECTS = 10000;
+	static const int _MAX_NUMBER_OBJECTS = 1000000;
 	size_t _currentFrame = 0;
 
 	// Scene data
