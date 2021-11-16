@@ -324,34 +324,6 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     vkUnmapMemory(_device, _cameraDataBuffer.deviceMemory);
 }
 
-void VulkanRenderer::_fillConstantGlobalBuffers(const leo::Scene* scene)
-{
-    // TODO: Put actual values (maybe from options and/or leo::Scene)
-    GPUSceneData sceneData;
-    sceneData.ambientColor = { 1, 0, 0, 0 };
-    sceneData.sunlightColor = { 0, 1, 0, 0 };
-    sceneData.sunlightDirection = { 0, 0, 0, 1 };
-
-    void* data = nullptr;
-    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof(GPUSceneData), 0, &data);
-    memcpy(data, &sceneData, sizeof(GPUSceneData));
-    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
-
-    data = nullptr;
-    size_t objectsDataBufferSize = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
-    vkMapMemory(_device, _objectsDataBuffer.deviceMemory, 0, objectsDataBufferSize, 0, &data);
-    GPUObjectData* objectDataPtr = static_cast<GPUObjectData*>(data);
-
-    for (const ObjectsBatch& batch : _objectsBatches) {
-        objectDataPtr->modelMatrix = glm::mat4(0.01f);
-        objectDataPtr->modelMatrix[1][1] *= -1;
-        objectDataPtr->modelMatrix[3][3] = 1;
-        objectDataPtr++;
-    }
-
-    vkUnmapMemory(_device, _objectsDataBuffer.deviceMemory);
-}
-
 void VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
     VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
@@ -566,7 +538,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     std::map<const leo::Material*, Material*> loadedMaterialsCache;
     std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
     std::map<const leo::Shape*, ShapeData*> shapeDataCache;
-    std::map<const Material*, std::map<const ShapeData*, uint32_t>> nbObjectsPerBatch;
+    std::map<const Material*, std::map<const ShapeData*, std::vector<const leo::Transform*>>> nbObjectsPerBatch;
     for (const leo::SceneObject& sceneObject : scene->objects) {
         const leo::PerformanceMaterial* sceneMaterial = static_cast<const leo::PerformanceMaterial*>(sceneObject.material.get());
         const leo::Shape* sceneShape = sceneObject.shape.get();
@@ -698,7 +670,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         if (shapeDataCache.find(sceneShape) == shapeDataCache.end()) {
             _shapeData.push_back(std::make_unique<ShapeData>());
             loadedShape = _shapeData.back().get();
-            
+
             const leo::Mesh* mesh = static_cast<const leo::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
 
             // Vertex buffer
@@ -724,9 +696,9 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             nbObjectsPerBatch[loadedMaterial] = {};
         }
         if (nbObjectsPerBatch[loadedMaterial].find(loadedShape) == nbObjectsPerBatch[loadedMaterial].end()) {
-            nbObjectsPerBatch[loadedMaterial][loadedShape] = 0;
+            nbObjectsPerBatch[loadedMaterial][loadedShape] = {};
         }
-        nbObjectsPerBatch[loadedMaterial][loadedShape]++;
+        nbObjectsPerBatch[loadedMaterial][loadedShape].push_back(sceneObject.transform.get());
     }
     _nbMaterials = nbObjectsPerBatch.size();
 
@@ -734,12 +706,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
-            uint32_t nbObjects = shapeNbPair.second;
 
             _objectsBatches.push_back({
                 material,  // material
                 shape,  // shape
-                nbObjects,  // nbObjects
+                static_cast<uint32_t>(shapeNbPair.second.size()),  // nbObjects
                 shape->nbElements, // primitivesPerObject
                 0,  // stride
                 0,  // offset
@@ -747,7 +718,35 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         }
     }
 
-    _fillConstantGlobalBuffers(scene);
+    // TODO: Put actual values (maybe from options and/or leo::Scene)
+    GPUSceneData sceneData;
+    sceneData.ambientColor = { 1, 0, 0, 0 };
+    sceneData.sunlightColor = { 0, 1, 0, 0 };
+    sceneData.sunlightDirection = { 0, 0, 0, 1 };
+
+    void* data = nullptr;
+    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof(GPUSceneData), 0, &data);
+    memcpy(data, &sceneData, sizeof(GPUSceneData));
+    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
+
+    data = nullptr;
+    size_t objectsDataBufferSize = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
+    vkMapMemory(_device, _objectsDataBuffer.deviceMemory, 0, objectsDataBufferSize, 0, &data);
+    GPUObjectData* objectDataPtr = static_cast<GPUObjectData*>(data);
+
+    for (const auto& materialShapesPair : nbObjectsPerBatch) {
+        const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
+        for (const auto& shapeNbPair : materialShapesPair.second) {
+            const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
+            for (const leo::Transform* transform : shapeNbPair.second) {
+                objectDataPtr->modelMatrix = transform->getMatrix();
+                objectDataPtr->modelMatrix[1][1] *= -1;
+                objectDataPtr++;
+            }
+        }
+    }
+
+    vkUnmapMemory(_device, _objectsDataBuffer.deviceMemory);
 
     /*
     * Indirect Command buffer
