@@ -20,14 +20,18 @@ namespace leo {
             const aiScene* aiScene,
             const std::string& fileDirectoryPath,
             std::unordered_map<aiMaterial*, std::shared_ptr<Material>>& modelMaterials,
-            std::vector<SceneObject>& sceneObjects);
+            std::unordered_map<aiMesh*, std::shared_ptr<Mesh>>& modelMeshes,
+            std::vector<SceneObject>& sceneObjects,
+            aiMatrix4x4 transform);
 
         void processMesh(
             aiMesh* assimpMesh,
             const aiScene* aiScene,
             const std::string& fileDirectoryPath,
             std::unordered_map<aiMaterial*, std::shared_ptr<Material>>& model_materials,
-            std::vector<SceneObject>& sceneObjects);
+            std::unordered_map<aiMesh*, std::shared_ptr<Mesh>>& modelMeshes,
+            std::vector<SceneObject>& sceneObjects,
+            aiMatrix4x4 transform);
 
         std::shared_ptr<Material> loadMaterial(aiMaterial* assimpMaterial, const std::string& fileDirectoryPath);
 
@@ -55,7 +59,7 @@ namespace leo {
 
         Assimp::Importer importer;
         const aiScene* aiScene = importer.ReadFile(filePath,
-            aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_PreTransformVertices | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_SortByPType
+            aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_SortByPType
 
         );
 
@@ -65,9 +69,10 @@ namespace leo {
         }
 
         std::unordered_map<aiMaterial*, std::shared_ptr<Material>> modelMaterials;
+        std::unordered_map<aiMesh*, std::shared_ptr<Mesh>> modelMeshes;
         std::string strFilePath = std::string(filePath);
         std::string fileDirectoryPath = strFilePath.substr(0, strFilePath.find_last_of('/'));
-        processNode(aiScene->mRootNode, aiScene, fileDirectoryPath, modelMaterials, model.objects);
+        processNode(aiScene->mRootNode, aiScene, fileDirectoryPath, modelMaterials, modelMeshes, model.objects, aiMatrix4x4());
 
         if (options.globalTransform) {
             for (SceneObject& object : model.objects) {
@@ -86,16 +91,19 @@ namespace leo {
             const aiScene* aiScene,
             const std::string& fileDirectoryPath,
             std::unordered_map<aiMaterial*, std::shared_ptr<Material>>& modelMaterials,
-            std::vector<SceneObject>& sceneObjects)
+            std::unordered_map<aiMesh*, std::shared_ptr<Mesh>>& modelMeshes,
+            std::vector<SceneObject>& sceneObjects,
+            aiMatrix4x4 transform)
         {
+            aiMatrix4x4 childTransform = node->mTransformation * transform;
             for (unsigned int i = 0; i < node->mNumMeshes; i++)
             {
                 aiMesh* mesh = aiScene->mMeshes[node->mMeshes[i]];
-                processMesh(mesh, aiScene, fileDirectoryPath, modelMaterials, sceneObjects);
+                processMesh(mesh, aiScene, fileDirectoryPath, modelMaterials, modelMeshes, sceneObjects, childTransform);
             }
             for (unsigned int i = 0; i < node->mNumChildren; i++)
             {
-                processNode(node->mChildren[i], aiScene, fileDirectoryPath, modelMaterials, sceneObjects);
+                processNode(node->mChildren[i], aiScene, fileDirectoryPath, modelMaterials, modelMeshes, sceneObjects, childTransform);
             }
 
         }
@@ -105,12 +113,52 @@ namespace leo {
             const aiScene* aiScene,
             const std::string& fileDirectoryPath,
             std::unordered_map<aiMaterial*, std::shared_ptr<Material>>& modelMaterials,
-            std::vector<SceneObject>& sceneObjects)
+            std::unordered_map<aiMesh*, std::shared_ptr<Mesh>>& modelMeshes,
+            std::vector<SceneObject>& sceneObjects,
+            aiMatrix4x4 transform)
         {
-            std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
             sceneObjects.push_back({});
             SceneObject& sceneObject = sceneObjects.back();
-            sceneObject.shape = mesh;
+
+            if (modelMeshes.find(assimpMesh) != modelMeshes.end()) {
+                sceneObject.shape = modelMeshes[assimpMesh];
+            }
+            else {
+                std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
+                sceneObject.shape = mesh;
+
+                // Populate indices vector
+                std::vector<uint32_t>& indices = mesh->indices;
+                for (unsigned int i = 0; i < assimpMesh->mNumFaces; ++i)
+                {
+                    const aiFace& face = assimpMesh->mFaces[i];
+                    for (unsigned int j = 0; j < face.mNumIndices; ++j) {
+                        indices.push_back(face.mIndices[j]);
+                    }
+                }
+
+                // Populate vertices vector
+                std::vector<Vertex>& vertices = mesh->vertices;
+                bool hasUv = assimpMesh->mTextureCoords[0];
+                bool hasNormals = assimpMesh->HasNormals();
+                bool hasTangents = assimpMesh->HasTangentsAndBitangents();
+                for (unsigned int i = 0; i < assimpMesh->mNumVertices; ++i) {
+                    vertices.push_back({
+                            glm::vec3(assimpMesh->mVertices[i].x, assimpMesh->mVertices[i].y, assimpMesh->mVertices[i].z),  // Position
+                            hasNormals ? glm::vec3(assimpMesh->mNormals[i].x, assimpMesh->mNormals[i].y, assimpMesh->mNormals[i].z) : glm::vec3(0, 0, 1),  // Normal or z+ by default
+                            hasTangents ? glm::vec3(assimpMesh->mTangents[i].x, assimpMesh->mTangents[i].y, assimpMesh->mTangents[i].z) : glm::vec3(1, 0, 0),  // Tangents or x+ by default
+                            hasUv ? glm::vec2(assimpMesh->mTextureCoords[0][i].x, assimpMesh->mTextureCoords[0][i].y) : glm::vec2(0, 0)  // UVs if any
+                        });
+                }
+            }
+
+            if (!transform.IsIdentity()) {
+                glm::mat4 glmTransform;
+                for (int i = 0; i < 16; ++i) {
+                    glmTransform[i % 4][i / 4] = *transform[i];
+                }
+                sceneObject.transform = std::make_shared<Transform>(glmTransform);
+            }
 
             // Process material
             aiMaterial* assimpMaterial = aiScene->mMaterials[assimpMesh->mMaterialIndex];
@@ -125,30 +173,6 @@ namespace leo {
                     modelMaterials[assimpMaterial] = material;
                 }
                 sceneObject.material = modelMaterials[assimpMaterial];
-            }
-
-            // Populate indices vector
-            std::vector<uint32_t>& indices = mesh->indices;
-            for (unsigned int i = 0; i < assimpMesh->mNumFaces; ++i)
-            {
-                const aiFace& face = assimpMesh->mFaces[i];
-                for (unsigned int j = 0; j < face.mNumIndices; ++j) {
-                    indices.push_back(face.mIndices[j]);
-                }
-            }
-
-            // Populate vertices vector
-            std::vector<Vertex>& vertices = mesh->vertices;
-            bool hasUv = assimpMesh->mTextureCoords[0];
-            bool hasNormals = assimpMesh->HasNormals();
-            bool hasTangents = assimpMesh->HasTangentsAndBitangents();
-            for (unsigned int i = 0; i < assimpMesh->mNumVertices; ++i) {
-                vertices.push_back({
-                        glm::vec3(assimpMesh->mVertices[i].x, assimpMesh->mVertices[i].y, assimpMesh->mVertices[i].z),  // Position
-                        hasNormals ? glm::vec3(assimpMesh->mNormals[i].x, assimpMesh->mNormals[i].y, assimpMesh->mNormals[i].z) : glm::vec3(0, 0, 1),  // Normal or z+ by default
-                        hasTangents ? glm::vec3(assimpMesh->mTangents[i].x, assimpMesh->mTangents[i].y, assimpMesh->mTangents[i].z) : glm::vec3(1, 0, 0),  // Tangents or x+ by default
-                        hasUv ? glm::vec2(assimpMesh->mTextureCoords[0][i].x, assimpMesh->mTextureCoords[0][i].y) : glm::vec2(0, 0)  // UVs if any
-                    });
             }
         }
 
