@@ -124,7 +124,7 @@ void MaterialBuilder::init(Parameters parameters)
 
 	// Forward pass
 
-	GraphicShaderPass::Parameters forwardPassParams{};
+	ShaderPass::Parameters forwardPassParams{};
 	forwardPassParams.device = _device;
 	forwardPassParams.shaderBuilder = &_shaderBuilder;
 	forwardPassParams.shaderPaths[VK_SHADER_STAGE_VERTEX_BIT] = "../Resources/Shaders/vert.spv";
@@ -132,14 +132,16 @@ void MaterialBuilder::init(Parameters parameters)
 	forwardPassParams.descriptorTypeOverwrites["transforms"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
 	_materialTemplates[MaterialType::BASIC] = std::make_unique<MaterialTemplate>();
-	performanceMaterialTemplateParams.passesParameters[GraphicShaderPass::Type::FORWARD] = forwardPassParams;
+	performanceMaterialTemplateParams.passesParameters[ShaderPass::Type::FORWARD] = forwardPassParams;
 
 	_materialTemplates[MaterialType::BASIC]->init(performanceMaterialTemplateParams);
-	forwardPipelineBuilder.pipelineLayout = _materialTemplates[MaterialType::BASIC]->getShaderPass(GraphicShaderPass::Type::FORWARD)->getPipelineLayout();
+	forwardPipelineBuilder.pipelineLayout = _materialTemplates[MaterialType::BASIC]->getPipelineLayout(ShaderPass::Type::FORWARD);
 
-	forwardPipelineBuilder.setShaders(*_materialTemplates[MaterialType::BASIC]->getShaderPass(GraphicShaderPass::Type::FORWARD));
+	forwardPipelineBuilder.setShaders(*_materialTemplates[MaterialType::BASIC]->getShaderPass(ShaderPass::Type::FORWARD));
 	VkPipeline forwardPassPipeline = forwardPipelineBuilder.buildPipeline(_device, _parameters.forwardRenderPass);
-	_materialTemplates[MaterialType::BASIC]->getShaderPass(GraphicShaderPass::Type::FORWARD)->setPipeline(forwardPassPipeline);
+	_materialTemplates[MaterialType::BASIC]->setPipeline(ShaderPass::Type::FORWARD, forwardPassPipeline);
+
+	_materialTemplates[MaterialType::BASIC]->getShaderPass(ShaderPass::Type::FORWARD)->destroyShaderModules();
 }
 
 void MaterialBuilder::cleanup()
@@ -171,15 +173,10 @@ void MaterialBuilder::setupMaterialDescriptorSets(Material& material)
 		builder.bindImage(i, imageInfos[i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 	}
 
-	builder.build(material.getDescriptorSet(GraphicShaderPass::Type::FORWARD));
+	builder.build(material.getDescriptorSet(ShaderPass::Type::FORWARD));
 }
 
-VkPipeline MaterialBuilder::getPipeline(MaterialType materiaType, GraphicShaderPass::Type passType)
+const MaterialTemplate* MaterialBuilder::getMaterialTemplate(MaterialType type)
 {
-	return _materialTemplates[materiaType]->getShaderPass(passType)->getPipeline();
-}
-
-VkPipelineLayout MaterialBuilder::getPipelineLayout(MaterialType materiaType, GraphicShaderPass::Type passType)
-{
-	return _materialTemplates[materiaType]->getShaderPass(passType)->getPipelineLayout();
+	return _materialTemplates.at(type).get();
 }

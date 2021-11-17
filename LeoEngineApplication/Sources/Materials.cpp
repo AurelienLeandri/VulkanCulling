@@ -12,12 +12,12 @@ const MaterialTemplate* Material::getTemplate() const
 	return _materialTemplate;
 }
 
-const VkDescriptorSet& Material::getDescriptorSet(GraphicShaderPass::Type type) const
+const VkDescriptorSet& Material::getDescriptorSet(ShaderPass::Type type) const
 {
 	return _descriptorSets.at(type);
 }
 
-VkDescriptorSet& Material::getDescriptorSet(GraphicShaderPass::Type type)
+VkDescriptorSet& Material::getDescriptorSet(ShaderPass::Type type)
 {
 	return _descriptorSets[type];
 }

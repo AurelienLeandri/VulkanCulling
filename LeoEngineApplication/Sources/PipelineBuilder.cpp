@@ -74,7 +74,7 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device, VkRenderPass pass)
 	return newPipeline;
 }
 
-void PipelineBuilder::setShaders(const GraphicShaderPass& shaderPass)
+void PipelineBuilder::setShaders(const ShaderPass& shaderPass)
 {
 	const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& shaderModules = shaderPass.getShaderModules();
 	for (auto& [stageFlag, shaderModule] : shaderModules) {
@@ -89,3 +89,20 @@ void PipelineBuilder::setShaders(const GraphicShaderPass& shaderPass)
 	}
 }
 
+VkPipeline ComputePipelineBuilder::buildPipeline(VkDevice device)
+{
+	VkComputePipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext = nullptr;
+
+	pipelineInfo.stage = shaderStage;
+	pipelineInfo.layout = pipelineLayout;
+
+
+	VkPipeline newPipeline;
+	if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline)) {
+		std::cerr << "Failed to build compute pipeline" << std::endl;
+		return VK_NULL_HANDLE;
+	}
+	return newPipeline;
+}

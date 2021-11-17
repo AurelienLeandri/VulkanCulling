@@ -131,6 +131,7 @@ private:
 	void _createGlobalBuffers();
 	void _fillConstantGlobalBuffers(const leo::Scene* scene);
 	void _createGlobalDescriptors(uint32_t nbObjects);
+	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout);
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -155,6 +156,7 @@ private:
 
 	// Builders and helpers
 	MaterialBuilder _materialBuilder;
+	ShaderBuilder _shaderBuilder;
 
 	// Pools
 	VkCommandPool _mainCommandPool = VK_NULL_HANDLE;
@@ -197,6 +199,10 @@ private:
 	// Indexes and utility containers to group similar objects in the scene
 	std::vector<ObjectsBatch> _objectsBatches;
 	size_t _nbMaterials = 0;
+
+	VkPipeline _cullingPipeline = VK_NULL_HANDLE;
+	VkPipelineLayout _cullingPipelineLayout = VK_NULL_HANDLE;
+	ShaderPass _cullShaderPass;
 
 	// Culling compute pipeline data
 	AllocatedBuffer _gpuObjectEntries;

@@ -7,7 +7,7 @@
 
 #include <map>
 
-void GraphicShaderPass::init(const Parameters& parameters)
+VkPipelineLayout ShaderPass::reflectShaderModules(const Parameters& parameters)
 {
 	static struct SetLayoutInfo {
 		VkDescriptorSetLayoutCreateInfo createInfo = {};
@@ -125,44 +125,31 @@ void GraphicShaderPass::init(const Parameters& parameters)
 	pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
-	VK_CHECK(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_pipelineLayout));
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+	VK_CHECK(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+
+	return pipelineLayout;
 }
 
-void GraphicShaderPass::cleanup()
+void ShaderPass::cleanup()
 {
-	for (auto& [shaderStage, shaderModule] : _shaderModules) {
-		vkDestroyShaderModule(_device, shaderModule, nullptr);
-	}
-	_shaderModules.clear();
-
-	vkDestroyPipeline(_device, _pipeline, nullptr);
-	_pipeline = VK_NULL_HANDLE;
+	destroyShaderModules();
 
 	for (VkDescriptorSetLayout& descriptorLayout : _descriptorSetLayouts) {
 		vkDestroyDescriptorSetLayout(_device, descriptorLayout, nullptr);
 	}
 	_descriptorSetLayouts.clear();
-
-	vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
-	_pipelineLayout = VK_NULL_HANDLE;
 }
 
-void GraphicShaderPass::setPipeline(VkPipeline pipeline)
+void ShaderPass::destroyShaderModules()
 {
-	_pipeline = pipeline;
+	for (auto& [shaderStage, shaderModule] : _shaderModules) {
+		vkDestroyShaderModule(_device, shaderModule, nullptr);
+	}
+	_shaderModules.clear();
 }
 
-const VkPipeline GraphicShaderPass::getPipeline() const
-{
-	return _pipeline;
-}
-
-VkPipelineLayout GraphicShaderPass::getPipelineLayout() const
-{
-	return _pipelineLayout;
-}
-
-const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& GraphicShaderPass::getShaderModules() const
+const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& ShaderPass::getShaderModules() const
 {
 	return _shaderModules;
 }

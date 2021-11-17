@@ -26,7 +26,8 @@ VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
     _device(vulkan->getLogicalDevice()),
     _globalDescriptorAllocator(_device),
     _globalDescriptorLayoutCache(_device),
-    _materialBuilder(_device, _vulkan)
+    _materialBuilder(_device, _vulkan),
+    _shaderBuilder(_device)
 {
     _framesData.resize(_vulkan->getSwapChainSize());
 }
@@ -115,6 +116,12 @@ void VulkanRenderer::_cleanup()
     vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
     vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
     _gpuResetBatches = {};
+
+    _cullShaderPass.cleanup();
+    vkDestroyPipeline(_device, _cullingPipeline, nullptr);
+    _cullingPipeline = VK_NULL_HANDLE;
+    vkDestroyPipelineLayout(_device, _cullingPipelineLayout, nullptr);
+    _cullingPipelineLayout = VK_NULL_HANDLE;
 }
 
 void VulkanRenderer::init()
@@ -141,6 +148,8 @@ void VulkanRenderer::init()
     _createSyncObjects();
 
     _materialBuilder.init({ _vulkan->getProperties().maxNbMsaaSamples, _renderPass });
+
+    _createComputePipeline("../Resources/Shaders/indirect_cull.spv", _cullingPipeline, _cullingPipelineLayout);
 }
 
 void VulkanRenderer::iterate()
@@ -202,8 +211,8 @@ void VulkanRenderer::iterate()
 
     vkCmdBeginRenderPass(_framesData[imageIndex].commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    VkPipeline currentPipeline = _materialBuilder.getPipeline(MaterialType::BASIC, GraphicShaderPass::Type::FORWARD);
-    VkPipelineLayout graphicsPipelineLayout = _materialBuilder.getPipelineLayout(MaterialType::BASIC, GraphicShaderPass::Type::FORWARD);
+    VkPipeline currentPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
+    VkPipelineLayout graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
 
     // Global data descriptor set
@@ -218,10 +227,10 @@ void VulkanRenderer::iterate()
     for (const ObjectsBatch& batch : _objectsBatches) {
         const Material* material = batch.material;
 
-        VkPipeline materialPipeline = _materialBuilder.getPipeline(material->getType(), GraphicShaderPass::Type::FORWARD);
+        VkPipeline materialPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
         if (currentPipeline != materialPipeline) {
             currentPipeline = materialPipeline;
-            graphicsPipelineLayout = _materialBuilder.getPipelineLayout(material->getType(), GraphicShaderPass::Type::FORWARD);
+            graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
             vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
         }
 
@@ -229,7 +238,7 @@ void VulkanRenderer::iterate()
 
         // Materials data descriptor set
         vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            graphicsPipelineLayout, 2, 1, &material->getDescriptorSet(GraphicShaderPass::Type::FORWARD), 0, nullptr);
+            graphicsPipelineLayout, 2, 1, &material->getDescriptorSet(ShaderPass::Type::FORWARD), 0, nullptr);
 
         // Objects data descriptor set
         vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1068,6 +1077,29 @@ void VulkanRenderer::_endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCom
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
 
     vkFreeCommandBuffers(_vulkan->getLogicalDevice(), commandPool, 1, &commandBuffer);
+}
+
+void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout)
+{
+    ShaderPass::Parameters shaderPassParameters = {};
+    shaderPassParameters.device = _device;
+    shaderPassParameters.shaderBuilder = &_shaderBuilder;
+    shaderPassParameters.shaderPaths[VK_SHADER_STAGE_COMPUTE_BIT] = shaderPath;
+    shaderPassParameters.descriptorTypeOverwrites["transforms"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+
+    layout = _cullShaderPass.reflectShaderModules(shaderPassParameters);
+
+    ComputePipelineBuilder computeBuilder;
+    computeBuilder.pipelineLayout = layout;
+    computeBuilder.shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    computeBuilder.shaderStage.pNext = nullptr;
+    computeBuilder.shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeBuilder.shaderStage.module = _cullShaderPass.getShaderModules().at(VK_SHADER_STAGE_COMPUTE_BIT);
+    computeBuilder.shaderStage.pName = "main";
+
+    pipeline = computeBuilder.buildPipeline(_device);
+
+    _cullShaderPass.destroyShaderModules();
 }
 
 void VulkanRenderer::setCamera(const leo::Camera* camera)

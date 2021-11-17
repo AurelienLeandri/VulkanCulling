@@ -8,12 +8,21 @@
 // NOTE: Pipeline builder from VkGuide
 // https://vkguide.dev/
 
-class GraphicShaderPass;
+class ShaderPass;
+
+class ComputePipelineBuilder {
+public:
+	VkPipeline buildPipeline(VkDevice device);
+
+public:
+	VkPipelineShaderStageCreateInfo  shaderStage = {};
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+};
 
 class PipelineBuilder {
 public:
 	VkPipeline buildPipeline(VkDevice device, VkRenderPass pass);
-	void setShaders(const GraphicShaderPass& shaderPass);
+	void setShaders(const ShaderPass& shaderPass);
 
 public:
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};

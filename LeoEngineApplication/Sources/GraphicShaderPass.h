@@ -7,10 +7,11 @@
 
 class ShaderBuilder;
 
-class GraphicShaderPass {
+class ShaderPass {
 public:
 	enum class Type {
 		FORWARD,
+		COMPUTE,
 		NB_TYPES
 	};
 
@@ -22,11 +23,9 @@ public:
 		std::unordered_map<std::string, VkDescriptorType> descriptorTypeOverwrites;
 	};
 
-	void init(const Parameters& parameters);
+	VkPipelineLayout reflectShaderModules(const Parameters& parameters);
 	void cleanup();
-	void setPipeline(VkPipeline pipeline);
-	const VkPipeline getPipeline() const;
-	VkPipelineLayout getPipelineLayout() const;
+	void destroyShaderModules();
 
 	const std::unordered_map<VkShaderStageFlagBits, VkShaderModule>& getShaderModules() const;
 
@@ -35,8 +34,6 @@ private:
 	ShaderBuilder* _shaderBuilder = nullptr;
 
 	std::vector<VkDescriptorSetLayout> _descriptorSetLayouts;
-	VkPipeline _pipeline = VK_NULL_HANDLE;
-	VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
 
 	std::unordered_map<VkShaderStageFlagBits, VkShaderModule> _shaderModules;
 };

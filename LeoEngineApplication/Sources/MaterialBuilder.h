@@ -23,8 +23,7 @@ public:
 	Material* createMaterial(MaterialType type);
 	void setupMaterialDescriptorSets(Material& material);
 
-	VkPipeline getPipeline(MaterialType materiaType, GraphicShaderPass::Type passType);
-	VkPipelineLayout getPipelineLayout(MaterialType materiaType, GraphicShaderPass::Type type);
+	const MaterialTemplate* getMaterialTemplate(MaterialType type);
 
 private:
 	const VulkanInstance* _vulkan;

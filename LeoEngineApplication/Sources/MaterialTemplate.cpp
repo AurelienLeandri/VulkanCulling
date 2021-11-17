@@ -4,10 +4,10 @@ void MaterialTemplate::init(const Parameters& parameters)
 {
 	_device = parameters.device;
 	for (const auto& [passType, passParameters] : parameters.passesParameters) {
-		_shaderPasses[passType] = std::make_unique<GraphicShaderPass>();
-		_shaderPasses[passType]->init(passParameters);
-
+		_shaderPasses[passType] = std::make_unique<ShaderPass>();
+		_pipelineLayouts[passType] = _shaderPasses[passType]->reflectShaderModules(passParameters);
 	}
+	_pipelines = parameters.pipelines;
 }
 
 void MaterialTemplate::cleanup()
@@ -16,18 +16,42 @@ void MaterialTemplate::cleanup()
 		pass->cleanup();
 	}
 	_shaderPasses.clear();
+
+	for (auto& [stage, pipeline] : _pipelines) {
+		vkDestroyPipeline(_device, pipeline, nullptr);
+	}
+
+	for (auto& [stage, layout] : _pipelineLayouts) {
+		vkDestroyPipelineLayout(_device, layout, nullptr);
+	}
+	_pipelineLayouts.clear();
 }
 
-const GraphicShaderPass* MaterialTemplate::getShaderPass(GraphicShaderPass::Type passType) const
+const ShaderPass* MaterialTemplate::getShaderPass(ShaderPass::Type passType) const
 {
 	return _shaderPasses.at(passType).get();
 }
 
-GraphicShaderPass* MaterialTemplate::getShaderPass(GraphicShaderPass::Type passType)
+ShaderPass* MaterialTemplate::getShaderPass(ShaderPass::Type passType)
 {
 	if (_shaderPasses.find(passType) == _shaderPasses.end()) {
 		return nullptr;
 	}
 
 	return _shaderPasses[passType].get();
+}
+
+void MaterialTemplate::setPipeline(ShaderPass::Type passType, VkPipeline pipeline)
+{
+	_pipelines[passType] = pipeline;
+}
+
+VkPipeline MaterialTemplate::getPipeline(ShaderPass::Type passType) const
+{
+	return _pipelines.at(passType);
+}
+
+VkPipelineLayout MaterialTemplate::getPipelineLayout(ShaderPass::Type passType) const
+{
+	return _pipelineLayouts.at(passType);
 }

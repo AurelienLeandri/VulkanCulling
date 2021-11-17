@@ -14,17 +14,23 @@ public:
 	struct Parameters {
 		VkDevice device = VK_NULL_HANDLE;
 		ShaderBuilder* shaderBuilder = nullptr;
-		std::unordered_map<GraphicShaderPass::Type, GraphicShaderPass::Parameters> passesParameters;
+		std::unordered_map<ShaderPass::Type, ShaderPass::Parameters> passesParameters;
+		std::unordered_map<ShaderPass::Type, VkPipeline> pipelines;
 	};
 
 	void init(const Parameters& parameters);
 	void cleanup();
-	const GraphicShaderPass* getShaderPass(GraphicShaderPass::Type passType) const;
-	GraphicShaderPass* getShaderPass(GraphicShaderPass::Type passType);
+	const ShaderPass* getShaderPass(ShaderPass::Type passType) const;
+	ShaderPass* getShaderPass(ShaderPass::Type passType);
+	void setPipeline(ShaderPass::Type passType, VkPipeline pipeline);
+	VkPipeline getPipeline(ShaderPass::Type passType) const;
+	VkPipelineLayout getPipelineLayout(ShaderPass::Type passType) const;
 
 private:
 	VkDevice _device;
 
-	std::unordered_map<GraphicShaderPass::Type, std::unique_ptr<GraphicShaderPass>> _shaderPasses;
+	std::unordered_map<ShaderPass::Type, VkPipeline> _pipelines;
+	std::unordered_map<ShaderPass::Type, VkPipelineLayout> _pipelineLayouts;
+	std::unordered_map<ShaderPass::Type, std::unique_ptr<ShaderPass>> _shaderPasses;
 };
 

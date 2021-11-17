@@ -32,8 +32,8 @@ public:
 	Material(MaterialBuilder* builder, const MaterialTemplate* materialTemplate, MaterialType type);
 
 	const MaterialTemplate* getTemplate() const;
-	const VkDescriptorSet& getDescriptorSet(GraphicShaderPass::Type type) const;
-	VkDescriptorSet& getDescriptorSet(GraphicShaderPass::Type type);
+	const VkDescriptorSet& getDescriptorSet(ShaderPass::Type type) const;
+	VkDescriptorSet& getDescriptorSet(ShaderPass::Type type);
 	MaterialType getType() const;
 
 	std::array<MaterialTexture, 5> textures = { {} };
@@ -42,7 +42,7 @@ private:
 	MaterialBuilder* _builder;
 	const MaterialTemplate* _materialTemplate;
 	MaterialType _type;
-	std::unordered_map<GraphicShaderPass::Type, VkDescriptorSet> _descriptorSets;
+	std::unordered_map<ShaderPass::Type, VkDescriptorSet> _descriptorSets;
 
 };
 
