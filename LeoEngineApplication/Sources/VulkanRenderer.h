@@ -33,6 +33,16 @@ struct GPUSceneData {
 	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
+struct GPUObjectEntry {
+	uint32_t batchId = 0;
+	uint32_t dataId = 0;
+};
+
+struct GPUBatch {
+	VkDrawIndexedIndirectCommand command = {};
+	uint32_t batchId = 0;
+	uint32_t dataId = 0;
+};
 
 struct GPUObjectData {
 	glm::mat4 modelMatrix;
@@ -120,7 +130,7 @@ private:
 
 	void _createGlobalBuffers();
 	void _fillConstantGlobalBuffers(const leo::Scene* scene);
-	void _createGlobalDescriptors();
+	void _createGlobalDescriptors(uint32_t nbObjects);
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -169,7 +179,6 @@ private:
 	AllocatedBuffer _cameraDataBuffer;
 	AllocatedBuffer _sceneDataBuffer;
 	AllocatedBuffer _objectsDataBuffer;
-	AllocatedBuffer _indirectCommandBuffer;
 
 	// Data shared between framebuffers
 	AllocatedImage _framebufferColor;
@@ -188,5 +197,11 @@ private:
 	// Indexes and utility containers to group similar objects in the scene
 	std::vector<ObjectsBatch> _objectsBatches;
 	size_t _nbMaterials = 0;
+
+	// Culling compute pipeline data
+	AllocatedBuffer _gpuObjectEntries;
+	AllocatedBuffer _gpuBatches;
+	AllocatedBuffer _gpuResetBatches;
+	AllocatedBuffer _gpuIndexToObjectId;
 };
 

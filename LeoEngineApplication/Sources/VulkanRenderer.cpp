@@ -100,9 +100,21 @@ void VulkanRenderer::_cleanup()
 
     _objectsBatches.clear();
 
-    vkDestroyBuffer(_device, _indirectCommandBuffer.buffer, nullptr);
-    vkFreeMemory(_device, _indirectCommandBuffer.deviceMemory, nullptr);
-    _indirectCommandBuffer = {};
+    vkDestroyBuffer(_device, _gpuBatches.buffer, nullptr);
+    vkFreeMemory(_device, _gpuBatches.deviceMemory, nullptr);
+    _gpuBatches = {};
+
+    vkDestroyBuffer(_device, _gpuIndexToObjectId.buffer, nullptr);
+    vkFreeMemory(_device, _gpuIndexToObjectId.deviceMemory, nullptr);
+    _gpuIndexToObjectId = {};
+
+    vkDestroyBuffer(_device, _gpuObjectEntries.buffer, nullptr);
+    vkFreeMemory(_device, _gpuObjectEntries.deviceMemory, nullptr);
+    _gpuObjectEntries = {};
+
+    vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
+    vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
+    _gpuResetBatches = {};
 }
 
 void VulkanRenderer::init()
@@ -120,7 +132,6 @@ void VulkanRenderer::init()
     _createCommandPools();
 
     _createGlobalBuffers();
-    _createGlobalDescriptors();
     _createFramebuffersImage();
 
     _createRenderPass();
@@ -203,7 +214,7 @@ void VulkanRenderer::iterate()
 
     uint32_t objectIndex = 0;
     uint32_t offset = 0;
-    uint32_t stride = sizeof(VkDrawIndexedIndirectCommand);
+    uint32_t stride = sizeof(GPUBatch);
     for (const ObjectsBatch& batch : _objectsBatches) {
         const Material* material = batch.material;
 
@@ -228,7 +239,7 @@ void VulkanRenderer::iterate()
 
         vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _indirectCommandBuffer.buffer, offset, batch.nbObjects, stride);
+        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _gpuBatches.buffer, offset, batch.nbObjects, stride);
 
         objectIndex++;
         offset += stride * batch.nbObjects;
@@ -295,15 +306,6 @@ void VulkanRenderer::_createGlobalBuffers()
     _createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _sceneDataBuffer.buffer, _sceneDataBuffer.deviceMemory);
-
-    /*
-    * Per-object data
-    */
-
-    size_t objectsDataBufferSize = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
-    _createBuffer(objectsDataBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _objectsDataBuffer.buffer, _objectsDataBuffer.deviceMemory);
 }
 
 void VulkanRenderer::_updateCamera(uint32_t currentImage) {
@@ -362,28 +364,30 @@ void VulkanRenderer::_copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevic
 
 void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer)
 {
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
-    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBuffer, stagingBufferMemory);
-
-    void* dstData = nullptr;
-    vkMapMemory(_device, stagingBufferMemory, 0, size, 0, &dstData);
-    memcpy(dstData, data, static_cast<size_t>(size));
-    vkUnmapMemory(_device, stagingBufferMemory);
-
     _createBuffer(size,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         buffer.buffer, buffer.deviceMemory);
 
-    _copyBuffer(stagingBuffer, buffer.buffer, size);
+    if (data) {
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            stagingBuffer, stagingBufferMemory);
 
-    vkDestroyBuffer(_device, stagingBuffer, nullptr);
-    stagingBuffer = VK_NULL_HANDLE;
-    vkFreeMemory(_device, stagingBufferMemory, nullptr);
-    stagingBufferMemory = VK_NULL_HANDLE;
+        void* dstData = nullptr;
+        vkMapMemory(_device, stagingBufferMemory, 0, size, 0, &dstData);
+        memcpy(dstData, data, static_cast<size_t>(size));
+        vkUnmapMemory(_device, stagingBufferMemory);
+
+        _copyBuffer(stagingBuffer, buffer.buffer, size);
+
+        vkDestroyBuffer(_device, stagingBuffer, nullptr);
+        stagingBuffer = VK_NULL_HANDLE;
+        vkFreeMemory(_device, stagingBufferMemory, nullptr);
+        stagingBufferMemory = VK_NULL_HANDLE;
+    }
 }
 
 void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -733,49 +737,98 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     memcpy(data, &sceneData, sizeof(GPUSceneData));
     vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
 
-    data = nullptr;
-    size_t objectsDataBufferSize = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
-    vkMapMemory(_device, _objectsDataBuffer.deviceMemory, 0, objectsDataBufferSize, 0, &data);
-    GPUObjectData* objectDataPtr = static_cast<GPUObjectData*>(data);
 
+    /*
+    * Per-object data
+    */
+
+    size_t objectsDataBufferSize = scene->objects.size() * sizeof(GPUObjectData);
+
+    std::vector<GPUObjectData> objectData(objectsDataBufferSize);
+    int i = 0;
     for (const auto& materialShapesPair : nbObjectsPerBatch) {
         const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
             for (const leo::Transform* transform : shapeNbPair.second) {
-                objectDataPtr->modelMatrix = transform->getMatrix();
-                objectDataPtr->modelMatrix[1][1] *= -1;
-                objectDataPtr++;
+                objectData[i].modelMatrix = transform->getMatrix();
+                objectData[i].modelMatrix[1][1] *= -1;
+                i++;
             }
         }
     }
 
-    vkUnmapMemory(_device, _objectsDataBuffer.deviceMemory);
+    _createGPUBuffer(objectsDataBufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        objectData.data(),
+        _objectsDataBuffer
+    );
 
     /*
     * Indirect Command buffer
     */
 
-    std::vector<VkDrawIndexedIndirectCommand> commandBufferData(scene->objects.size(), VkDrawIndexedIndirectCommand{});
+    std::vector<GPUBatch> commandBufferData(scene->objects.size(), GPUBatch{});
     size_t offset = 0;
-    uint32_t aaa = 0;
     for (int i = 0; i < _objectsBatches.size(); ++i) {
         size_t stride = 0;
         for (int j = 0; j < _objectsBatches[i].nbObjects; ++j) {
-            VkDrawIndexedIndirectCommand& command = commandBufferData[offset + stride];
-            command.firstInstance = offset + stride;  // Used to access i in the model matrix since we dont use instancing.
-            command.instanceCount = 1;
-            command.indexCount = _objectsBatches[i].primitivesPerObject;
+            GPUBatch& gpuBatch = commandBufferData[offset + stride];
+            gpuBatch.command.firstInstance = offset + stride;  // Used to access i in the model matrix since we dont use instancing.
+            gpuBatch.command.instanceCount = 1;
+            gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
             stride++;
         }
-        aaa += _objectsBatches[i].primitivesPerObject;
         offset += stride;
     }
-    _createGPUBuffer(commandBufferData.size() * sizeof(VkDrawIndexedIndirectCommand),
+    _createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         commandBufferData.data(),
-        _indirectCommandBuffer
+        _gpuBatches
     );
+
+    /*
+    * Indirect Command buffer reset
+    */
+
+    _createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        commandBufferData.data(),
+        _gpuResetBatches
+    );
+
+    /*
+    * Culling data buffers
+    */
+
+    std::vector<GPUObjectEntry> objects(scene->objects.size());
+    {
+        int entryIdx = 0;
+        for (int batchIdx = 0; batchIdx < _objectsBatches.size(); ++batchIdx) {
+            for (int i = 0; i < _objectsBatches[batchIdx].nbObjects; ++i) {
+                objects[entryIdx].batchId = batchIdx;
+                objects[entryIdx].dataId = entryIdx;
+                entryIdx++;
+            }
+        }
+    }
+    _createGPUBuffer(scene->objects.size() * sizeof(GPUObjectEntry),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        objects.data(),
+        _gpuObjectEntries
+    );
+
+    _createGPUBuffer(scene->objects.size() * sizeof(uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        nullptr,
+        _gpuIndexToObjectId
+    );
+
+    /*
+    * Setup global descriptors
+    */
+
+    _createGlobalDescriptors(scene->objects.size());
 }
 
 void VulkanRenderer::_createRenderPass()
@@ -893,7 +946,7 @@ void VulkanRenderer::_createFramebuffersImage()
     _vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view);
 }
 
-void VulkanRenderer::_createGlobalDescriptors()
+void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
 {
     DescriptorAllocator::Options globalDescriptorAllocatorOptions = {};
     globalDescriptorAllocatorOptions.poolBaseSize = 10;
@@ -932,7 +985,7 @@ void VulkanRenderer::_createGlobalDescriptors()
     VkDescriptorBufferInfo objectsDataBufferInfo = {};
     objectsDataBufferInfo.buffer = _objectsDataBuffer.buffer;
     objectsDataBufferInfo.offset = 0;
-    objectsDataBufferInfo.range = _MAX_NUMBER_OBJECTS * sizeof(GPUObjectData);
+    objectsDataBufferInfo.range = nbObjects * sizeof(GPUObjectData);
 
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _globalDescriptorAllocator)
         .bindBuffer(0, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
