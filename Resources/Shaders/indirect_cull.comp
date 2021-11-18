@@ -1,13 +1,10 @@
 #version 450
 
-
 layout (local_size_x = 256) in;
 
-layout(set = 0, binding = 3) uniform transforms {   
-    mat4 view;
-    mat4 proj;
-	mat4 viewproj;
-} cameraData;
+struct ObjectData{
+	mat4 model;
+};
 
 struct DrawCommand
 {
@@ -16,48 +13,37 @@ struct DrawCommand
     uint    firstIndex;
     int     vertexOffset;
     uint    firstInstance;
-	uint objectID;
 	uint batchID;
+	uint dataID;
 };
-
-//draw indirect buffer
-layout(set = 0, binding = 1)  buffer InstanceBuffer{   
-	DrawCommand Draws[];
-} drawBuffer;
 
 struct GPUInstance {
-	uint objectID;
 	uint batchID;
+	uint objectID;
 };
 
-//draw indirect buffer
-layout(set = 0, binding = 2) readonly buffer InstanceBuffer2{   
-	GPUInstance Instances[];
-} compactInstanceBuffer;
+layout(set = 0, binding = 0) uniform CameraData {
+    mat4 view;
+    mat4 proj;
+	mat4 viewproj;
+} camera;
 
-void main() 
-{		
-	uint gID = gl_GlobalInvocationID.x;
-	if(gID < cullData.drawCount)
-	{
-		uint objectID = compactInstanceBuffer.Instances[gID].objectID;
-		bool visible = false;
-		if(cullData.AABBcheck == 0)
-		{
-			visible = IsVisible(objectID);
-		}
-		else{
-			visible = IsVisibleAABB(objectID);
-		}
-		
-		if(visible)
-		{
-			uint batchIndex = compactInstanceBuffer.Instances[gID].batchID;
-			uint countIndex = atomicAdd(drawBuffer.Draws[batchIndex].instanceCount,1);
+layout(std140, set = 0, binding = 1) readonly buffer ObjectBuffer{
+	ObjectData objects[];
+} objectBuffer;
 
-			uint instanceIndex = drawBuffer.Draws[batchIndex].firstInstance + countIndex;
+layout(set = 0, binding = 2)  buffer DrawBuffer {
+	DrawCommand drawsCommands[];
+} drawBuffer;
 
-			finalInstanceBuffer.IDs[instanceIndex] = objectID;
-		}
-	}
+layout(set = 0, binding = 3) readonly buffer InstanceBuffer {
+	GPUInstance gpuInstances[];
+} instanceBuffer;
+
+layout(set = 0, binding = 4) buffer IndexMap {
+	uint map[];
+} objectDataIndices;
+
+void main()
+{
 }

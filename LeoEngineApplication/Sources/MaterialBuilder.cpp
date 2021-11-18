@@ -129,7 +129,7 @@ void MaterialBuilder::init(Parameters parameters)
 	forwardPassParams.shaderBuilder = &_shaderBuilder;
 	forwardPassParams.shaderPaths[VK_SHADER_STAGE_VERTEX_BIT] = "../Resources/Shaders/vert.spv";
 	forwardPassParams.shaderPaths[VK_SHADER_STAGE_FRAGMENT_BIT] = "../Resources/Shaders/frag.spv";
-	forwardPassParams.descriptorTypeOverwrites["transforms"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	forwardPassParams.descriptorTypeOverwrites["camera"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
 	_materialTemplates[MaterialType::BASIC] = std::make_unique<MaterialTemplate>();
 	performanceMaterialTemplateParams.passesParameters[ShaderPass::Type::FORWARD] = forwardPassParams;

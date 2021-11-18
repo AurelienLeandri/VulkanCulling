@@ -23,7 +23,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
     mat4 proj;
     mat4 viewProj;
-} transforms;
+} camera;
 
 struct ObjectData{
 	mat4 model;
@@ -34,9 +34,9 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
 } objectBuffer;
 
 void main() {
-	gl_Position = transforms.viewProj * objectBuffer.objects[gl_BaseInstance].model * vec4(inPosition, 1.0);
+	gl_Position = camera.viewProj * objectBuffer.objects[gl_BaseInstance].model * vec4(inPosition, 1.0);
 	// gl_Position = vec4(inPosition, 1.0);
-    // fragNormal = normalize(vec3(transpose(inverse(transforms.model)) * vec4(inNormal, 0.0)));
+    // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
     fragNormal = inNormal;
     fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
 }

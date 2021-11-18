@@ -132,6 +132,7 @@ private:
 	void _fillConstantGlobalBuffers(const leo::Scene* scene);
 	void _createGlobalDescriptors(uint32_t nbObjects);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout);
+	void _createCullingDescriptors(uint32_t nbObjects);
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -205,9 +206,12 @@ private:
 	ShaderPass _cullShaderPass;
 
 	// Culling compute pipeline data
+	DescriptorAllocator _cullingDescriptorAllocator;
 	AllocatedBuffer _gpuObjectEntries;
 	AllocatedBuffer _gpuBatches;
 	AllocatedBuffer _gpuResetBatches;
 	AllocatedBuffer _gpuIndexToObjectId;
+	VkDescriptorSet _cullingDescriptorSet;
+	VkDescriptorSetLayout _cullingDescriptorSetLayout;
 };
 
