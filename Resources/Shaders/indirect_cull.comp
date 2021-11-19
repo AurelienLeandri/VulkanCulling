@@ -19,7 +19,7 @@ struct DrawCommand
 
 struct GPUInstance {
 	uint batchID;
-	uint objectID;
+	uint dataID;
 };
 
 layout(set = 0, binding = 0) uniform CameraData {
@@ -48,9 +48,8 @@ void main()
 {
 	uint gID = gl_GlobalInvocationID.x;
 	uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
-	if ((batchIndex % 2) == 0) {
-		drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
+	uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
+	if (true) {
+		atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount, 1);
 	}
-	//atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount,1);
-	//drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
 }

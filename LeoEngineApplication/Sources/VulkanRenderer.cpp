@@ -186,7 +186,20 @@ void VulkanRenderer::iterate()
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-
+    {
+        void* voidDataPtr = nullptr;
+        GPUBatch* commandBufferPtr = nullptr;
+        vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
+        commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
+        for (int i = 0; i < _testBatchesSize; i++) {
+            GPUBatch& batch = commandBufferPtr[i];
+            if (batch.command.instanceCount == 0) {
+                std::cout << i << std::endl;
+            }
+            int a = 0;
+        }
+        vkUnmapMemory(_device, _gpuBatches.deviceMemory);
+    }
 
     /*
     * Recording commands
@@ -277,18 +290,20 @@ void VulkanRenderer::iterate()
 
     VK_CHECK(vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, frameData.renderFinishedFence));
 
-    void* voidDataPtr = nullptr;
-    GPUBatch* commandBufferPtr = nullptr;
-    vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
-    commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
-    for (int i = 0; i < _testBatchesSize; i++) {
-        GPUBatch& batch = commandBufferPtr[i];
-        if (batch.command.instanceCount == 0) {
-            std::cout << i << std::endl;
+    {
+        void* voidDataPtr = nullptr;
+        GPUBatch* commandBufferPtr = nullptr;
+        vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
+        commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
+        for (int i = 0; i < _testBatchesSize; i++) {
+            GPUBatch& batch = commandBufferPtr[i];
+            if (batch.command.instanceCount == 0) {
+                std::cout << i << std::endl;
+            }
+            int a = 0;
         }
-        int a = 0;
+        vkUnmapMemory(_device, _gpuBatches.deviceMemory);
     }
-    vkUnmapMemory(_device, _gpuBatches.deviceMemory);
 
     /*
     * Presentation
@@ -900,7 +915,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
     _createGPUBuffer(nbObjects * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        nullptr,
+        objects.data(),
         _gpuIndexToObjectId
     );
 
@@ -1177,7 +1192,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     cullingDescriptorAllocatorOptions.poolBaseSize = 10;
     cullingDescriptorAllocatorOptions.poolSizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.f },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4.f },
     };
     _cullingDescriptorAllocator.init(cullingDescriptorAllocatorOptions);
 
@@ -1191,22 +1206,22 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     VkDescriptorBufferInfo objectsDataBufferInfo = {};
     objectsDataBufferInfo.buffer = _objectsDataBuffer.buffer;
     objectsDataBufferInfo.offset = 0;
-    objectsDataBufferInfo.range = nbObjects * sizeof(GPUObjectData);
+    objectsDataBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo drawBufferInfo = {};
     drawBufferInfo.buffer = _gpuBatches.buffer;
     drawBufferInfo.offset = 0;
-    drawBufferInfo.range = sizeof(GPUBatch);
+    drawBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo instancesInfo = {};
     instancesInfo.buffer = _gpuObjectEntries.buffer;
     instancesInfo.offset = 0;
-    instancesInfo.range = sizeof(GPUObjectEntry);
+    instancesInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo indexMapInfo = {};
     indexMapInfo.buffer = _gpuIndexToObjectId.buffer;
     indexMapInfo.offset = 0;
-    indexMapInfo.range = sizeof(uint32_t);
+    indexMapInfo.range = VK_WHOLE_SIZE;
 
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator)
         .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
