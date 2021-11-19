@@ -212,6 +212,7 @@ private:
 	AllocatedBuffer _gpuBatches;
 	VkBufferMemoryBarrier _gpuBatchesBarrier = {};
 	AllocatedBuffer _gpuResetBatches;
+	VkBufferMemoryBarrier _gpuBatchesResetBarrier = {};
 	AllocatedBuffer _gpuIndexToObjectId;
 	VkBufferMemoryBarrier _gpuIndexToObjectIdBarrier = {};
 	VkDescriptorSet _cullingDescriptorSet;
