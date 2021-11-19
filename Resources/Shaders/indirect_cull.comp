@@ -46,4 +46,7 @@ layout(set = 0, binding = 4) buffer IndexMap {
 
 void main()
 {
+	uint gID = gl_GlobalInvocationID.x;
+	uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
+	drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
 }

@@ -134,8 +134,7 @@ private:
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout);
 	void _createCullingDescriptors(uint32_t nbObjects);
 
-	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-		VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void _createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
 	void _transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
@@ -206,11 +205,14 @@ private:
 	ShaderPass _cullShaderPass;
 
 	// Culling compute pipeline data
+	uint32_t _nbInstances = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
 	AllocatedBuffer _gpuObjectEntries;
 	AllocatedBuffer _gpuBatches;
+	VkBufferMemoryBarrier _gpuBatchesBarrier = {};
 	AllocatedBuffer _gpuResetBatches;
 	AllocatedBuffer _gpuIndexToObjectId;
+	VkBufferMemoryBarrier _gpuIndexToObjectIdBarrier = {};
 	VkDescriptorSet _cullingDescriptorSet;
 	VkDescriptorSetLayout _cullingDescriptorSetLayout;
 };

@@ -70,6 +70,7 @@ void VulkanRenderer::_cleanup()
 
     // Destroy descriptors
     _globalDescriptorAllocator.cleanup();
+    _cullingDescriptorAllocator.cleanup();
     _globalDescriptorLayoutCache.cleanup();
 
     // Cleanup of the framebuffers shared data
@@ -186,8 +187,9 @@ void VulkanRenderer::iterate()
     submitInfo.pSignalSemaphores = signalSemaphores;
 
 
+
     /*
-    * Recording drawing commands
+    * Recording commands
     */
 
     VkCommandBufferBeginInfo beginInfo = {};
@@ -196,6 +198,23 @@ void VulkanRenderer::iterate()
     beginInfo.pInheritanceInfo = nullptr;
 
     VK_CHECK(vkBeginCommandBuffer(_framesData[imageIndex].commandBuffer, &beginInfo));
+
+
+    // Culling
+
+    vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _cullingPipeline);
+
+    uint32_t uniformOffset = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame);
+    vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+        _cullingPipelineLayout, 0, 1, &_cullingDescriptorSet, 1, &uniformOffset);
+
+    vkCmdDispatch(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>((_nbInstances / 256) + 1), 1, 1);
+
+    std::array<VkBufferMemoryBarrier, 2> barriers = { _gpuIndexToObjectIdBarrier, _gpuBatchesBarrier };
+
+    vkCmdPipelineBarrier(_framesData[imageIndex].commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0, nullptr);
+
+    // Drawing
 
     VkRenderPassBeginInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -217,10 +236,8 @@ void VulkanRenderer::iterate()
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
 
     // Global data descriptor set
-    uint32_t uniformOffset = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame);
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
-
 
     uint32_t objectIndex = 0;
     uint32_t offset = 0;
@@ -260,6 +277,12 @@ void VulkanRenderer::iterate()
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
     VK_CHECK(vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, frameData.renderFinishedFence));
+
+
+
+    /*
+    * Presentation
+    */
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -306,7 +329,7 @@ void VulkanRenderer::_createGlobalBuffers()
 
     _createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _cameraDataBuffer.buffer, _cameraDataBuffer.deviceMemory);
+        _cameraDataBuffer);
 
     /*
     * Creating scene data buffer
@@ -315,7 +338,7 @@ void VulkanRenderer::_createGlobalBuffers()
     size_t sceneDataBufferSize = sizeof (GPUSceneData);
     _createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _sceneDataBuffer.buffer, _sceneDataBuffer.deviceMemory);
+        _sceneDataBuffer);
 }
 
 void VulkanRenderer::_updateCamera(uint32_t currentImage) {
@@ -337,7 +360,7 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
 }
 
 void VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+    VkMemoryPropertyFlags properties, AllocatedBuffer& buffer)
 {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -345,10 +368,10 @@ void VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CHECK(vkCreateBuffer(_device, &bufferInfo, nullptr, &buffer));
+    VK_CHECK(vkCreateBuffer(_device, &bufferInfo, nullptr, &buffer.buffer));
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(_device, buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(_device, buffer.buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -357,9 +380,9 @@ void VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 
     // TODO: This should not be called for every resource but instead we should use offsets
     // and put several buffers into one allocation.
-    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &bufferMemory));
+    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &buffer.deviceMemory));
 
-    VK_CHECK(vkBindBufferMemory(_device, buffer, bufferMemory, 0));
+    VK_CHECK(vkBindBufferMemory(_device, buffer.buffer, buffer.deviceMemory, 0));
 }
 
 void VulkanRenderer::_copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
@@ -377,26 +400,24 @@ void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usag
     _createBuffer(size,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        buffer.buffer, buffer.deviceMemory);
+        buffer);
 
     if (data) {
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
+        AllocatedBuffer stagingBuffer;
         _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuffer, stagingBufferMemory);
+            stagingBuffer);
 
         void* dstData = nullptr;
-        vkMapMemory(_device, stagingBufferMemory, 0, size, 0, &dstData);
+        vkMapMemory(_device, stagingBuffer.deviceMemory, 0, size, 0, &dstData);
         memcpy(dstData, data, static_cast<size_t>(size));
-        vkUnmapMemory(_device, stagingBufferMemory);
+        vkUnmapMemory(_device, stagingBuffer.deviceMemory);
 
-        _copyBuffer(stagingBuffer, buffer.buffer, size);
+        _copyBuffer(stagingBuffer.buffer, buffer.buffer, size);
 
-        vkDestroyBuffer(_device, stagingBuffer, nullptr);
-        stagingBuffer = VK_NULL_HANDLE;
-        vkFreeMemory(_device, stagingBufferMemory, nullptr);
-        stagingBufferMemory = VK_NULL_HANDLE;
+        vkDestroyBuffer(_device, stagingBuffer.buffer, nullptr);
+        vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
+        stagingBuffer = {};
     }
 }
 
@@ -614,24 +635,22 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
                     _transitionImageLayout(*loadedImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-                    VkBuffer stagingBuffer;
-                    VkDeviceMemory stagingBufferMemory;
+                    AllocatedBuffer stagingBuffer;
                     VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
-                    _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+                    _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer);
 
                     void* data = nullptr;
-                    vkMapMemory(_device, stagingBufferMemory, 0, imageSize, 0, &data);
+                    vkMapMemory(_device, stagingBuffer.deviceMemory, 0, imageSize, 0, &data);
                     memcpy(data, sceneTexture->data, static_cast<size_t>(imageSize));
-                    vkUnmapMemory(_device, stagingBufferMemory);
+                    vkUnmapMemory(_device, stagingBuffer.deviceMemory);
 
-                    _copyBufferToImage(stagingBuffer, loadedImage->image, texWidth, texHeight);
+                    _copyBufferToImage(stagingBuffer.buffer, loadedImage->image, texWidth, texHeight);
 
                     _generateMipmaps(*loadedImage, imageFormat, texWidth, texHeight);
 
-                    vkDestroyBuffer(_device, stagingBuffer, nullptr);
-                    stagingBuffer = VK_NULL_HANDLE;
-                    vkFreeMemory(_device, stagingBufferMemory, nullptr);
-                    stagingBufferMemory = VK_NULL_HANDLE;
+                    vkDestroyBuffer(_device, stagingBuffer.buffer, nullptr);
+                    vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
+                    stagingBuffer = {};
 
                     // Image view
 
@@ -789,6 +808,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
             stride++;
         }
+        _nbInstances += _objectsBatches[i].nbObjects;
         offset += stride;
     }
     _createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
@@ -796,6 +816,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         commandBufferData.data(),
         _gpuBatches
     );
+
+    //_createBuffer(commandBufferData.size() * sizeof(GPUBatch),
+    //    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+    //    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //    _gpuBatches);
 
     /*
     * Indirect Command buffer reset
@@ -842,6 +867,26 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
     _createGlobalDescriptors(nbObjects);
     _createCullingDescriptors(nbObjects);
+
+    /*
+    * Culling data barriers
+    */
+
+    _gpuIndexToObjectIdBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    _gpuIndexToObjectIdBarrier.pNext = nullptr;
+    _gpuIndexToObjectIdBarrier.buffer = _gpuIndexToObjectId.buffer;
+    _gpuIndexToObjectIdBarrier.size = VK_WHOLE_SIZE;
+    _gpuIndexToObjectIdBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    _gpuIndexToObjectIdBarrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    _gpuIndexToObjectIdBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(_vulkan->getQueueFamilyIndices().graphicsFamily.value());
+
+    _gpuBatchesBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    _gpuBatchesBarrier.pNext = nullptr;
+    _gpuBatchesBarrier.buffer = _gpuBatches.buffer;
+    _gpuBatchesBarrier.size = VK_WHOLE_SIZE;
+    _gpuBatchesBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    _gpuBatchesBarrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    _gpuBatchesBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(_vulkan->getQueueFamilyIndices().graphicsFamily.value());
 }
 
 void VulkanRenderer::_createRenderPass()
@@ -1085,10 +1130,6 @@ void VulkanRenderer::_endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCom
 
 void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
 {
-    /*
-    * Culling data descriptors
-    */
-
     DescriptorAllocator::Options cullingDescriptorAllocatorOptions = {};
     cullingDescriptorAllocatorOptions.poolBaseSize = 10;
     cullingDescriptorAllocatorOptions.poolSizes = {
