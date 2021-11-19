@@ -34,7 +34,7 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
 } objectBuffer;
 
 void main() {
-	gl_Position = camera.viewProj * objectBuffer.objects[gl_BaseInstance].model * vec4(inPosition, 1.0);
+	gl_Position = camera.viewProj * objectBuffer.objects[gl_InstanceIndex].model * vec4(inPosition, 1.0);
 	// gl_Position = vec4(inPosition, 1.0);
     // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
     fragNormal = inNormal;

@@ -48,5 +48,9 @@ void main()
 {
 	uint gID = gl_GlobalInvocationID.x;
 	uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
-	drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
+	if ((batchIndex % 2) == 0) {
+		drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
+	}
+	//atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount,1);
+	//drawBuffer.drawsCommands[batchIndex].instanceCount = 0;
 }

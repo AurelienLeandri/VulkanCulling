@@ -206,6 +206,7 @@ private:
 
 	// Culling compute pipeline data
 	uint32_t _nbInstances = 0;
+	uint32_t _testBatchesSize = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
 	AllocatedBuffer _gpuObjectEntries;
 	AllocatedBuffer _gpuBatches;

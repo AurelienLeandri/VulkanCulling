@@ -208,7 +208,8 @@ void VulkanRenderer::iterate()
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
         _cullingPipelineLayout, 0, 1, &_cullingDescriptorSet, 1, &uniformOffset);
 
-    vkCmdDispatch(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>((_nbInstances / 256) + 1), 1, 1);
+    uint32_t groupCountX = static_cast<uint32_t>((_nbInstances / 256) + 1);
+    vkCmdDispatch(_framesData[imageIndex].commandBuffer, groupCountX, 1, 1);
 
     std::array<VkBufferMemoryBarrier, 2> barriers = { _gpuIndexToObjectIdBarrier, _gpuBatchesBarrier };
 
@@ -239,7 +240,6 @@ void VulkanRenderer::iterate()
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
 
-    uint32_t objectIndex = 0;
     uint32_t offset = 0;
     uint32_t stride = sizeof(GPUBatch);
     for (const ObjectsBatch& batch : _objectsBatches) {
@@ -266,10 +266,9 @@ void VulkanRenderer::iterate()
 
         vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _gpuBatches.buffer, offset, batch.nbObjects, stride);
+        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _gpuBatches.buffer, offset, 1, stride);
 
-        objectIndex++;
-        offset += stride * batch.nbObjects;
+        offset += stride;
     }
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
@@ -278,7 +277,18 @@ void VulkanRenderer::iterate()
 
     VK_CHECK(vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, frameData.renderFinishedFence));
 
-
+    void* voidDataPtr = nullptr;
+    GPUBatch* commandBufferPtr = nullptr;
+    vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
+    commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
+    for (int i = 0; i < _testBatchesSize; i++) {
+        GPUBatch& batch = commandBufferPtr[i];
+        if (batch.command.instanceCount == 0) {
+            std::cout << i << std::endl;
+        }
+        int a = 0;
+    }
+    vkUnmapMemory(_device, _gpuBatches.deviceMemory);
 
     /*
     * Presentation
@@ -709,12 +719,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             const leo::Mesh* mesh = static_cast<const leo::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
 
             // Vertex buffer
-            _createGPUBuffer(sizeof(leo::Vertex)* mesh->vertices.size(),
+            _createGPUBuffer(sizeof(leo::Vertex) * mesh->vertices.size(),
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
                 loadedShape->vertexBuffer);
 
             // Index buffer
-            _createGPUBuffer(sizeof(mesh->indices[0])* mesh->indices.size(),
+            _createGPUBuffer(sizeof(mesh->indices[0]) * mesh->indices.size(),
                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
                 loadedShape->indexBuffer);
 
@@ -811,16 +821,49 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         _nbInstances += _objectsBatches[i].nbObjects;
         offset += stride;
     }
-    _createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-        commandBufferData.data(),
-        _gpuBatches
-    );
-
-    //_createBuffer(commandBufferData.size() * sizeof(GPUBatch),
+    //_createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
     //    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-    //    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    //    _gpuBatches);
+    //    commandBufferData.data(),
+    //    _gpuBatches
+    //);
+
+    VkDeviceSize commandBufferSize = _objectsBatches.size() * sizeof(GPUBatch);
+    _createBuffer(commandBufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        _gpuBatches);
+    {
+        void* voidDataPtr = nullptr;
+        GPUBatch* commandBufferPtr = nullptr;
+        vkMapMemory(_device, _gpuBatches.deviceMemory, 0, commandBufferSize, 0, &voidDataPtr);
+        commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
+        offset = 0;
+        for (int i = 0; i < _objectsBatches.size(); ++i) {
+            size_t stride = _objectsBatches[i].nbObjects;
+            GPUBatch& gpuBatch = commandBufferPtr[i];
+            gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
+            gpuBatch.command.instanceCount = stride;
+            gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
+            gpuBatch.command.firstIndex = 0;
+            gpuBatch.command.vertexOffset = 0;
+            offset += stride;
+        }
+        vkUnmapMemory(_device, _gpuBatches.deviceMemory);
+    }
+    _testBatchesSize = _objectsBatches.size();
+
+    void* voidDataPtr = nullptr;
+    GPUBatch* commandBufferPtr = nullptr;
+    vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
+    commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
+    for (int i = 0; i < _testBatchesSize; i++) {
+        GPUBatch& batch = commandBufferPtr[i];
+        if (batch.command.instanceCount == 0) {
+            //std::cout << i << std::endl;
+        }
+        int a = 0;
+    }
+    vkUnmapMemory(_device, _gpuBatches.deviceMemory);
 
     /*
     * Indirect Command buffer reset
@@ -833,7 +876,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     );
 
     /*
-    * Culling data buffers
+    * Instances buffer
     */
 
     uint32_t nbObjects = static_cast<size_t>(scene->objects.size());
