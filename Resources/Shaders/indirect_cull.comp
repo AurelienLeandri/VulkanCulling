@@ -22,34 +22,44 @@ struct GPUInstance {
 	uint dataID;
 };
 
-layout(set = 0, binding = 0) uniform CameraData {
+layout (set = 0, binding = 0) uniform CullingGlobalData {
+	uint nbInstances;
+} globalData;
+
+
+layout (set = 0, binding = 1) uniform CameraData {
     mat4 view;
     mat4 proj;
 	mat4 viewproj;
 } camera;
 
-layout(std140, set = 0, binding = 1) readonly buffer ObjectBuffer{
+layout (std140, set = 0, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
-layout(set = 0, binding = 2)  buffer DrawBuffer {
+layout (set = 0, binding = 3)  buffer DrawBuffer {
 	DrawCommand drawsCommands[];
 } drawBuffer;
 
-layout(set = 0, binding = 3) readonly buffer InstanceBuffer {
+layout (set = 0, binding = 4) readonly buffer InstanceBuffer {
 	GPUInstance gpuInstances[];
 } instanceBuffer;
 
-layout(set = 0, binding = 4) buffer IndexMap {
+layout (set = 0, binding = 5) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
 void main()
 {
 	uint gID = gl_GlobalInvocationID.x;
-	uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
-	uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
-	if (true) {
-		atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount, 1);
+	if (gID < globalData.nbInstances) {
+		uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
+		uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
+		if (true) {
+			uint count = atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount, 1);
+			
+			uint instanceIndex = drawBuffer.drawsCommands[batchIndex].firstInstance + count;
+			objectDataIndices.map[instanceIndex] = dataIndex;
+		}
 	}
 }

@@ -44,6 +44,10 @@ struct GPUBatch {
 	uint32_t dataId = 0;
 };
 
+struct GPUCullingGlobalData {
+	uint32_t nbInstances = 0;
+};
+
 struct GPUObjectData {
 	glm::mat4 modelMatrix;
 };
@@ -210,6 +214,7 @@ private:
 	DescriptorAllocator _cullingDescriptorAllocator;
 	AllocatedBuffer _gpuObjectEntries;
 	AllocatedBuffer _gpuBatches;
+	AllocatedBuffer _gpuCullingGlobalData;
 	VkBufferMemoryBarrier _gpuBatchesBarrier = {};
 	AllocatedBuffer _gpuResetBatches;
 	VkBufferMemoryBarrier _gpuBatchesResetBarrier = {};

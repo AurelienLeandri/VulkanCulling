@@ -119,6 +119,10 @@ void VulkanRenderer::_cleanup()
     vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
     _gpuResetBatches = {};
 
+    vkDestroyBuffer(_device, _gpuCullingGlobalData.buffer, nullptr);
+    vkFreeMemory(_device, _gpuCullingGlobalData.deviceMemory, nullptr);
+    _gpuCullingGlobalData = {};
+
     _cullShaderPass.cleanup();
     vkDestroyPipeline(_device, _cullingPipeline, nullptr);
     _cullingPipeline = VK_NULL_HANDLE;
@@ -290,9 +294,6 @@ void VulkanRenderer::iterate()
         commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
         for (int i = 0; i < _testBatchesSize; i++) {
             GPUBatch& batch = commandBufferPtr[i];
-            if (batch.command.instanceCount == 0) {
-                std::cout << i << std::endl;
-            }
             int a = 0;
         }
         vkUnmapMemory(_device, _gpuBatches.deviceMemory);
@@ -912,6 +913,14 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         _gpuIndexToObjectId
     );
 
+    GPUCullingGlobalData globalData;
+    globalData.nbInstances = nbObjects;
+    _createGPUBuffer(sizeof(GPUCullingGlobalData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        &globalData,
+        _gpuCullingGlobalData
+    );
+
     /*
     * Setup descriptors
     */
@@ -1193,11 +1202,17 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     cullingDescriptorAllocatorOptions.poolBaseSize = 10;
     cullingDescriptorAllocatorOptions.poolSizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4.f },
     };
     _cullingDescriptorAllocator.init(cullingDescriptorAllocatorOptions);
 
     DescriptorBuilder builder = DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator);
+
+    VkDescriptorBufferInfo globalDataBufferInfo = {};
+    globalDataBufferInfo.buffer = _gpuCullingGlobalData.buffer;
+    globalDataBufferInfo.offset = 0;
+    globalDataBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo cameraBufferInfo = {};
     cameraBufferInfo.buffer = _cameraDataBuffer.buffer;
@@ -1225,11 +1240,12 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     indexMapInfo.range = VK_WHOLE_SIZE;
 
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator)
-        .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(1, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(2, drawBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(3, instancesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(4, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(0, globalDataBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(1, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(2, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(3, drawBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(4, instancesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(5, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .build(_cullingDescriptorSet, _cullingDescriptorSetLayout);
 }
 
