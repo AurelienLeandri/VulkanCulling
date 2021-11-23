@@ -25,8 +25,13 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 viewProj;
 } camera;
 
+layout (set = 0, binding = 2) buffer IndexMap {
+	uint map[];
+} objectDataIndices;
+
 struct ObjectData{
 	mat4 model;
+	vec4 sphereBounds;
 };
 
 layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
@@ -34,7 +39,8 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
 } objectBuffer;
 
 void main() {
-	gl_Position = camera.viewProj * objectBuffer.objects[gl_InstanceIndex].model * vec4(inPosition, 1.0);
+	uint dataIndex = objectDataIndices.map[gl_InstanceIndex];
+	gl_Position = camera.viewProj * objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0);
 	// gl_Position = vec4(inPosition, 1.0);
     // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
     fragNormal = inNormal;

@@ -367,8 +367,7 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
 
     GPUCameraData cameraData = {};
     cameraData.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
-    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
-    cameraData.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
+    cameraData.proj = _projectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
     void* data = nullptr;
@@ -801,6 +800,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             for (const leo::Transform* transform : shapeNbPair.second) {
                 objectData[i].modelMatrix = transform->getMatrix();
                 objectData[i].modelMatrix[1][1] *= -1;
+                objectData[i].sphereBounds = glm::vec4(1);
                 i++;
             }
         }
@@ -914,6 +914,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     );
 
     GPUCullingGlobalData globalData;
+    glm::mat4 projectionT = glm::transpose(_projectionMatrix);
+    globalData.frustum[0] = projectionT[3] + projectionT[0];
+    //globalData.frustum[1] = projectionT[3] - projectionT[0];
+    //globalData.frustum[2] = projectionT[3] + projectionT[1];
+    //globalData.frustum[3] = projectionT[3] - projectionT[1];
     globalData.nbInstances = nbObjects;
     _createGPUBuffer(sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1079,7 +1084,7 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
     globalDescriptorAllocatorOptions.poolSizes = {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.f },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2.f },
     };
     _globalDescriptorAllocator.init(globalDescriptorAllocatorOptions);
 
@@ -1099,9 +1104,15 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
     sceneBufferInfo.offset = 0;
     sceneBufferInfo.range = sizeof(GPUSceneData);
 
+    VkDescriptorBufferInfo indexMapInfo = {};
+    indexMapInfo.buffer = _gpuIndexToObjectId.buffer;
+    indexMapInfo.offset = 0;
+    indexMapInfo.range = VK_WHOLE_SIZE;
+
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _globalDescriptorAllocator)
         .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT)
         .bindBuffer(1, sceneBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .bindBuffer(2, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
         .build(_globalDataDescriptorSet, _globalDataDescriptorSetLayout);
 
     /*
@@ -1279,4 +1290,7 @@ void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& 
 void VulkanRenderer::setCamera(const leo::Camera* camera)
 {
     _camera = camera;
+
+    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
+    _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
 }

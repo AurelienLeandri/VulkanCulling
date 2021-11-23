@@ -45,11 +45,14 @@ struct GPUBatch {
 };
 
 struct GPUCullingGlobalData {
+	glm::vec4 frustum[6] = { glm::vec4(0) };
 	uint32_t nbInstances = 0;
+	bool cullingEnabled = true;
 };
 
 struct GPUObjectData {
 	glm::mat4 modelMatrix;
+	glm::vec4 sphereBounds;
 };
 
 struct AllocatedBuffer {
@@ -209,6 +212,7 @@ private:
 	ShaderPass _cullShaderPass;
 
 	// Culling compute pipeline data
+	glm::mat4 _projectionMatrix = glm::mat4(1);
 	uint32_t _nbInstances = 0;
 	uint32_t _testBatchesSize = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
