@@ -10,6 +10,7 @@
 
 #include "VulkanUtils.h"
 #include "DebugUtils.h"
+#include "Scene/Camera.h"
 
 #include <iostream>
 #include <array>
@@ -366,7 +367,28 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     */
 
     GPUCameraData cameraData = {};
-    cameraData.view = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
+    glm::vec3 front = _camera->getFront();
+    glm::vec3 up = _camera->getUp();
+    glm::vec3 position = _camera->getPosition();
+    position.y *= -1;
+    /*
+    leo::Camera camera;
+    front.z *= -1;
+    up *= -1;
+    camera.setPosition(_camera->getPosition());
+    camera.setFront(front);
+    front = camera.getFront();
+    up = camera.getUp();
+    */
+
+    leo::Camera camera;
+    camera.setPosition(glm::vec3(7, 7, 0));
+    camera.setFront(glm::vec3(0, 0, 1));
+
+    glm::mat4 view(glm::vec4(_camera->getRight(), 0.f), glm::vec4(_camera->getUp(), 0), glm::vec4(_camera->getFront(), 0), glm::vec4(_camera->getPosition(), 1));
+    cameraData.view = glm::lookAt(position, position + front, up);
+    //cameraData.view = view;
+    //cameraData.view = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
     cameraData.proj = _projectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
@@ -591,7 +613,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     std::map<const leo::Material*, Material*> loadedMaterialsCache;
     std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
     std::map<const leo::Shape*, ShapeData*> shapeDataCache;
-    std::map<const Material*, std::map<const ShapeData*, std::vector<const leo::Transform*>>> nbObjectsPerBatch;
+
+    static struct _ObjectInstanceData {
+        const leo::Shape* shape = nullptr;
+        const leo::Transform* transform = nullptr;
+    };
+    std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> nbObjectsPerBatch;
     for (const leo::SceneObject& sceneObject : scene->objects) {
         const leo::PerformanceMaterial* sceneMaterial = static_cast<const leo::PerformanceMaterial*>(sceneObject.material.get());
         const leo::Shape* sceneShape = sceneObject.shape.get();
@@ -753,7 +780,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         if (nbObjectsPerBatch[loadedMaterial].find(loadedShape) == nbObjectsPerBatch[loadedMaterial].end()) {
             nbObjectsPerBatch[loadedMaterial][loadedShape] = {};
         }
-        nbObjectsPerBatch[loadedMaterial][loadedShape].push_back(sceneObject.transform.get());
+        nbObjectsPerBatch[loadedMaterial][loadedShape].push_back({ sceneShape, sceneObject.transform.get() });
     }
     _nbMaterials = nbObjectsPerBatch.size();
 
@@ -797,10 +824,16 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
-            for (const leo::Transform* transform : shapeNbPair.second) {
-                objectData[i].modelMatrix = transform->getMatrix();
-                objectData[i].modelMatrix[1][1] *= -1;
-                objectData[i].sphereBounds = glm::vec4(1);
+            for (const _ObjectInstanceData& instanceData : shapeNbPair.second) {
+                objectData[i].modelMatrix = instanceData.transform->getMatrix();
+                const glm::vec4& sphereBounds = static_cast<const leo::Mesh*>(instanceData.shape)->boundingSphere;
+                glm::vec4 b = instanceData.transform->getMatrix() * glm::vec4(1, 1, 1, 0);
+                glm::vec4 a = glm::abs(b);
+                float scale = glm::max(a.x, glm::max(a.y, a.z));
+                glm::vec4 transformedSphere = instanceData.transform->getMatrix() * glm::vec4(sphereBounds.x, sphereBounds.y, sphereBounds.z, 1.0f);
+                transformedSphere /= transformedSphere.w;
+                transformedSphere.w = scale * sphereBounds.w;
+                objectData[i].sphereBounds = transformedSphere;
                 i++;
             }
         }
@@ -819,16 +852,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     std::vector<GPUBatch> commandBufferData(_objectsBatches.size(), GPUBatch{});
     size_t offset = 0;
     for (int i = 0; i < _objectsBatches.size(); ++i) {
-        size_t stride = 0;
-        for (int j = 0; j < _objectsBatches[i].nbObjects; ++j) {
-            GPUBatch& gpuBatch = commandBufferData[i];
-            gpuBatch.command.firstInstance = offset + stride;  // Used to access i in the model matrix since we dont use instancing.
-            gpuBatch.command.instanceCount = 0;
-            gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
-            stride++;
-        }
+        GPUBatch& gpuBatch = commandBufferData[i];
+        gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
+        gpuBatch.command.instanceCount = 0;
+        gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
         _nbInstances += _objectsBatches[i].nbObjects;
-        offset += stride;
+        offset += _objectsBatches[i].nbObjects;
     }
     //_createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
     //    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -916,10 +945,16 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     GPUCullingGlobalData globalData;
     glm::mat4 projectionT = glm::transpose(_projectionMatrix);
     globalData.frustum[0] = projectionT[3] + projectionT[0];
-    //globalData.frustum[1] = projectionT[3] - projectionT[0];
-    //globalData.frustum[2] = projectionT[3] + projectionT[1];
-    //globalData.frustum[3] = projectionT[3] - projectionT[1];
+    globalData.frustum[1] = projectionT[3] - projectionT[0];
+    globalData.frustum[2] = projectionT[3] + projectionT[1];
+    globalData.frustum[3] = projectionT[3] - projectionT[1];
     globalData.nbInstances = nbObjects;
+    //globalData.viewMatrix = glm::lookAt(glm::vec3{ 0, 0, 0 }, glm::vec3{ -1, -1, -1 }, glm::vec3{ 0, 1, 0 });
+    //globalData.viewMatrix = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
+    leo::Camera camera;
+    camera.setPosition(glm::vec3(150, -150, 0));
+    camera.setFront(glm::vec3(0, -1, 1));
+    globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
     _createGPUBuffer(sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         &globalData,

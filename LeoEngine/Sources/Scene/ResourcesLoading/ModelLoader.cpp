@@ -142,14 +142,25 @@ namespace leo {
                 bool hasUv = assimpMesh->mTextureCoords[0];
                 bool hasNormals = assimpMesh->HasNormals();
                 bool hasTangents = assimpMesh->HasTangentsAndBitangents();
+                glm::vec3 minV(assimpMesh->mVertices[0].x, assimpMesh->mVertices[0].y, assimpMesh->mVertices[0].z);
+                glm::vec3 maxV(assimpMesh->mVertices[0].x, assimpMesh->mVertices[0].y, assimpMesh->mVertices[0].z);
                 for (unsigned int i = 0; i < assimpMesh->mNumVertices; ++i) {
+                    const aiVector3D& v = assimpMesh->mVertices[i];
+                    for (int k = 0; k < 3; ++k) {
+                        if (v[k] < minV[k]) { minV[k] = v[k]; }
+                        if (v[k] > maxV[k]) { maxV[k] = v[k]; }
+                    }
                     vertices.push_back({
-                            glm::vec3(assimpMesh->mVertices[i].x, assimpMesh->mVertices[i].y, assimpMesh->mVertices[i].z),  // Position
+                            glm::vec3(v.x, v.y, v.z),  // Position
                             hasNormals ? glm::vec3(assimpMesh->mNormals[i].x, assimpMesh->mNormals[i].y, assimpMesh->mNormals[i].z) : glm::vec3(0, 0, 1),  // Normal or z+ by default
                             hasTangents ? glm::vec3(assimpMesh->mTangents[i].x, assimpMesh->mTangents[i].y, assimpMesh->mTangents[i].z) : glm::vec3(1, 0, 0),  // Tangents or x+ by default
                             hasUv ? glm::vec2(assimpMesh->mTextureCoords[0][i].x, assimpMesh->mTextureCoords[0][i].y) : glm::vec2(0, 0)  // UVs if any
                         });
                 }
+                glm::vec3 halfway = (maxV - minV) / 2.f;
+                glm::vec3 center = minV + halfway;
+                float radius = glm::length(halfway);
+                mesh->boundingSphere = glm::vec4(center, radius * 2.f);
             }
 
             if (!transform.IsIdentity()) {

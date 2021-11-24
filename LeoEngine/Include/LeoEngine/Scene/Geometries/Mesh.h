@@ -20,5 +20,6 @@ namespace leo {
 	public:
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
+		glm::vec4 boundingSphere = glm::vec4(0, 0, 0, 1);
 	};
 }

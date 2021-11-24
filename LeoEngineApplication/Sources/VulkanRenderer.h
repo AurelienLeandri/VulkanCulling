@@ -45,9 +45,10 @@ struct GPUBatch {
 };
 
 struct GPUCullingGlobalData {
+	glm::mat4 viewMatrix = glm::mat4(1);
 	glm::vec4 frustum[6] = { glm::vec4(0) };
 	uint32_t nbInstances = 0;
-	bool cullingEnabled = true;
+	bool cullingEnabled = false;
 };
 
 struct GPUObjectData {

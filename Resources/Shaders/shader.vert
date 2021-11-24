@@ -18,6 +18,7 @@ layout (location = 2) in vec2 inTexCoord;
 
 layout (location = 0) out vec3 fragNormal;
 layout (location = 1) out vec2 fragTexCoord;
+layout (location = 2) out vec3 fragCoord;
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
@@ -45,4 +46,5 @@ void main() {
     // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
     fragNormal = inNormal;
     fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
+	fragCoord = vec3(objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0));
 }

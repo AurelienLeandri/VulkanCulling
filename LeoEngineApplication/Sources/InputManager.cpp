@@ -60,8 +60,8 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     xoffset *= MOUSE_SENSITIVITY;
     yoffset *= MOUSE_SENSITIVITY;
 
-    _currentYaw += xoffset;
-    _currentPitch += yoffset;
+    _currentYaw += -xoffset;
+    _currentPitch += -yoffset;  // Vulkan convention
 
     if (_currentPitch > 89.0f)
         _currentPitch = 89.0f;

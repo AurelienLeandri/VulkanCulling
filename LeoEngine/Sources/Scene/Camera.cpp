@@ -5,7 +5,7 @@
 namespace leo {
 
 	Camera::Camera() :
-		Camera(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0), glm::radians(90.f))
+		Camera(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0), glm::radians(90.f))
 	{
 	}
 
@@ -51,7 +51,7 @@ namespace leo {
 	{
 		_front = glm::normalize(front);
 		// Also re-calculate the Right and Up vector
-		_right = glm::normalize(glm::cross(_front, glm::vec3(0, 1, 0)));
+		_right = glm::normalize(glm::cross(_front, glm::vec3(0, -1, 0)));
 		// Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
 		_up = glm::normalize(glm::cross(_right, _front));
 	}

@@ -24,6 +24,7 @@ struct GPUInstance {
 };
 
 layout (set = 0, binding = 0) uniform CullingGlobalData {
+	mat4 view;
 	vec4 frustum[6];  // Left/right/top/bottom frustum planes
 	uint nbInstances;
 	bool cullingEnabled;
@@ -55,17 +56,18 @@ layout (set = 0, binding = 5) buffer IndexMap {
 
 bool IsVisible(uint objectDataIndex)
 {
+return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
-	vec4 center = vec4((camera.view * vec4(sphereBounds.xyz, 1.f)).xyz, 1.f);
+	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;
 
 	bool visible = true;
 	
 	for (int i = 0; i < 6; ++i) {
-		visible = visible && dot(globalData.frustum[i], center) > -radius;
+		visible = visible && (dot(globalData.frustum[i].xyz, center) > -radius);
 	}
 
-	visible = visible || !globalData.cullingEnabled;
+	visible = visible || (!globalData.cullingEnabled);
 
 	return visible;
 }
