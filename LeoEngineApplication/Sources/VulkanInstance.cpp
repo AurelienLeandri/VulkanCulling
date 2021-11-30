@@ -501,7 +501,8 @@ void VulkanInstance::createImage(
     VkImageUsageFlags usage,
     VkMemoryPropertyFlags properties,
     VkImage& image,
-    VkDeviceMemory& imageMemory)
+    VkDeviceMemory& imageMemory,
+    VkImageLayout initialLayout)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -513,7 +514,7 @@ void VulkanInstance::createImage(
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.initialLayout = initialLayout;
     imageInfo.usage = usage;
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;

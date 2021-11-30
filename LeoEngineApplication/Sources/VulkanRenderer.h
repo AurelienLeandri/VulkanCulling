@@ -143,6 +143,7 @@ private:
 	void _createCullingDescriptors(uint32_t nbObjects);
 	void _createDepthPyramidDescriptors();
 	void _createOcclusionCullingData();
+	void _computeDepthPyramid(VkCommandBuffer commandBuffer);
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -238,8 +239,11 @@ private:
 	uint32_t _depthPyramidWidth = 0;
 	uint32_t _depthPyramidHeight = 0;
 	std::vector<VkImageView> _depthPyramidLevelViews;
-	VkDescriptorSet _depthPyramidDescriptorSet = VK_NULL_HANDLE;
+	std::vector<VkDescriptorSet> _depthPyramidDescriptorSets;
 	VkDescriptorSetLayout _depthPyramidDescriptorSetLayout = VK_NULL_HANDLE;
 	DescriptorAllocator _depthPyramidDescriptorAllocator;
+	std::vector<VkImageMemoryBarrier> _depthPyramidMipLevelBarriers;
+	VkImageMemoryBarrier _framebufferDepthWriteBarrier = {};
+	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
 };
 

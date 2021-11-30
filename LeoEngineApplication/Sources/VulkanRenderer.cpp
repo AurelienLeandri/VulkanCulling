@@ -215,9 +215,6 @@ void VulkanRenderer::iterate()
 
     VK_CHECK(vkBeginCommandBuffer(_framesData[imageIndex].commandBuffer, &beginInfo));
 
-    // Depth pyramid building
-    // TD 13, 14
-
     // Culling
 
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _cullingPipeline);
@@ -299,10 +296,12 @@ void VulkanRenderer::iterate()
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
+    // Depth pyramid building
+    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);
+
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
     VK_CHECK(vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, frameData.renderFinishedFence));
-
     {
         void* voidDataPtr = nullptr;
         GPUBatch* commandBufferPtr = nullptr;
@@ -337,6 +336,31 @@ void VulkanRenderer::iterate()
     }
 
     _currentFrame = (_currentFrame + 1) % _MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &_framebufferDepthWriteBarrier);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipeline);
+
+    for (int32_t i = 0; i < _depthPyramid.mipLevels; ++i)
+    {
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipelineLayout, 0, 1, &_depthPyramidDescriptorSets[i], 0, nullptr);
+
+        uint32_t levelWidth = glm::max(1u, _depthPyramidWidth >> i);
+        uint32_t levelHeight = glm::max(1u, _depthPyramidHeight >> i);
+
+        glm::vec2 levelSize(levelWidth, levelHeight);
+
+        uint32_t groupCountX = (levelWidth + 32 - 1) / 32;
+        uint32_t groupCountY = (levelHeight + 32 - 1) / 32;
+        vkCmdPushConstants(commandBuffer, _depthPyramidPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(glm::vec2), &levelSize);
+        vkCmdDispatch(commandBuffer, groupCountX, groupCountY, 1);
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &_depthPyramidMipLevelBarriers[i]);
+    }
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &_framebufferDepthReadBarrier);
 }
 
 void VulkanRenderer::_createCommandPools()
@@ -478,6 +502,7 @@ void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 
 void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
+    // TODO: Write a barrier helper and use it instead of this function.
     VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
 
     VkImageMemoryBarrier barrier = {};
@@ -511,6 +536,13 @@ void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat 
 
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     }
     else {
         throw VulkanRendererException("Unsupported layout transition.");
@@ -1310,6 +1342,8 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
 
 void VulkanRenderer::_createDepthPyramidDescriptors()
 {
+    _depthPyramidDescriptorSets.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
+
     DescriptorAllocator::Options depthPyramidDescriptorAllocatorOptions = {};
     depthPyramidDescriptorAllocatorOptions.poolBaseSize = _depthPyramid.mipLevels;
     depthPyramidDescriptorAllocatorOptions.poolSizes = {
@@ -1337,7 +1371,7 @@ void VulkanRenderer::_createDepthPyramidDescriptors()
         DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _depthPyramidDescriptorAllocator)
             .bindImage(0, dstInfo, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
             .bindImage(1, srcInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT)
-            .build(_depthPyramidDescriptorSet, _depthPyramidDescriptorSetLayout);
+            .build(_depthPyramidDescriptorSets[i], _depthPyramidDescriptorSetLayout);
     }
 }
 
@@ -1390,12 +1424,57 @@ void VulkanRenderer::_createOcclusionCullingData()
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthPyramid.image, _depthPyramid.memory);
 
+    _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
     _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, _depthPyramid.mipLevels, _depthPyramid.view);
 
     _depthPyramidLevelViews.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
-    for (int32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
+    for (int i = 0; i < _depthPyramid.mipLevels; ++i) {
         _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 1, _depthPyramidLevelViews[i], i);
     }
+
+    _depthPyramidMipLevelBarriers.resize(_depthPyramid.mipLevels, {});
+    for (int i = 0; i < _depthPyramid.mipLevels; ++i) {
+        VkImageMemoryBarrier& barrier = _depthPyramidMipLevelBarriers[i];
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = _depthPyramid.image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = i;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    }
+
+    _framebufferDepthWriteBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    _framebufferDepthWriteBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    _framebufferDepthWriteBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    _framebufferDepthWriteBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    _framebufferDepthWriteBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    _framebufferDepthWriteBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    _framebufferDepthWriteBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    _framebufferDepthWriteBarrier.image = _framebufferDepth.image;
+    _framebufferDepthWriteBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    _framebufferDepthWriteBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    _framebufferDepthWriteBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    _framebufferDepthReadBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    _framebufferDepthReadBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    _framebufferDepthReadBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    _framebufferDepthReadBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    _framebufferDepthReadBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    _framebufferDepthReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    _framebufferDepthReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    _framebufferDepthReadBarrier.image = _framebufferDepth.image;
+    _framebufferDepthReadBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    _framebufferDepthReadBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    _framebufferDepthReadBarrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
 }
 
 void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass)
