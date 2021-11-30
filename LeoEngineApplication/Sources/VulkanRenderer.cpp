@@ -21,6 +21,10 @@
 
 #include <stb_image.h>
 
+namespace {
+    uint32_t previousPow2(uint32_t v);
+}
+
 VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
     _vulkan(vulkan),
     _options(options),
@@ -80,6 +84,7 @@ void VulkanRenderer::_cleanup()
     vkFreeMemory(_device, _framebufferColor.memory, nullptr);
     _framebufferColor = {};
 
+    vkDestroySampler(_device, _framebufferDepth.textureSampler, nullptr);
     vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
     vkDestroyImage(_device, _framebufferDepth.image, nullptr);
     vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
@@ -124,6 +129,7 @@ void VulkanRenderer::_cleanup()
     vkFreeMemory(_device, _gpuCullingGlobalData.deviceMemory, nullptr);
     _gpuCullingGlobalData = {};
 
+
     _cullShaderPass.cleanup();
     vkDestroyPipeline(_device, _cullingPipeline, nullptr);
     _cullingPipeline = VK_NULL_HANDLE;
@@ -131,11 +137,68 @@ void VulkanRenderer::_cleanup()
     _cullingPipelineLayout = VK_NULL_HANDLE;
 }
 
+void VulkanRenderer::_createOcclusionCullingData()
+{
+    VkSamplerCreateInfo samplerCreateInfo = {};
+    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerCreateInfo.minLod = 0;
+    samplerCreateInfo.maxLod = 16.f;
+    VkSamplerReductionModeCreateInfoEXT reductionCreateInfo = {};
+    reductionCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO_EXT;
+    reductionCreateInfo.reductionMode = VK_SAMPLER_REDUCTION_MODE_MIN;
+    samplerCreateInfo.pNext = &reductionCreateInfo;
+
+    VK_CHECK(vkCreateSampler(_device, &samplerCreateInfo, 0, &_framebufferDepth.textureSampler));
+
+    const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
+    _depthPyramidWidth = previousPow2(instanceProperties.swapChainExtent.width);
+    _depthPyramidHeight = previousPow2(instanceProperties.swapChainExtent.height);
+    _depthPyramid.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(instanceProperties.swapChainExtent.width, instanceProperties.swapChainExtent.height)))) + 1;
+
+    VkExtent3D depthPyramidExtent = {
+        static_cast<uint32_t>(_depthPyramidWidth),
+        static_cast<uint32_t>(_depthPyramidHeight),
+        1
+    };
+
+    VkImageCreateInfo depthPyramidCreateInfo = {};
+    depthPyramidCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    depthPyramidCreateInfo.pNext = nullptr;
+    depthPyramidCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    depthPyramidCreateInfo.format = _depthBufferFormat;
+    depthPyramidCreateInfo.extent = depthPyramidExtent;
+    depthPyramidCreateInfo.mipLevels = _depthPyramid.mipLevels;
+    depthPyramidCreateInfo.arrayLayers = 1;
+    depthPyramidCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthPyramidCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    depthPyramidCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    _vulkan->createImage(_depthPyramidWidth, _depthPyramidHeight, _depthPyramid.mipLevels,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_FORMAT_R32_SFLOAT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        _depthPyramid.image, _depthPyramid.memory);
+
+    _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, _depthPyramid.mipLevels, _depthPyramid.view);
+
+    _depthPyramidLevelViews.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
+    for (int32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
+        _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 1, _depthPyramidLevelViews[i], i);
+    }
+}
+
 void VulkanRenderer::init()
 {
 
     _depthBufferFormat = _vulkan->findSupportedFormat(
-        { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+        { VK_FORMAT_D32_SFLOAT },
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
     );
@@ -157,6 +220,8 @@ void VulkanRenderer::init()
     _materialBuilder.init({ _vulkan->getProperties().maxNbMsaaSamples, _renderPass });
 
     _createComputePipeline("../Resources/Shaders/indirect_cull.spv", _cullingPipeline, _cullingPipelineLayout);
+
+    _createOcclusionCullingData();
 }
 
 void VulkanRenderer::iterate()
@@ -202,6 +267,8 @@ void VulkanRenderer::iterate()
 
     VK_CHECK(vkBeginCommandBuffer(_framesData[imageIndex].commandBuffer, &beginInfo));
 
+    // Depth pyramid building
+    // TD 13, 14
 
     // Culling
 
@@ -1104,7 +1171,7 @@ void VulkanRenderer::_createFramebuffersImage()
         instanceProperties.maxNbMsaaSamples,
         _depthBufferFormat,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _framebufferDepth.image,
         _framebufferDepth.memory);
@@ -1285,6 +1352,8 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     indexMapInfo.offset = 0;
     indexMapInfo.range = VK_WHOLE_SIZE;
 
+    // TD15 -> 17
+
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator)
         .bindBuffer(0, globalDataBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(1, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1328,4 +1397,12 @@ void VulkanRenderer::setCamera(const leo::Camera* camera)
 
     const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
     _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
+}
+
+namespace {
+    uint32_t previousPow2(uint32_t v) {
+        uint32_t result = 1;
+        while (result * 2 < v) result *= 2;
+        return result;
+    }
 }

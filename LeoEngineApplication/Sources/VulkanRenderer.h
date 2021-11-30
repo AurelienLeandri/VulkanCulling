@@ -141,6 +141,7 @@ private:
 	void _createGlobalDescriptors(uint32_t nbObjects);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout);
 	void _createCullingDescriptors(uint32_t nbObjects);
+	void _createOcclusionCullingData();
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -227,5 +228,9 @@ private:
 	VkBufferMemoryBarrier _gpuIndexToObjectIdBarrier = {};
 	VkDescriptorSet _cullingDescriptorSet;
 	VkDescriptorSetLayout _cullingDescriptorSetLayout;
+	AllocatedImage _depthPyramid = {};
+	uint32_t _depthPyramidWidth = 0;
+	uint32_t _depthPyramidHeight = 0;
+	std::vector<VkImageView> _depthPyramidLevelViews;
 };
 

@@ -29,16 +29,17 @@ namespace {
         void* pUserData);
 
     const std::vector<const char*> debugInstanceExtensions = {
-    VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+    VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
-    const std::vector<const char*> validationLayers = {
+    const std::vector<const char*> additionalLayers = {
     "VK_LAYER_KHRONOS_validation",
     "VK_LAYER_LUNARG_monitor"
     };
 
     const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME
     };
 }
 
@@ -75,9 +76,9 @@ void VulkanInstance::init()
 
     // Validation layers
     if (enableValidationLayers) {
-        checkValidationLayerSupport(validationLayers);
-        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+        checkValidationLayerSupport(additionalLayers);
+        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(additionalLayers.size());
+        instanceCreateInfo.ppEnabledLayerNames = additionalLayers.data();
 
         // Create a debug messenger specificaly for instance creation and destruction.
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
@@ -194,8 +195,8 @@ void VulkanInstance::init()
     // Device-specific validation layers are not used anymore. We set them regardless for backward compatibility
     logicalDeviceCreateInfo.enabledLayerCount = 0;
     if (enableValidationLayers) {
-        logicalDeviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        logicalDeviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+        logicalDeviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(additionalLayers.size());
+        logicalDeviceCreateInfo.ppEnabledLayerNames = additionalLayers.data();
     }
 
     VK_CHECK(vkCreateDevice(_physicalDevice, &logicalDeviceCreateInfo, nullptr, &_device));
@@ -548,7 +549,7 @@ size_t VulkanInstance::padUniformBufferSize(size_t originalSize)
 }
 
 void VulkanInstance::createImageView(
-    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView) const
+    VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView, uint32_t baseMipLevel) const
 {
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -556,7 +557,7 @@ void VulkanInstance::createImageView(
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.baseMipLevel = baseMipLevel;
     viewInfo.subresourceRange.levelCount = mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
