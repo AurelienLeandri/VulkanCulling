@@ -139,8 +139,9 @@ private:
 	void _createGlobalBuffers();
 	void _fillConstantGlobalBuffers(const leo::Scene* scene);
 	void _createGlobalDescriptors(uint32_t nbObjects);
-	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout);
+	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass);
 	void _createCullingDescriptors(uint32_t nbObjects);
+	void _createDepthPyramidDescriptors();
 	void _createOcclusionCullingData();
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
@@ -212,25 +213,33 @@ private:
 	VkPipeline _cullingPipeline = VK_NULL_HANDLE;
 	VkPipelineLayout _cullingPipelineLayout = VK_NULL_HANDLE;
 	ShaderPass _cullShaderPass;
+	VkPipeline _depthPyramidPipeline = VK_NULL_HANDLE;
+	VkPipelineLayout _depthPyramidPipelineLayout = VK_NULL_HANDLE;
+	ShaderPass _depthPyramidShaderPass;
 
 	// Culling compute pipeline data
 	glm::mat4 _projectionMatrix = glm::mat4(1);
 	uint32_t _nbInstances = 0;
 	uint32_t _testBatchesSize = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
-	AllocatedBuffer _gpuObjectEntries;
-	AllocatedBuffer _gpuBatches;
-	AllocatedBuffer _gpuCullingGlobalData;
+	AllocatedBuffer _gpuObjectEntries = {};
+	AllocatedBuffer _gpuBatches = {};
+	AllocatedBuffer _gpuCullingGlobalData = {};
 	VkBufferMemoryBarrier _gpuBatchesBarrier = {};
-	AllocatedBuffer _gpuResetBatches;
+	AllocatedBuffer _gpuResetBatches = {};
 	VkBufferMemoryBarrier _gpuBatchesResetBarrier = {};
-	AllocatedBuffer _gpuIndexToObjectId;
+	AllocatedBuffer _gpuIndexToObjectId = {};
 	VkBufferMemoryBarrier _gpuIndexToObjectIdBarrier = {};
-	VkDescriptorSet _cullingDescriptorSet;
-	VkDescriptorSetLayout _cullingDescriptorSetLayout;
+	VkDescriptorSet _cullingDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _cullingDescriptorSetLayout = VK_NULL_HANDLE;
+
+	// Depth pyramid computing data
 	AllocatedImage _depthPyramid = {};
 	uint32_t _depthPyramidWidth = 0;
 	uint32_t _depthPyramidHeight = 0;
 	std::vector<VkImageView> _depthPyramidLevelViews;
+	VkDescriptorSet _depthPyramidDescriptorSet = VK_NULL_HANDLE;
+	VkDescriptorSetLayout _depthPyramidDescriptorSetLayout = VK_NULL_HANDLE;
+	DescriptorAllocator _depthPyramidDescriptorAllocator;
 };
 
