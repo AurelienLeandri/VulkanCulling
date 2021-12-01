@@ -7,6 +7,14 @@
 
 struct GLFWwindow;
 
+struct AllocatedImage {
+	VkImage image = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+	VkImageView view = VK_NULL_HANDLE;
+	VkSampler textureSampler = VK_NULL_HANDLE;
+	uint32_t mipLevels = 0;
+};
+
 class VulkanInstance
 {
 public:
@@ -45,7 +53,7 @@ public:
 
 	// Utility
 	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
-		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED);
+		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedImage& image);
 	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView, uint32_t baseMipLevel = 0) const;
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
 		VkImageTiling tiling, VkFormatFeatureFlags features) const;

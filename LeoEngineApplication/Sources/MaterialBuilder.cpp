@@ -79,9 +79,9 @@ void MaterialBuilder::init(Parameters parameters)
 	multisamplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisamplingInfo.pNext = nullptr;
 
-	multisamplingInfo.sampleShadingEnable = VK_TRUE;
+	multisamplingInfo.sampleShadingEnable = VK_FALSE;
 	multisamplingInfo.rasterizationSamples = _parameters.multisamplingNbSamples;
-	multisamplingInfo.minSampleShading = 0.2f;
+	multisamplingInfo.minSampleShading = 0;
 	multisamplingInfo.pSampleMask = nullptr;
 	multisamplingInfo.alphaToCoverageEnable = VK_FALSE;
 	multisamplingInfo.alphaToOneEnable = VK_FALSE;

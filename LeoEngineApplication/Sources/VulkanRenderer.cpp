@@ -163,7 +163,10 @@ void VulkanRenderer::init()
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _depthImage.image, _depthImage.memory);
+        _depthImage);
+
+    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+
     _vulkan->createImageView(_depthImage.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
     _depthImage.mipLevels = 1;
 
@@ -190,6 +193,12 @@ void VulkanRenderer::iterate()
 
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
+
+    static int times = 0;
+    if (times == 70) {
+        _testWriteDepthBufferToDisc();
+    }
+    times++;
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -309,7 +318,7 @@ void VulkanRenderer::iterate()
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
     // Depth pyramid building
-    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);
+    //_computeDepthPyramid(_framesData[imageIndex].commandBuffer);
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -346,8 +355,6 @@ void VulkanRenderer::iterate()
     if (result) {
         throw VulkanRendererException("Failed to present swap chain image.");
     }
-
-    //_testWriteDepthBufferToDisc();
 
     _currentFrame = (_currentFrame + 1) % _MAX_FRAMES_IN_FLIGHT;
 }
@@ -514,7 +521,7 @@ void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usag
     }
 }
 
-void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspect)
 {
     // TODO: Write a barrier helper and use it instead of this function.
     VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
@@ -526,7 +533,7 @@ void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat 
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = imageData.image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.aspectMask = aspect;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = imageData.mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
@@ -558,12 +565,26 @@ void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat 
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
     }
-    else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+        barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
     else {
         throw VulkanRendererException("Unsupported layout transition.");
@@ -574,7 +595,7 @@ void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat 
     _endSingleTimeCommands(commandBuffer, _mainCommandPool);
 }
 
-void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect) {
     // TODO: Try to setup a command buffer to record several operations and then flush everything once,
     // instead of calling beginSingleTimeCommands and endSingleTimeCommands each time.
     // Could also be done for uniforms and other stuff that creates single-time command buffers several times.
@@ -585,7 +606,7 @@ void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.aspectMask = aspect;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
@@ -744,7 +765,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
                     _vulkan->createImage(texWidth, texHeight, loadedImage->mipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, loadedImage->image, loadedImage->memory);
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
 
                     _transitionImageLayout(*loadedImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -1091,7 +1112,7 @@ void VulkanRenderer::_createRenderPass()
     depthAttachment.format = _depthBufferFormat;
     depthAttachment.samples = instanceProperties.maxNbMsaaSamples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1101,7 +1122,7 @@ void VulkanRenderer::_createRenderPass()
     depthAttachmentRef.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachmentRef.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    depthAttachmentRef.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
     VkAttachmentDescription2 colorAttachmentResolve = {};
     colorAttachmentResolve.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
@@ -1135,12 +1156,12 @@ void VulkanRenderer::_createRenderPass()
     depthAttachmentResolveRef.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
     depthAttachmentResolveRef.attachment = 3;
     depthAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachmentResolveRef.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    depthAttachmentResolveRef.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
     VkSubpassDescriptionDepthStencilResolve subpassDepthSencilResolve = {};
     subpassDepthSencilResolve.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE;
     subpassDepthSencilResolve.stencilResolveMode = VK_RESOLVE_MODE_NONE;
-    subpassDepthSencilResolve.depthResolveMode = VK_RESOLVE_MODE_MIN_BIT;
+    subpassDepthSencilResolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
     subpassDepthSencilResolve.pDepthStencilResolveAttachment = &depthAttachmentResolveRef;
 
     VkSubpassDescription2 subpass = {};
@@ -1177,9 +1198,6 @@ void VulkanRenderer::_createRenderPass()
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
     VK_CHECK(vkCreateRenderPass2(_device, &renderPassInfo, nullptr, &_renderPass));
 }
 
@@ -1196,8 +1214,7 @@ void VulkanRenderer::_createFramebuffersImage()
         colorFormat, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _framebufferColor.image,
-        _framebufferColor.memory);
+        _framebufferColor);
 
     _vulkan->createImageView(_framebufferColor.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _framebufferColor.view);
 
@@ -1208,10 +1225,9 @@ void VulkanRenderer::_createFramebuffersImage()
         instanceProperties.maxNbMsaaSamples,
         _depthBufferFormat,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _framebufferDepth.image,
-        _framebufferDepth.memory);
+        _framebufferDepth);
 
     _vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view);
 }
@@ -1479,8 +1495,9 @@ void VulkanRenderer::_createOcclusionCullingData()
         VK_SAMPLE_COUNT_1_BIT,
         VK_FORMAT_R32_SFLOAT,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        _depthPyramid.image, _depthPyramid.memory);
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        _depthPyramid);
 
     _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
@@ -1536,74 +1553,55 @@ void VulkanRenderer::_createOcclusionCullingData()
 }
 
 void VulkanRenderer::_testWriteDepthBufferToDisc() {
+    return;
+    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
     uint32_t width = _vulkan->getProperties().swapChainExtent.width;
     uint32_t height = _vulkan->getProperties().swapChainExtent.height;
 
     VkDeviceSize size = width * height * 4;
-    AllocatedBuffer buffer;
 
-    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer);
+    AllocatedBuffer copyBuffer;
+    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
 
-    VkImage image = _vulkan->getSwapChainImages()[_currentFrame];
-    AllocatedImage allocatedImage;
-    allocatedImage.image = image;
-    allocatedImage.mipLevels = 1;
-    _transitionImageLayout(allocatedImage, _vulkan->getProperties().swapChainImageFormat, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    //_transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    VkCommandBuffer copyCmd = _beginSingleTimeCommands(_mainCommandPool);
+    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
 
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width, height, 1 };
 
+    vkCmdCopyImageToBuffer(cmd, _depthImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
 
-    vkCmdCopyImageToBuffer(
-        copyCmd,
-        image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        buffer.buffer,
-        1,
-        &region
-    );
-
-    _endSingleTimeCommands(copyCmd, _mainCommandPool);
-
-    // Map image memory so we can start copying from it
-    void* data;
-    vkMapMemory(_device, buffer.deviceMemory, 0, size, 0, &data);
-
+    _endSingleTimeCommands(cmd, _mainCommandPool);
+    
+    void* data = nullptr;
+    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
+    float* dataPtr = static_cast<float*>(data);
 
     std::ofstream file("bleubleu.ppm", std::ios::out | std::ios::binary);
 
     // ppm header
-    file << "P6\n" << width << "\n" << height << "\n" << 255 << "\n";
+    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
 
-    float* row = (float*)data;
-
-    auto size_v = width * height;
-
-    for (uint32_t y = 0; y < size_v; y++) {
-
-        file.write((char*)row + 1, 1);
-        file.write((char*)row + 1, 1);
-        file.write((char*)row + 1, 1);
-
-        row++;
-
+    for (int i = 0; i < width * height; ++i) {
+        float val = dataPtr[i];
+        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
     }
+    file.flush();
 
     file.close();
+    vkUnmapMemory(_device, copyBuffer.deviceMemory);
 
-    // Clean up resources
-    vkUnmapMemory(_device, buffer.deviceMemory);
-    vkFreeMemory(_device, buffer.deviceMemory, nullptr);
-    vkDestroyBuffer(_device, buffer.buffer, nullptr);
+    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
+    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
 }
 
 void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass)

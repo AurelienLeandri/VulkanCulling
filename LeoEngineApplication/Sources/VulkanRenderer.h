@@ -61,14 +61,6 @@ struct AllocatedBuffer {
 	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
 };
 
-struct AllocatedImage {
-	VkImage image = VK_NULL_HANDLE;
-	VkDeviceMemory memory = VK_NULL_HANDLE;
-	VkImageView view = VK_NULL_HANDLE;
-	VkSampler textureSampler = VK_NULL_HANDLE;
-	uint32_t mipLevels = 0;
-};
-
 struct ShapeData {
 	AllocatedBuffer vertexBuffer;
 	AllocatedBuffer indexBuffer;
@@ -148,8 +140,8 @@ private:
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void _createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
-	void _transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	void _transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
+	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 	void _generateMipmaps(AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
 
 	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);

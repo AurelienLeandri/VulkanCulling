@@ -177,9 +177,7 @@ void VulkanInstance::init()
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
-    // Antialiazing on shading, for example textures with sudden color changes.
-    // Has a performance cost.
-    deviceFeatures.sampleRateShading = VK_TRUE;
+    deviceFeatures.sampleRateShading = VK_FALSE;
     deviceFeatures.multiDrawIndirect = VK_TRUE;
 
     VkDeviceCreateInfo logicalDeviceCreateInfo = {};
@@ -277,8 +275,16 @@ void VulkanInstance::cleanupSwapChain() {
 }
 
 int VulkanInstance::_ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndices& indices, SwapChainSupportDetails& swapChainSupportDetails) {
-    VkPhysicalDeviceProperties deviceProperties;
-    vkGetPhysicalDeviceProperties(device, &deviceProperties);
+    VkPhysicalDeviceProperties2 deviceProperties2;
+    deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
+    VkPhysicalDeviceDepthStencilResolvePropertiesKHR depthResolveProperties{};
+    depthResolveProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES_KHR;
+    deviceProperties2.pNext = &depthResolveProperties;
+
+    vkGetPhysicalDeviceProperties2(device, &deviceProperties2);
+
+    VkPhysicalDeviceProperties& deviceProperties = deviceProperties2.properties;
 
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
@@ -288,6 +294,10 @@ int VulkanInstance::_ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndi
     }
 
     if (!deviceFeatures.samplerAnisotropy) {
+        return 0;
+    }
+
+    if (!(depthResolveProperties.supportedDepthResolveModes & (VK_RESOLVE_MODE_SAMPLE_ZERO_BIT | VK_RESOLVE_MODE_MIN_BIT | VK_RESOLVE_MODE_MAX_BIT))) {
         return 0;
     }
 
@@ -413,7 +423,7 @@ void VulkanInstance::_createSwapChain()
     swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
     swapChainCreateInfo.imageExtent = extent;
     swapChainCreateInfo.imageArrayLayers = 1;
-    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // NOTE: Transfer is for saving to file
+    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     uint32_t queueFamilyIndices[] = {
         _queueFamilyIndices.graphicsFamily.value(),
@@ -499,9 +509,7 @@ void VulkanInstance::createImage(
     VkImageTiling tiling,
     VkImageUsageFlags usage,
     VkMemoryPropertyFlags properties,
-    VkImage& image,
-    VkDeviceMemory& imageMemory,
-    VkImageLayout initialLayout)
+    AllocatedImage& image)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -513,24 +521,26 @@ void VulkanInstance::createImage(
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
-    imageInfo.initialLayout = initialLayout;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = usage;
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CHECK(vkCreateImage(_device, &imageInfo, nullptr, &image));
+    VK_CHECK(vkCreateImage(_device, &imageInfo, nullptr, &image.image));
 
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(_device, image, &memRequirements);
+    vkGetImageMemoryRequirements(_device, image.image, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &imageMemory));
+    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &image.memory));
 
-    vkBindImageMemory(_device, image, imageMemory, 0);
+    vkBindImageMemory(_device, image.image, image.memory, 0);
+
+    image.mipLevels = mipLevels;
 }
 
 /*
