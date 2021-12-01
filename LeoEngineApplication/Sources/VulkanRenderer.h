@@ -157,6 +157,8 @@ private:
 
 	void _cleanup();
 
+	void _testWriteDepthBufferToDisc();
+
 private:
 	Options _options;
 
@@ -197,6 +199,7 @@ private:
 	AllocatedImage _framebufferColor;
 	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 	AllocatedImage _framebufferDepth;
+	AllocatedImage _depthImage;
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;

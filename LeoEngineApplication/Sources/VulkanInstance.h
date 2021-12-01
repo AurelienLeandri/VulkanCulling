@@ -57,6 +57,8 @@ public:
 	VkDevice& getLogicalDevice();
 	const QueueFamilyIndices& getQueueFamilyIndices() const;
 	const std::vector<VkImageView>& getSwapChainImageViews() const;
+	const std::vector<VkImage>& getSwapChainImages() const;
+	std::vector<VkImage>& getSwapChainImages();
 	VkQueue& getGraphicsQueue();
 	VkQueue& getPresentationQueue();
 	VkSwapchainKHR& getSwapChain();

@@ -39,7 +39,6 @@ namespace {
 
     const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME
     };
 }
 
@@ -63,7 +62,7 @@ void VulkanInstance::init()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     instanceCreateInfo.pApplicationInfo = &appInfo;
 
@@ -414,7 +413,7 @@ void VulkanInstance::_createSwapChain()
     swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
     swapChainCreateInfo.imageExtent = extent;
     swapChainCreateInfo.imageArrayLayers = 1;
-    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // NOTE: Transfer is for saving to file
 
     uint32_t queueFamilyIndices[] = {
         _queueFamilyIndices.graphicsFamily.value(),
@@ -597,6 +596,16 @@ VkFormat VulkanInstance::findSupportedFormat(const std::vector<VkFormat>& candid
 
     throw VulkanRendererException("Failed to find supported format.");
     return VkFormat::VK_FORMAT_UNDEFINED;
+}
+
+const std::vector<VkImage>& VulkanInstance::getSwapChainImages() const
+{
+    return _swapChainImages;
+}
+
+std::vector<VkImage>& VulkanInstance::getSwapChainImages()
+{
+    return _swapChainImages;
 }
 
 uint32_t VulkanInstance::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
