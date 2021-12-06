@@ -53,6 +53,7 @@ layout (set = 0, binding = 5) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
+layout(set = 0, binding = 6) uniform sampler2D depthPyramid;
 
 bool IsVisible(uint objectDataIndex)
 {
