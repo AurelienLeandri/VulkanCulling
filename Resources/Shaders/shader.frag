@@ -22,4 +22,5 @@ layout(set = 2, binding = 4) uniform sampler2D heightTexture;
 void main() {
 	outColor = texture(diffuseTexture, fragTexCoord);
 	//outColor = vec4(vec3(1.0) - fragCoord / 250.0, 1);
+	//outColor = vec4(fragNormal, 1.0);
 }

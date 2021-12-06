@@ -47,6 +47,12 @@ struct GPUBatch {
 struct GPUCullingGlobalData {
 	glm::mat4 viewMatrix = glm::mat4(1);
 	glm::vec4 frustum[6] = { glm::vec4(0) };
+	float zNear = 0;
+	float zFar = 10000.f;
+	float P00 = 0;
+	float P11 = 0;
+	int pyramidWidth = 0;
+	int pyramidHeight = 0;
 	uint32_t nbInstances = 0;
 	bool cullingEnabled = false;
 };
@@ -240,5 +246,9 @@ private:
 	std::vector<VkImageMemoryBarrier> _depthPyramidMipLevelBarriers;
 	VkImageMemoryBarrier _framebufferDepthWriteBarrier = {};
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
+
+	// Other
+	float _zNear = 0.1f;
+	float _zFar = 1000.f;
 };
 

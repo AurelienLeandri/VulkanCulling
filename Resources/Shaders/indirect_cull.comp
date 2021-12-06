@@ -26,6 +26,12 @@ struct GPUInstance {
 layout (set = 0, binding = 0) uniform CullingGlobalData {
 	mat4 view;
 	vec4 frustum[6];  // Left/right/top/bottom frustum planes
+	float zNear;
+	float zFar;
+	float P00;
+	float P11;
+	int pyramidWidth;
+	int pyramidHeight;
 	uint nbInstances;
 	bool cullingEnabled;
 } globalData;
@@ -55,20 +61,87 @@ layout (set = 0, binding = 5) buffer IndexMap {
 
 layout(set = 0, binding = 6) uniform sampler2D depthPyramid;
 
+
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool projectSphere(vec3 C, float r, out vec4 aabb)
+{
+	float znear = globalData.zNear;
+	float P00 = globalData.P00;
+	float P11 = globalData.P11;
+
+	if (C.z < r + znear)
+		return false;
+
+	vec2 cx = -C.xz;
+	vec2 vx = vec2(sqrt(dot(cx, cx) - r * r), r);
+	vec2 minx = mat2(vx.x, vx.y, -vx.y, vx.x) * cx;
+	vec2 maxx = mat2(vx.x, -vx.y, vx.y, vx.x) * cx;
+
+	vec2 cy = -C.yz;
+	vec2 vy = vec2(sqrt(dot(cy, cy) - r * r), r);
+	vec2 miny = mat2(vy.x, vy.y, -vy.y, vy.x) * cy;
+	vec2 maxy = mat2(vy.x, -vy.y, vy.y, vy.x) * cy;
+
+	aabb = vec4(minx.x / minx.y * P00, miny.x / miny.y * P11, maxx.x / maxx.y * P00, maxy.x / maxy.y * P11);
+	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
+
+	return true;
+}
+
 bool IsVisible(uint objectDataIndex)
 {
-return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;
-
+	
 	bool visible = true;
 	
+	center.z *= -1;
+	
 	for (int i = 0; i < 6; ++i) {
-		visible = visible && (dot(globalData.frustum[i].xyz, center) > -radius);
+		//visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
 	}
+	
+	//visible = visible && center.z + radius > globalData.zNear && center.z - radius < globalData.zFar;
+	
+	vec4 aabb;
+	if (projectSphere(center, radius, aabb))
+	{
+		float width = (aabb.z - aabb.x) * globalData.pyramidWidth;
+		float height = (aabb.w - aabb.y) * globalData.pyramidHeight;
+		
+		float level = floor(log2(max(width, height)));
+		
+		float zNear = globalData.zNear;
+		float zFar = globalData.zFar;
+		
+		// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
+		float depth = textureLod(depthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
+		depth = (zNear) / (zFar + zNear - depth * (zFar - zNear));
+		
+		float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
 
-	visible = visible || (!globalData.cullingEnabled);
+		visible = visible && depthSphere <= depth;
+		
+		/*
+		uint gID = gl_GlobalInvocationID.x;
+		uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
+		uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
+		if (dataIndex == 0) {  // Moyen
+			drawBuffer.drawsCommands[batchIndex].firstIndex = uint(depth * 1000.0);
+			//drawBuffer.drawsCommands[batchIndex].firstIndex = uint(depthSphere * 1000.0);
+			//drawBuffer.drawsCommands[batchIndex].firstIndex = uint(level);
+		}
+		else if (dataIndex == 1) {  // Petit
+			drawBuffer.drawsCommands[batchIndex].vertexOffset = int(depth * 1000.0);
+			//drawBuffer.drawsCommands[batchIndex].vertexOffset = int(depthSphere * 1000.0);
+			//drawBuffer.drawsCommands[batchIndex].vertexOffset = int(level);
+		}
+		else if (dataIndex == 2) {  // Grand
+			drawBuffer.drawsCommands[batchIndex].firstInstance = uint(depth * 1000.0);
+		}
+		*/
+	}
 
 	return visible;
 }

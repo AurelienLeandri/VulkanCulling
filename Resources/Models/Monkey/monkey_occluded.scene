@@ -1,0 +1,7 @@
+m m1 monkey_smooth.obj
+t t1 0 0 20 5 5 5 0 0 0
+t t2 0 0 40 1 1 1 0 0 0
+t t3 0 0 110 50 50 50 0 0 0
+o m1 t1
+o m1 t2
+o m1 t3

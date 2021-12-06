@@ -144,7 +144,7 @@ void VulkanRenderer::init()
     _depthBufferFormat = _vulkan->findSupportedFormat(
         { VK_FORMAT_D32_SFLOAT },
         VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
     );
     if (_depthBufferFormat == VK_FORMAT_UNDEFINED) {
         throw VulkanRendererException("Failed to find a supported format for the depth buffer.");
@@ -193,7 +193,6 @@ void VulkanRenderer::iterate()
 
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
-
 
     /*
     static bool first = true;
@@ -434,24 +433,26 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
     position.y *= -1;
+    //position = glm::vec3(0, 20, 0);
+
     /*
-    leo::Camera camera;
-    front.z *= -1;
-    up *= -1;
-    camera.setPosition(_camera->getPosition());
-    camera.setFront(front);
-    front = camera.getFront();
-    up = camera.getUp();
+    position = glm::vec3(0);
+    up = glm::vec3(0, -1, 0);
+    front = glm::vec3(0, 0, 1);
+    glm::vec3 right(1, 0, 0);
     */
 
-    leo::Camera camera;
-    camera.setPosition(glm::vec3(7, 7, 0));
-    camera.setFront(glm::vec3(0, 0, 1));
-
-    glm::mat4 view(glm::vec4(_camera->getRight(), 0.f), glm::vec4(_camera->getUp(), 0), glm::vec4(_camera->getFront(), 0), glm::vec4(_camera->getPosition(), 1));
     cameraData.view = glm::lookAt(position, position + front, up);
-    //cameraData.view = view;
-    //cameraData.view = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
+    /*
+    cameraData.view = glm::mat4(
+        glm::vec4(1, 0, 0, 0),
+        glm::vec4(0, -1, 0, 0),
+        glm::vec4(0, 0, 1, 0),
+        glm::vec4(0, 0, 0, 1)
+    );
+    */
+    //cameraData.view[2] *= -1;
+    //cameraData.view[0] *= -1;
     cameraData.proj = _projectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
@@ -1047,12 +1048,16 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     globalData.frustum[1] = projectionT[3] - projectionT[0];
     globalData.frustum[2] = projectionT[3] + projectionT[1];
     globalData.frustum[3] = projectionT[3] - projectionT[1];
+    globalData.zNear = _zNear;
+    globalData.zFar = _zFar;
+    globalData.P00 = projectionT[0][0];
+    globalData.P11 = projectionT[1][1];
+    globalData.pyramidWidth = _depthPyramidWidth;
+    globalData.pyramidHeight = _depthPyramidHeight;
     globalData.nbInstances = nbObjects;
-    //globalData.viewMatrix = glm::lookAt(glm::vec3{ 0, 0, 0 }, glm::vec3{ -1, -1, -1 }, glm::vec3{ 0, 1, 0 });
-    //globalData.viewMatrix = glm::lookAt(_camera->getPosition(), _camera->getPosition() + _camera->getFront(), _camera->getUp());
     leo::Camera camera;
-    camera.setPosition(glm::vec3(150, -150, 0));
-    camera.setFront(glm::vec3(0, -1, 1));
+    camera.setPosition(glm::vec3(0, 0, 0));
+    camera.setFront(glm::vec3(0, 0, 1));
     globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
     _createGPUBuffer(sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1557,62 +1562,64 @@ void VulkanRenderer::_createOcclusionCullingData()
 
 }
 
-//void VulkanRenderer::_testWriteDepthBufferToDisc() {
-//    return;
-//    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-//    uint32_t width = _vulkan->getProperties().swapChainExtent.width;
-//    uint32_t height = _vulkan->getProperties().swapChainExtent.height;
-//
-//    VkDeviceSize size = width * height * 4;
-//
-//    AllocatedBuffer copyBuffer;
-//    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
-//
-//    //_transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-//
-//    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
-//
-//    VkBufferImageCopy region = {};
-//    region.bufferOffset = 0;
-//    region.bufferRowLength = 0;
-//    region.bufferImageHeight = 0;
-//    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-//    region.imageSubresource.mipLevel = 0;
-//    region.imageSubresource.baseArrayLayer = 0;
-//    region.imageSubresource.layerCount = 1;
-//    region.imageOffset = { 0, 0, 0 };
-//    region.imageExtent = { width, height, 1 };
-//
-//    vkCmdCopyImageToBuffer(cmd, _depthImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
-//
-//    _endSingleTimeCommands(cmd, _mainCommandPool);
-//    
-//    void* data = nullptr;
-//    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
-//    float* dataPtr = static_cast<float*>(data);
-//
-//    std::ofstream file("bleubleu.ppm", std::ios::out | std::ios::binary);
-//
-//    // ppm header
-//    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
-//
-//    for (int i = 0; i < width * height; ++i) {
-//        float val = dataPtr[i];
-//        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
-//    }
-//    file.flush();
-//
-//    file.close();
-//    vkUnmapMemory(_device, copyBuffer.deviceMemory);
-//
-//    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
-//    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
-//}
-
 void VulkanRenderer::_testWriteDepthBufferToDisc() {
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    uint32_t width = _depthPyramidWidth / pow(2, 10);
-    uint32_t height = _depthPyramidHeight / pow(2, 10);
+    uint32_t width = _vulkan->getProperties().swapChainExtent.width;
+    uint32_t height = _vulkan->getProperties().swapChainExtent.height;
+
+    VkDeviceSize size = width * height * 4;
+
+    AllocatedBuffer copyBuffer;
+    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
+
+    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { width, height, 1 };
+
+    vkCmdCopyImageToBuffer(cmd, _depthImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
+
+    _endSingleTimeCommands(cmd, _mainCommandPool);
+    
+    void* data = nullptr;
+    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
+    float* dataPtr = static_cast<float*>(data);
+
+    std::ofstream file("bleubleu.ppm", std::ios::out | std::ios::binary);
+
+    // ppm header
+    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
+
+    for (int i = 0; i < width * height; ++i) {
+        float val = dataPtr[i];
+        val = (2.0 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
+        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
+    }
+    file.flush();
+
+    file.close();
+    vkUnmapMemory(_device, copyBuffer.deviceMemory);
+
+    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
+    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
+}
+
+/*
+void VulkanRenderer::_testWriteDepthBufferToDisc() {
+    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
+    int mip = 0;
+    uint32_t width = _depthPyramidWidth / pow(2, mip);
+    uint32_t height = _depthPyramidHeight / pow(2, mip);
 
     VkDeviceSize size = width * height * 4;
 
@@ -1628,7 +1635,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 10;
+    region.imageSubresource.mipLevel = mip;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
     region.imageOffset = { 0, 0, 0 };
@@ -1659,6 +1666,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
     vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
     vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
 }
+*/
 
 void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass)
 {
@@ -1692,7 +1700,7 @@ void VulkanRenderer::setCamera(const leo::Camera* camera)
     _camera = camera;
 
     const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
-    _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, 0.1f, 100000.0f);
+    _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, _zNear, _zFar);
 }
 
 namespace {
