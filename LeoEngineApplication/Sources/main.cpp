@@ -13,9 +13,9 @@ int main() {
 
 	std::cout << "Loading scene" << std::endl;
 	//const char* scenePath = "../Resources/Models/Sponza/Sponza.scene";
-	const char* scenePath = "../Resources/Models/Sponza/super_sponza.scene";
+	//const char* scenePath = "../Resources/Models/Sponza/super_sponza.scene";
 	//const char* scenePath = "../Resources/Models/Monkey/monkey.scene";
-	//const char* scenePath = "../Resources/Models/Monkey/super_monkey.scene";
+	const char* scenePath = "../Resources/Models/Monkey/super_monkey.scene";
 	//const char* scenePath = "../Resources/Models/Monkey/monkey_occluded.scene";
 	if (application.loadScene(scenePath)) {
 		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;

@@ -194,13 +194,11 @@ void VulkanRenderer::iterate()
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
-    /*
-    static bool first = true;
-    if (first)
-        first = false;
+    static int times = 0;
+    if (times < 70)
+        times++;
     else
         _testWriteDepthBufferToDisc();
-    */
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -433,7 +431,7 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
     position.y *= -1;
-    //position = glm::vec3(0, 20, 0);
+    //position = glm::vec3(50, 50, 0);
 
     /*
     position = glm::vec3(0);

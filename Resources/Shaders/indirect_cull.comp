@@ -90,6 +90,7 @@ bool projectSphere(vec3 C, float r, out vec4 aabb)
 
 bool IsVisible(uint objectDataIndex)
 {
+return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;
