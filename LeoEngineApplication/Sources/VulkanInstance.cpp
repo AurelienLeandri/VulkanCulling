@@ -148,7 +148,8 @@ void VulkanInstance::init()
     }
 
     _physicalDevice = *candidateDevice;
-    _properties.maxNbMsaaSamples = _getMaxUsableSampleCount();
+    // _properties.maxNbMsaaSamples = _getMaxUsableSampleCount();  // ONE_SAMPLE
+    _properties.maxNbMsaaSamples = VK_SAMPLE_COUNT_1_BIT;
     vkGetPhysicalDeviceProperties(_physicalDevice, &_physicalDeviceProperties);
     _properties.maxSamplerAnisotropy = _physicalDeviceProperties.limits.maxSamplerAnisotropy;
 

@@ -248,7 +248,7 @@ private:
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
 
 	// Other
-	float _zNear = 0.1f;
-	float _zFar = 1000.f;
+	float _zNear = 10.f;
+	float _zFar = 100.f;
 };
 

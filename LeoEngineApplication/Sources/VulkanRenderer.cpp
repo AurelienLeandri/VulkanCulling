@@ -161,7 +161,8 @@ void VulkanRenderer::init()
         VK_SAMPLE_COUNT_1_BIT,
         _depthBufferFormat,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        // VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,  // ONE_SAMPLE
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,  // ONE_SAMPLE
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthImage);
 
@@ -194,11 +195,15 @@ void VulkanRenderer::iterate()
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
+    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    /*
     static int times = 0;
     if (times < 70)
         times++;
     else
         _testWriteDepthBufferToDisc();
+    */
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -318,7 +323,7 @@ void VulkanRenderer::iterate()
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
     // Depth pyramid building
-    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);
+    //_computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -1108,11 +1113,13 @@ void VulkanRenderer::_createRenderPass()
     colorAttachment.format = instanceProperties.swapChainImageFormat;
     colorAttachment.samples = instanceProperties.maxNbMsaaSamples;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    //colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;  // ONE_SAMPLE
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;  // ONE_SAMPLE
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    //colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;  // ONE_SAMPLE
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // ONE_SAmple
 
     VkAttachmentReference2 colorAttachmentRef = {};
     colorAttachmentRef.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
@@ -1125,18 +1132,20 @@ void VulkanRenderer::_createRenderPass()
     depthAttachment.format = _depthBufferFormat;
     depthAttachment.samples = instanceProperties.maxNbMsaaSamples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    //depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;  // ONE_SAMPLE
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    //depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // ONE_SAMPLE
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;  // ONE_SAMPLE
 
     VkAttachmentReference2 depthAttachmentRef = {};
     depthAttachmentRef.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachmentRef.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
+    /*
     VkAttachmentDescription2 colorAttachmentResolve = {};
     colorAttachmentResolve.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
     colorAttachmentResolve.format = instanceProperties.swapChainImageFormat;
@@ -1176,6 +1185,7 @@ void VulkanRenderer::_createRenderPass()
     subpassDepthSencilResolve.stencilResolveMode = VK_RESOLVE_MODE_NONE;
     subpassDepthSencilResolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
     subpassDepthSencilResolve.pDepthStencilResolveAttachment = &depthAttachmentResolveRef;
+    */  // ONE_SAMPLE
 
     VkSubpassDescription2 subpass = {};
     subpass.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2;
@@ -1183,8 +1193,10 @@ void VulkanRenderer::_createRenderPass()
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
-    subpass.pResolveAttachments = &colorAttachmentResolveRef;
-    subpass.pNext = &subpassDepthSencilResolve;
+    //subpass.pResolveAttachments = &colorAttachmentResolveRef;  // ONE_SAMPLE
+    //subpass.pNext = &subpassDepthSencilResolve;  // ONE_SAMPLE
+    subpass.pResolveAttachments = nullptr;  // ONE_SAMPLE
+    subpass.pNext = nullptr;  // ONE_SAMPLE
 
     VkSubpassDependency2 dependency = {};
     dependency.sType = VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2;
@@ -1195,11 +1207,16 @@ void VulkanRenderer::_createRenderPass()
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::array<VkAttachmentDescription2, 4> attachments = {
+    /*std::array<VkAttachmentDescription2, 2> attachments = {
         colorAttachment,
         depthAttachment,
         colorAttachmentResolve,
         depthAttachmentResolve
+    };*/  // ONE_SAMPLE
+
+    std::array<VkAttachmentDescription2, 2> attachments = {
+        colorAttachment,
+        depthAttachment
     };
 
     VkRenderPassCreateInfo2 renderPassInfo = {};
@@ -1302,12 +1319,16 @@ void VulkanRenderer::_createFramebuffers()
     const std::vector<VkImageView>& swapChainImageViews = _vulkan->getSwapChainImageViews();
 
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        std::array<VkImageView, 4> attachments = {
+        /*std::array<VkImageView, 4> attachments = {
             _framebufferColor.view,
             _framebufferDepth.view,
             swapChainImageViews[i],
             _depthImage.view
-        };
+        };*/  // ONE_SAMPLE
+        std::array<VkImageView, 2> attachments = {
+            swapChainImageViews[i],
+            _depthImage.view
+        };  // ONE_SAMPLE
 
         const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
 
