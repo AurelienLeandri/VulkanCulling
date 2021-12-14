@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <map>
 
-#include <glm/glm.hpp>
+#include <GeometryIncludes.h>
 
 namespace leo {
 	class Scene;
@@ -156,6 +156,7 @@ private:
 	void _cleanup();
 
 	void _testWriteDepthBufferToDisc();
+	void _testWriteDepthPyramidToDisc();
 
 private:
 	Options _options;
@@ -248,7 +249,7 @@ private:
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
 
 	// Other
-	float _zNear = 10.f;
+	float _zNear = 1.0f;
 	float _zFar = 100.f;
 };
 

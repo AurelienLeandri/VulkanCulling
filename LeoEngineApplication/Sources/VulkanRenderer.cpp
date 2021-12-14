@@ -17,7 +17,7 @@
 #include <fstream>
 #include <set>
 
-#include <glm/gtc/matrix_transform.hpp>
+#include <GeometryIncludes.h>
 
 #include <stb_image.h>
 
@@ -195,15 +195,17 @@ void VulkanRenderer::iterate()
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
-    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-
     /*
     static int times = 0;
-    if (times < 70)
+    if (times < 350)
         times++;
-    else
+    else {
         _testWriteDepthBufferToDisc();
+        _testWriteDepthPyramidToDisc();
+    }
     */
+
+    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
@@ -323,7 +325,7 @@ void VulkanRenderer::iterate()
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
     // Depth pyramid building
-    //_computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
+    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -1138,7 +1140,7 @@ void VulkanRenderer::_createRenderPass()
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     //depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // ONE_SAMPLE
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;  // ONE_SAMPLE
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;  // ONE_SAMPLE
 
     VkAttachmentReference2 depthAttachmentRef = {};
     depthAttachmentRef.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
@@ -1621,7 +1623,62 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
 
     for (int i = 0; i < width * height; ++i) {
         float val = dataPtr[i];
-        val = (2.0 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
+        //val = val * 2.0f - 1.0f;
+        //val = (2.0f * _zNear * _zFar) / (_zFar + _zNear - val * (_zFar - _zNear));
+        //val = (2.0 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
+        //val = _zNear * _zFar / (_zFar + val * (_zNear - _zFar));
+        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
+    }
+    file.flush();
+
+    file.close();
+    vkUnmapMemory(_device, copyBuffer.deviceMemory);
+
+    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
+    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
+}
+
+void VulkanRenderer::_testWriteDepthPyramidToDisc() {
+    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
+    int mip = 4;
+    uint32_t width = _depthPyramidWidth / pow(2, mip);
+    uint32_t height = _depthPyramidHeight / pow(2, mip);
+
+    VkDeviceSize size = width * height * 4;
+
+    AllocatedBuffer copyBuffer;
+    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
+
+    _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = mip;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { width, height, 1 };
+
+    vkCmdCopyImageToBuffer(cmd, _depthPyramid.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
+
+    _endSingleTimeCommands(cmd, _mainCommandPool);
+
+    void* data = nullptr;
+    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
+    float* dataPtr = static_cast<float*>(data);
+
+    std::ofstream file("pleupleu.ppm", std::ios::out | std::ios::binary);
+
+    // ppm header
+    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
+
+    for (int i = 0; i < width * height; ++i) {
+        float val = dataPtr[i];
         file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
     }
     file.flush();

@@ -90,7 +90,6 @@ bool projectSphere(vec3 C, float r, out vec4 aabb)
 
 bool IsVisible(uint objectDataIndex)
 {
-return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;
@@ -118,11 +117,12 @@ return true;
 		
 		// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
 		float depth = textureLod(depthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
-		depth = (zNear) / (zFar + zNear - depth * (zFar - zNear));
+		//depth = (zNear) / (zFar + zNear - depth * (zFar - zNear));
 		
-		float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
+		float depthSphere = zNear / (center.z - radius);
+		//float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
 
-		visible = visible && depthSphere <= depth;
+		visible = visible && depthSphere >= depth;
 		
 		/*
 		uint gID = gl_GlobalInvocationID.x;
