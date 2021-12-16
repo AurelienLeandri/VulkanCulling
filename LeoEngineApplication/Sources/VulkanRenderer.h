@@ -33,15 +33,28 @@ struct GPUSceneData {
 	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
-struct GPUObjectEntry {
+struct alignas(16) GPUObjectEntry {
 	uint32_t batchId = 0;
 	uint32_t dataId = 0;
 };
 
-struct GPUBatch {
+struct alignas(16) GPUBatch {
 	VkDrawIndexedIndirectCommand command = {};
 	uint32_t batchId = 0;
 	uint32_t dataId = 0;
+};
+
+struct alignas(16) DebugCulling {
+	glm::vec3 posSphere = glm::vec3(0);
+	float offset0 = 0;
+	glm::vec2 uv = glm::vec2(0);
+	float radius = 0;
+	float width = 0;
+	float height = 0;
+	float zSphere = 0;
+	float zBuffer = 0;
+	uint32_t mipLevel = 0;
+	uint32_t projectSphere = 0;
 };
 
 struct GPUCullingGlobalData {
@@ -57,7 +70,7 @@ struct GPUCullingGlobalData {
 	bool cullingEnabled = false;
 };
 
-struct GPUObjectData {
+struct alignas (16) GPUObjectData {
 	glm::mat4 modelMatrix;
 	glm::vec4 sphereBounds;
 };
@@ -247,9 +260,10 @@ private:
 	std::vector<VkImageMemoryBarrier> _depthPyramidMipLevelBarriers;
 	VkImageMemoryBarrier _framebufferDepthWriteBarrier = {};
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
+	AllocatedBuffer _debugCullingBuffer;
 
 	// Other
-	float _zNear = 1.0f;
-	float _zFar = 100.f;
+	float _zNear = 0.1f;
+	float _zFar = 1000.f;
 };
 

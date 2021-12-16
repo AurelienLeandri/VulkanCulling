@@ -160,7 +160,7 @@ namespace leo {
                 glm::vec3 halfway = (maxV - minV) / 2.f;
                 glm::vec3 center = minV + halfway;
                 float radius = glm::length(halfway);
-                mesh->boundingSphere = glm::vec4(center, radius * 2.f);
+                mesh->boundingSphere = glm::vec4(center, radius);
             }
 
             if (!transform.IsIdentity()) {

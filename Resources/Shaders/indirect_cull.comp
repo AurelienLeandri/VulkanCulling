@@ -47,19 +47,36 @@ layout (std140, set = 0, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
-layout (set = 0, binding = 3)  buffer DrawBuffer {
+layout (std140, set = 0, binding = 3)  buffer DrawBuffer {
 	DrawCommand drawsCommands[];
 } drawBuffer;
 
-layout (set = 0, binding = 4) readonly buffer InstanceBuffer {
+layout (std140, set = 0, binding = 4) readonly buffer InstanceBuffer {
 	GPUInstance gpuInstances[];
 } instanceBuffer;
 
-layout (set = 0, binding = 5) buffer IndexMap {
+layout (std140, set = 0, binding = 5) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
 layout(set = 0, binding = 6) uniform sampler2D depthPyramid;
+
+struct DebugCullingData {
+	vec3 posSphere;
+	float offset0;
+	vec2 uv;
+	float radius;
+	float width;
+	float height;
+	float zSphere;
+	float zBuffer;
+	uint mipLevel;
+	uint projectSphere;
+};
+
+layout(std140, set = 0, binding = 7) buffer DebugCulling {
+	DebugCullingData data[];
+} debugBuffer;
 
 
 // 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
@@ -90,37 +107,59 @@ bool projectSphere(vec3 C, float r, out vec4 aabb)
 
 bool IsVisible(uint objectDataIndex)
 {
+	return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;
-	
+	debugBuffer.data[objectDataIndex].radius = radius;
+
+		
 	bool visible = true;
 	
 	center.z *= -1;
-	
+	debugBuffer.data[objectDataIndex].posSphere = center;
+
+	/*
 	for (int i = 0; i < 6; ++i) {
-		//visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
+		visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
 	}
 	
-	//visible = visible && center.z + radius > globalData.zNear && center.z - radius < globalData.zFar;
+	visible = visible && center.z + radius > globalData.zNear && center.z - radius < globalData.zFar;
+	*/
 	
 	vec4 aabb;
 	if (projectSphere(center, radius, aabb))
 	{
+		debugBuffer.data[objectDataIndex].projectSphere = 1;
+
 		float width = (aabb.z - aabb.x) * globalData.pyramidWidth;
 		float height = (aabb.w - aabb.y) * globalData.pyramidHeight;
+		debugBuffer.data[objectDataIndex].width = width;
+
+		debugBuffer.data[objectDataIndex].height = height;
+
 		
 		float level = floor(log2(max(width, height)));
+		debugBuffer.data[objectDataIndex].mipLevel = uint(level);
+
 		
 		float zNear = globalData.zNear;
 		float zFar = globalData.zFar;
 		
+		vec2 uv = (aabb.xy + aabb.zw) * 0.5;
+		debugBuffer.data[objectDataIndex].uv = uv;
+
+		
 		// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
-		float depth = textureLod(depthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
+		float depth = textureLod(depthPyramid, uv, level).x;
 		//depth = (zNear) / (zFar + zNear - depth * (zFar - zNear));
+		debugBuffer.data[objectDataIndex].zBuffer = depth;
+
 		
 		float depthSphere = zNear / (center.z - radius);
-		//float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
+		depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
+		debugBuffer.data[objectDataIndex].zSphere = depthSphere;
+
 
 		visible = visible && depthSphere >= depth;
 		
@@ -144,7 +183,8 @@ bool IsVisible(uint objectDataIndex)
 		*/
 	}
 
-	return visible;
+	//return visible;
+	return true;
 }
 
 
