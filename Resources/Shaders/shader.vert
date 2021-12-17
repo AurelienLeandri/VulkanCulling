@@ -8,13 +8,13 @@ layout (location = 0) out vec3 fragNormal;
 layout (location = 1) out vec2 fragTexCoord;
 layout (location = 2) out vec3 fragCoord;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
+layout(std140, set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
     mat4 proj;
     mat4 viewProj;
 } camera;
 
-layout (std140, set = 0, binding = 2) buffer IndexMap {
+layout (std430, set = 0, binding = 2) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
@@ -23,7 +23,7 @@ struct ObjectData{
 	vec4 sphereBounds;
 };
 
-layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer{
+layout(std430, set = 1, binding = 0) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 

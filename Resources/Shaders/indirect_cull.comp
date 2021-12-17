@@ -23,7 +23,7 @@ struct GPUInstance {
 	uint dataID;
 };
 
-layout (set = 0, binding = 0) uniform CullingGlobalData {
+layout (std140, set = 0, binding = 0) uniform CullingGlobalData {
 	mat4 view;
 	vec4 frustum[6];  // Left/right/top/bottom frustum planes
 	float zNear;
@@ -37,25 +37,25 @@ layout (set = 0, binding = 0) uniform CullingGlobalData {
 } globalData;
 
 
-layout (set = 0, binding = 1) uniform CameraData {
+layout (std140, set = 0, binding = 1) uniform CameraData {
     mat4 view;
     mat4 proj;
 	mat4 viewproj;
 } camera;
 
-layout (std140, set = 0, binding = 2) readonly buffer ObjectBuffer{
+layout (std430, set = 0, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
-layout (std140, set = 0, binding = 3)  buffer DrawBuffer {
+layout (std430, set = 0, binding = 3)  buffer DrawBuffer {
 	DrawCommand drawsCommands[];
 } drawBuffer;
 
-layout (std140, set = 0, binding = 4) readonly buffer InstanceBuffer {
+layout (std430, set = 0, binding = 4) readonly buffer InstanceBuffer {
 	GPUInstance gpuInstances[];
 } instanceBuffer;
 
-layout (std140, set = 0, binding = 5) buffer IndexMap {
+layout (std430, set = 0, binding = 5) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
@@ -107,7 +107,6 @@ bool projectSphere(vec3 C, float r, out vec4 aabb)
 
 bool IsVisible(uint objectDataIndex)
 {
-	return true;
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	float radius = sphereBounds.w;

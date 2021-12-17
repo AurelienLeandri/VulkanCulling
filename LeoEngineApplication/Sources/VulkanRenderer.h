@@ -33,19 +33,19 @@ struct GPUSceneData {
 	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
-struct alignas(16) GPUObjectEntry {
+struct GPUObjectEntry {
 	uint32_t batchId = 0;
 	uint32_t dataId = 0;
 };
 
-struct alignas(16) GPUBatch {
+struct GPUBatch {
 	VkDrawIndexedIndirectCommand command = {};
 	uint32_t batchId = 0;
 	uint32_t dataId = 0;
 };
 
-struct alignas(16) DebugCulling {
-	glm::vec3 posSphere = glm::vec3(0);
+struct DebugCulling {
+	alignas (16) glm::vec3 posSphere = glm::vec3(0);
 	float offset0 = 0;
 	glm::vec2 uv = glm::vec2(0);
 	float radius = 0;
@@ -70,7 +70,7 @@ struct GPUCullingGlobalData {
 	bool cullingEnabled = false;
 };
 
-struct alignas (16) GPUObjectData {
+struct GPUObjectData {
 	glm::mat4 modelMatrix;
 	glm::vec4 sphereBounds;
 };
