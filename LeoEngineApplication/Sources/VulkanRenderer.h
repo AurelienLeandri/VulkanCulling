@@ -25,6 +25,7 @@ struct GPUCameraData {
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::mat4 viewProj;
+	glm::mat4 invProj;
 };
 
 struct GPUSceneData {
@@ -235,6 +236,7 @@ private:
 
 	// Culling compute pipeline data
 	glm::mat4 _projectionMatrix = glm::mat4(1);
+	glm::mat4 _invProjectionMatrix = glm::mat4(1);
 	uint32_t _nbInstances = 0;
 	uint32_t _testBatchesSize = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
@@ -264,6 +266,6 @@ private:
 
 	// Other
 	float _zNear = 0.1f;
-	float _zFar = 1000.f;
+	float _zFar = 300.f;
 };
 

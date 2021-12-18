@@ -42,6 +42,9 @@ namespace leo {
     }
 
     std::unordered_map<std::string, Model> ModelLoader::_modelsCache;
+    std::unordered_map<uint32_t, std::unordered_map<uint32_t, Model>> ModelLoader::_spheresCache;
+    const std::shared_ptr<Material> ModelLoader::_defaultMaterial = std::make_shared<PerformanceMaterial>();
+
 
     const Model ModelLoader::loadModel(const char* filePath, LoadingOptions options)
     {
@@ -80,6 +83,84 @@ namespace leo {
                     object.transform = std::make_shared<Transform>(options.globalTransform->getMatrix() * object.transform->getMatrix());
                 }
             }
+        }
+
+        return model;
+    }
+
+    const Model ModelLoader::loadSphereModel(uint32_t xSegments, uint32_t ySegments, LoadingOptions options)
+    {
+        auto xSegmentFind = _spheresCache.find(xSegments);
+        if (xSegmentFind != _spheresCache.end()) {
+            auto ySegmentFind = xSegmentFind->second.find(ySegments);
+            if (ySegmentFind != xSegmentFind->second.end()) {
+                Model model = ySegmentFind->second;
+                return model;
+            }
+        }
+
+        _spheresCache[xSegments] = {};
+        _spheresCache[xSegments][ySegments] = {};
+        Model& model = _spheresCache[xSegments][ySegments];
+
+        model.objects.emplace_back();
+        SceneObject& object = model.objects.back();
+
+        std::shared_ptr<Mesh> mesh = std::make_shared<Mesh>();
+        mesh->boundingSphere = glm::vec4(0, 0, 0, 1);
+        object.shape = mesh;
+
+        object.transform = options.globalTransform;
+
+        object.material = _defaultMaterial;
+        
+        static const float PI = 3.14159265359f;
+        for (unsigned int y = 0; y <= ySegments; ++y)
+        {
+            for (unsigned int x = 0; x <= xSegments; ++x)
+            {
+                float xSegment = static_cast<float>(x) / xSegments;
+                float ySegment = static_cast<float>(y) / ySegments;
+                float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+                float yPos = std::cos(ySegment * PI);
+                float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+                glm::vec3 p(xPos, yPos, zPos);
+                glm::vec2 uv(xSegment, ySegment);
+                glm::vec3 n = glm::normalize(p);
+                glm::vec3 t(0, 0, 1);  // TODO: Compute tangents. Not needed for now.
+
+                mesh->vertices.push_back({p, n, t, uv});
+            }
+        }
+
+        bool oddRow = false;
+        for (int y = 0; y < ySegments; ++y)
+        {
+            if (!oddRow) // even rows: y == 0, y == 2; and so on
+            {
+                for (int x = 0; x <= xSegments; ++x)
+                {
+                    mesh->indices.push_back(y * (xSegments + 1) + x);
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + x);
+                    mesh->indices.push_back(y * (xSegments + 1) + ((x + 1) % (xSegments + 1)));
+                    mesh->indices.push_back(y * (xSegments + 1) + ((x + 1) % (xSegments + 1)));
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + x);
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + ((x + 1) % (xSegments + 1)));
+                }
+            }
+            else
+            {
+                for (int x = xSegments; x >= 0; --x)
+                {
+                    mesh->indices.push_back(y * (xSegments + 1) + x);
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + x);
+                    mesh->indices.push_back(y * (xSegments + 1) + (x - 1 < 0 ? xSegments : x - 1));
+                    mesh->indices.push_back(y * (xSegments + 1) + (x - 1 < 0 ? xSegments : x - 1));
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + x);
+                    mesh->indices.push_back((y + 1) * (xSegments + 1) + (x - 1 < 0 ? xSegments : x - 1));
+                }
+            }
+            oddRow = !oddRow;
         }
 
         return model;
@@ -159,7 +240,7 @@ namespace leo {
                 }
                 glm::vec3 halfway = (maxV - minV) / 2.f;
                 glm::vec3 center = minV + halfway;
-                float radius = glm::length(halfway);
+                float radius = glm::length(halfway) * 2.0f;
                 mesh->boundingSphere = glm::vec4(center, radius);
             }
 

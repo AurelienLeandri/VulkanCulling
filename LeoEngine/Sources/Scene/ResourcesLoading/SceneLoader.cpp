@@ -5,6 +5,7 @@
 #include <Scene/Transform.h>
 #include <Scene/ResourcesLoading/ModelLoader.h>
 #include <Scene/Camera.h>
+#include <Scene/Materials/PerformanceMaterial.h>
 
 #include <string>
 #include <unordered_map>
@@ -113,8 +114,21 @@ namespace leo {
 			if (models.find(modelName) != models.end()) {
 				throw SceneLoaderException("A model with that name was already created. No duplicates are allowed for model entries. Choose a different name.", lineNb);
 			}
-			Model m = ModelLoader::loadModel((fileDirectoryPath + "/" + modelPath).c_str());
-			models[modelName] = m;
+
+			if (modelPath.rfind("__sphere", 0) == 0) {  // Sphere
+				uint32_t xSegments;
+				uint32_t ySegments;
+				entry >> xSegments >> ySegments;
+				if (entry.fail() || !xSegments || !ySegments) {
+					throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
+				}
+				models[modelName] = ModelLoader::loadSphereModel(xSegments, ySegments);
+				static std::shared_ptr<Material> sphereMaterial = std::make_shared<PerformanceMaterial>();
+				models[modelName].objects[0].material = sphereMaterial;
+			}
+			else {
+				models[modelName] = ModelLoader::loadModel((fileDirectoryPath + "/" + modelPath).c_str());
+			}
 		}
 
 		void loadTransformEntry(std::stringstream& entry, std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms, size_t lineNb)

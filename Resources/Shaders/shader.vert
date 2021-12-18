@@ -12,6 +12,7 @@ layout(std140, set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
     mat4 proj;
     mat4 viewProj;
+    mat4 invProj;
 } camera;
 
 layout (std430, set = 0, binding = 2) buffer IndexMap {

@@ -230,15 +230,13 @@ void VulkanRenderer::iterate()
         firstTime = false;
     }
 
-    /*
-    static int times = 0;
+    /*static int times = 0;
     if (times < 350)
         times++;
     else {
         _testWriteDepthBufferToDisc();
         _testWriteDepthPyramidToDisc();
-    }
-    */
+    }*/
 
     _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -483,6 +481,7 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     //cameraData.view[2] *= -1;
     //cameraData.view[0] *= -1;
     cameraData.proj = _projectionMatrix;
+    cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
     void* data = nullptr;
@@ -1652,10 +1651,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
 
     for (int i = 0; i < width * height; ++i) {
         float val = dataPtr[i];
-        //val = val * 2.0f - 1.0f;
-        //val = (2.0f * _zNear * _zFar) / (_zFar + _zNear - val * (_zFar - _zNear));
-        //val = (2.0 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
-        //val = _zNear * _zFar / (_zFar + val * (_zNear - _zFar));
+        val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
         file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
     }
     file.flush();
@@ -1708,6 +1704,7 @@ void VulkanRenderer::_testWriteDepthPyramidToDisc() {
 
     for (int i = 0; i < width * height; ++i) {
         float val = dataPtr[i];
+        val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
         file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
     }
     file.flush();
@@ -1806,6 +1803,7 @@ void VulkanRenderer::setCamera(const leo::Camera* camera)
 
     const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
     _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, _zNear, _zFar);
+    _invProjectionMatrix = glm::inverse(_projectionMatrix);
 }
 
 namespace {
