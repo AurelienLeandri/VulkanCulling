@@ -196,7 +196,6 @@ void VulkanRenderer::iterate()
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-
     static bool firstTime = true;
     if (!firstTime)
     {
@@ -460,26 +459,8 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
     position.y *= -1;
-    //position = glm::vec3(50, 50, 0);
-
-    /*
-    position = glm::vec3(0);
-    up = glm::vec3(0, -1, 0);
-    front = glm::vec3(0, 0, 1);
-    glm::vec3 right(1, 0, 0);
-    */
 
     cameraData.view = glm::lookAt(position, position + front, up);
-    /*
-    cameraData.view = glm::mat4(
-        glm::vec4(1, 0, 0, 0),
-        glm::vec4(0, -1, 0, 0),
-        glm::vec4(0, 0, 1, 0),
-        glm::vec4(0, 0, 0, 1)
-    );
-    */
-    //cameraData.view[2] *= -1;
-    //cameraData.view[0] *= -1;
     cameraData.proj = _projectionMatrix;
     cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
@@ -1534,7 +1515,7 @@ void VulkanRenderer::_createOcclusionCullingData()
     samplerCreateInfo.maxLod = 16.f;
     VkSamplerReductionModeCreateInfo reductionCreateInfo = {};
     reductionCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
-    reductionCreateInfo.reductionMode = VK_SAMPLER_REDUCTION_MODE_MIN;
+    reductionCreateInfo.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
     samplerCreateInfo.pNext = &reductionCreateInfo;
 
     VK_CHECK(vkCreateSampler(_device, &samplerCreateInfo, 0, &_depthImage.textureSampler));

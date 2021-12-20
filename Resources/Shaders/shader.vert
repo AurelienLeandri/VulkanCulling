@@ -34,9 +34,9 @@ void main() {
 	// gl_Position = vec4(inPosition, 1.0);
     // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
     //fragNormal = inNormal;
-	//fragNormal = (camera.view * objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0)).xyz;
+	//fragNormal = (objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0)).xyz;
 	fragNormal = (objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0)).xyz / 10;
-    //fragNormal.z *= -1;
+	//fragNormal = (gl_Position / gl_Position.w).xyz;
 	fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
 	fragCoord = vec3(objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0));
 }
