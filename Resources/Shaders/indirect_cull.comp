@@ -118,14 +118,12 @@ bool IsVisible(uint objectDataIndex)
 	bool visible = true;
 	
 	debugBuffer.data[objectDataIndex].posSphere = center;
-
-	/*
+	
 	for (int i = 0; i < 6; ++i) {
 		visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
 	}
 	
 	visible = visible && center.z + radius > globalData.zNear && center.z - radius < globalData.zFar;
-	*/
 	
 	vec4 aabb;
 	if (projectSphere(center, radius, aabb))

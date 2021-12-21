@@ -195,6 +195,7 @@ void VulkanRenderer::iterate()
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
+    /*
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
     static bool firstTime = true;
     if (!firstTime)
@@ -228,6 +229,7 @@ void VulkanRenderer::iterate()
     else {
         firstTime = false;
     }
+    */
 
     /*static int times = 0;
     if (times < 350)
@@ -357,7 +359,11 @@ void VulkanRenderer::iterate()
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
     // Depth pyramid building
-    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
+    //static bool f = true;
+    //if (f) {
+        _computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
+    //    f = !f;
+    //}
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -459,6 +465,16 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
     position.y *= -1;
+
+    /*  // DEBUG
+    static int times = 0;
+    if (times < 20) {
+        front = glm::vec3(0, 0, 1);
+        up = glm::vec3(0, -1, 0);
+        position = glm::vec3(0.f, 2.5f, 0.f);
+        times++;
+    }
+    */
 
     cameraData.view = glm::lookAt(position, position + front, up);
     cameraData.proj = _projectionMatrix;
@@ -1064,7 +1080,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     globalData.pyramidHeight = _depthPyramidHeight;
     globalData.nbInstances = nbObjects;
     leo::Camera camera;
-    camera.setPosition(glm::vec3(0, 0, 0));
+    camera.setPosition(glm::vec3(0.f, 2.5f, 0.f));
     camera.setFront(glm::vec3(0, 0, 1));
     globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
     _createGPUBuffer(sizeof(GPUCullingGlobalData),
