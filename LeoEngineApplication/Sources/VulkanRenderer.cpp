@@ -195,52 +195,6 @@ void VulkanRenderer::iterate()
     vkWaitForFences(_device, 1, &frameData.renderFinishedFence, VK_TRUE, UINT64_MAX);
     vkResetFences(_device, 1, &frameData.renderFinishedFence);
 
-    /*
-    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    static bool firstTime = true;
-    if (!firstTime)
-    {
-        {
-            void* voidDataPtr = nullptr;
-            GPUBatch* commandBufferPtr = nullptr;
-            vkMapMemory(_device, _gpuBatches.deviceMemory, 0, _testBatchesSize * sizeof(GPUBatch), 0, &voidDataPtr);
-            commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
-            std::vector<GPUBatch> info;
-            for (int i = 0; i < _testBatchesSize; i++) {
-                GPUBatch& batch = commandBufferPtr[i];
-                info.push_back(commandBufferPtr[i]);
-            }
-            vkUnmapMemory(_device, _gpuBatches.deviceMemory);
-        }
-
-        {
-            void* voidDataPtr = nullptr;
-            DebugCulling* debugPtr = nullptr;
-            vkMapMemory(_device, _debugCullingBuffer.deviceMemory, 0, _nbInstances * sizeof(DebugCulling), 0, &voidDataPtr);
-            debugPtr = static_cast<DebugCulling*>(voidDataPtr);
-            std::vector<DebugCulling> info;
-            for (int i = 0; i < _nbInstances; i++) {
-                DebugCulling& debugObject = debugPtr[i];
-                info.push_back(debugObject);
-            }
-            vkUnmapMemory(_device, _debugCullingBuffer.deviceMemory);
-        }
-    }
-    else {
-        firstTime = false;
-    }
-    */
-
-    /*static int times = 0;
-    if (times < 350)
-        times++;
-    else {
-        _testWriteDepthBufferToDisc();
-        _testWriteDepthPyramidToDisc();
-    }*/
-
-    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(
         _device, _vulkan->getSwapChain(), UINT64_MAX, frameData.presentSemaphore, VK_NULL_HANDLE, &imageIndex);
@@ -358,12 +312,7 @@ void VulkanRenderer::iterate()
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
-    // Depth pyramid building
-    //static bool f = true;
-    //if (f) {
-        _computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
-    //    f = !f;
-    //}
+    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);  // ONE_SAMPLE
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -465,16 +414,6 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
     position.y *= -1;
-
-    /*  // DEBUG
-    static int times = 0;
-    if (times < 20) {
-        front = glm::vec3(0, 0, 1);
-        up = glm::vec3(0, -1, 0);
-        position = glm::vec3(0.f, 2.5f, 0.f);
-        times++;
-    }
-    */
 
     cameraData.view = glm::lookAt(position, position + front, up);
     cameraData.proj = _projectionMatrix;

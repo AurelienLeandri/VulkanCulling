@@ -113,11 +113,11 @@ bool IsVisible(uint objectDataIndex)
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	center.z *= -1;  // z is negative in view space.
 	float radius = sphereBounds.w;
-	debugBuffer.data[objectDataIndex].radius = radius;
+	//debugBuffer.data[objectDataIndex].radius = radius;
 
 	bool visible = true;
 	
-	debugBuffer.data[objectDataIndex].posSphere = center;
+	//debugBuffer.data[objectDataIndex].posSphere = center;
 	
 	for (int i = 0; i < 6; ++i) {
 		visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
@@ -128,35 +128,35 @@ bool IsVisible(uint objectDataIndex)
 	vec4 aabb;
 	if (projectSphere(center, radius, aabb))
 	{
-		debugBuffer.data[objectDataIndex].projectSphere = 1;
+		//debugBuffer.data[objectDataIndex].projectSphere = 1;
 
 		float width = (aabb.z - aabb.x) * globalData.pyramidWidth;
 		float height = (aabb.w - aabb.y) * globalData.pyramidHeight;
-		debugBuffer.data[objectDataIndex].width = width;
+		//debugBuffer.data[objectDataIndex].width = width;
 
-		debugBuffer.data[objectDataIndex].height = height;
+		//debugBuffer.data[objectDataIndex].height = height;
 
 		
 		float level = max(floor(log2(max(width, height))) - 1, 0);
-		debugBuffer.data[objectDataIndex].mipLevel = uint(level);
+		//debugBuffer.data[objectDataIndex].mipLevel = uint(level);
 
 		
 		float zNear = globalData.zNear;
 		float zFar = globalData.zFar;
 		
 		vec2 uv = (aabb.xy + aabb.zw) * 0.5;
-		debugBuffer.data[objectDataIndex].uv = uv;
+		//debugBuffer.data[objectDataIndex].uv = uv;
 
 		float depth = textureLod(depthPyramid, uv, level).x;
 		//depth = (2.0 * zNear) / (zFar + zNear - depth * (zFar - zNear));
-		debugBuffer.data[objectDataIndex].zBuffer = depth;
+		//debugBuffer.data[objectDataIndex].zBuffer = depth;
 
 		float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
 		center.z *= -1;
 		vec4 projectedSphere = camera.proj * (vec4(center, 1.0) + vec4(0, 0, radius, 0));
 		projectedSphere /= projectedSphere.w;
 		depthSphere = projectedSphere.z;
-		debugBuffer.data[objectDataIndex].zSphere = depthSphere;
+		//debugBuffer.data[objectDataIndex].zSphere = depthSphere;
 
 		visible = visible && depthSphere <= depth;
 		
