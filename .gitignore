@@ -5,3 +5,9 @@
 **/Libraries/
 *.spv
 *.ppm
+out/
+*.ilk
+*.pdb
+*.dll
+!external/bin/*.dll
+CMakeSettings.json
