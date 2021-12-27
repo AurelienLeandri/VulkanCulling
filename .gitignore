@@ -12,3 +12,4 @@ out/
 !external/bin/*.dll
 CMakeSettings.json
 *.exe
+build/

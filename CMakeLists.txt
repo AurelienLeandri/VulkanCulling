@@ -5,8 +5,7 @@ cmake_minimum_required(VERSION 3.11.0)
 
 set(NAME LeoEngine)
 
-set(LIB_PATH "external/lib")
-set(INCLUDE_PATH "external/include")
+set(SHADERS_PATH "${CMAKE_SOURCE_DIR}/resources/shaders")
  
 message(STATUS "Using generator ${CMAKE_GENERATOR}")
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
