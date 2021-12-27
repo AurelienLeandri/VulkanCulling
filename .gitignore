@@ -11,3 +11,4 @@ out/
 *.dll
 !external/bin/*.dll
 CMakeSettings.json
+*.exe

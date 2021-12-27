@@ -12,12 +12,12 @@ int main() {
 	}
 
 	std::cout << "Loading scene" << std::endl;
-	//const char* scenePath = "../resources/models/Sponza/Sponza.scene";
-	//const char* scenePath = "../resources/models/Sponza/super_sponza.scene";
-	const char* scenePath = "../resources/models/Monkey/monkey.scene";
-	//const char* scenePath = "../resources/models/Monkey/super_monkey.scene";
-	//const char* scenePath = "../resources/models/Monkey/monkey_occluded.scene";
-	//const char* scenePath = "../resources/models/sphere_scene.scene";
+	//const char* scenePath = "resources/models/Sponza/Sponza.scene";
+	const char* scenePath = "resources/models/Sponza/super_sponza.scene";
+	//const char* scenePath = "resources/models/Monkey/monkey.scene";
+	//const char* scenePath = "resources/models/Monkey/super_monkey.scene";
+	//const char* scenePath = "resources/models/Monkey/monkey_occluded.scene";
+	//const char* scenePath = "resources/models/sphere_scene.scene";
 	if (application.loadScene(scenePath)) {
 		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
 		return 1;

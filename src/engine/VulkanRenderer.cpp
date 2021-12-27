@@ -179,11 +179,11 @@ void VulkanRenderer::init()
 
     _materialBuilder.init({ _vulkan->getProperties().maxNbMsaaSamples, _renderPass });
 
-    _createComputePipeline("../resources/shaders/indirect_cull.spv", _cullingPipeline, _cullingPipelineLayout, _cullShaderPass);
+    _createComputePipeline("resources/shaders/indirect_cull.spv", _cullingPipeline, _cullingPipelineLayout, _cullShaderPass);
 
     _createOcclusionCullingData();
 
-    _createComputePipeline("../resources/shaders/depth_pyramid.spv", _depthPyramidPipeline, _depthPyramidPipelineLayout, _depthPyramidShaderPass);
+    _createComputePipeline("resources/shaders/depth_pyramid.spv", _depthPyramidPipeline, _depthPyramidPipelineLayout, _depthPyramidShaderPass);
 
     _createDepthPyramidDescriptors();
 }
