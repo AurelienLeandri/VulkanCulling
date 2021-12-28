@@ -86,15 +86,19 @@ void VulkanRenderer::_cleanup()
     vkFreeMemory(_device, _framebufferColor.memory, nullptr);
     _framebufferColor = {};
 
-    vkDestroySampler(_device, _framebufferDepth.textureSampler, nullptr);
     vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
     vkDestroyImage(_device, _framebufferDepth.image, nullptr);
     vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
     _framebufferDepth = {};
 
     _materialBuilder.cleanup();
+
+    for (VkSampler& sampler : _materialImagesSamplers) {
+        vkDestroySampler(_device, sampler, nullptr);
+    }
+    _materialImagesSamplers.clear();
+
     for (std::unique_ptr<AllocatedImage>& imageData : _materialImagesData) {
-        vkDestroySampler(_device, imageData->textureSampler, nullptr);
         vkDestroyImageView(_device, imageData->view, nullptr);
         vkDestroyImage(_device, imageData->image, nullptr);
         vkFreeMemory(_device, imageData->memory, nullptr);
@@ -147,12 +151,12 @@ void VulkanRenderer::init()
     const std::vector<VkImageView>& swapChainImageViews = _vulkan->getSwapChainImageViews();
     VkExtent2D swapChainExtent = _vulkan->getProperties().swapChainExtent;
 
-    _depthBufferFormat = _vulkan->findSupportedFormat(
+    VkFormat depthBufferFormat = _vulkan->findSupportedFormat(
         { VK_FORMAT_D32_SFLOAT },
         VK_IMAGE_TILING_OPTIMAL,
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
     );
-    if (_depthBufferFormat == VK_FORMAT_UNDEFINED) {
+    if (depthBufferFormat == VK_FORMAT_UNDEFINED) {
         throw VulkanRendererException("Failed to find a supported format for the depth buffer.");
     }
 
@@ -194,7 +198,7 @@ void VulkanRenderer::init()
 
     VkAttachmentDescription2 depthAttachment = {};
     depthAttachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-    depthAttachment.format = _depthBufferFormat;
+    depthAttachment.format = depthBufferFormat;
     depthAttachment.samples = instanceProperties.maxNbMsaaSamples;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -228,7 +232,7 @@ void VulkanRenderer::init()
 
     VkAttachmentDescription2 depthAttachmentResolve = {};
     depthAttachmentResolve.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-    depthAttachmentResolve.format = _depthBufferFormat;
+    depthAttachmentResolve.format = depthBufferFormat;
     depthAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
     depthAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -310,24 +314,24 @@ void VulkanRenderer::init()
         instanceProperties.swapChainExtent.height,
         1,
         instanceProperties.maxNbMsaaSamples,
-        _depthBufferFormat,
+        depthBufferFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _framebufferDepth);
-    _vulkan->createImageView(_framebufferDepth.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view);
+    _vulkan->createImageView(_framebufferDepth.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view);
     _framebufferDepth.mipLevels = 1;
 
     // Depth resolve attachment (a depth buffer is required by some shaders and algorithms)
     _vulkan->createImage(swapChainExtent.width, swapChainExtent.height, 1,
         VK_SAMPLE_COUNT_1_BIT,
-        _depthBufferFormat,
+        depthBufferFormat,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthImage);
-    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-    _vulkan->createImageView(_depthImage.image, _depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
+    _transitionImageLayout(_depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    _vulkan->createImageView(_depthImage.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
     _depthImage.mipLevels = 1;
 
 
@@ -433,7 +437,7 @@ void VulkanRenderer::init()
     reductionCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
     reductionCreateInfo.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
     samplerCreateInfo.pNext = &reductionCreateInfo;
-    VK_CHECK(vkCreateSampler(_device, &samplerCreateInfo, 0, &_depthImage.textureSampler));
+    VK_CHECK(vkCreateSampler(_device, &samplerCreateInfo, 0, &_depthImageSampler));
 
 
     // Depth pyramid for occlusion culling
@@ -452,14 +456,14 @@ void VulkanRenderer::init()
     _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, _depthPyramid.mipLevels, _depthPyramid.view);
 
     _depthPyramidLevelViews.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
-    for (int i = 0; i < _depthPyramid.mipLevels; ++i) {
+    for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
         _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 1, _depthPyramidLevelViews[i], i);
     }
 
 
     // Barriers for layout transition between read and write access of the depth pyramid's levels
     _depthPyramidMipLevelBarriers.resize(_depthPyramid.mipLevels, {});
-    for (int i = 0; i < _depthPyramid.mipLevels; ++i) {
+    for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
         VkImageMemoryBarrier& barrier = _depthPyramidMipLevelBarriers[i];
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -517,7 +521,7 @@ void VulkanRenderer::init()
     };
     _depthPyramidDescriptorAllocator.init(depthPyramidDescriptorAllocatorOptions);
 
-    for (int i = 0; i < _depthPyramid.mipLevels; ++i) {
+    for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
         VkDescriptorImageInfo srcInfo = {};
         if (i == 0) {
             srcInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -527,10 +531,10 @@ void VulkanRenderer::init()
             srcInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             srcInfo.imageView = _depthPyramidLevelViews[i - 1];
         }
-        srcInfo.sampler = _depthImage.textureSampler;
+        srcInfo.sampler = _depthImageSampler;
 
         VkDescriptorImageInfo dstInfo;
-        dstInfo.sampler = _depthImage.textureSampler;
+        dstInfo.sampler = _depthImageSampler;
         dstInfo.imageView = _depthPyramidLevelViews[i];
         dstInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -605,7 +609,10 @@ void VulkanRenderer::iterate()
 
     std::array<VkBufferMemoryBarrier, 2> barriers = { _gpuIndexToObjectIdBarrier, _gpuBatchesBarrier };
 
-    vkCmdPipelineBarrier(_framesData[imageIndex].commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0, nullptr);
+    vkCmdPipelineBarrier(_framesData[imageIndex].commandBuffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+        0, 0, nullptr, static_cast<uint32_t>(barriers.size()), barriers.data(), 0, nullptr);
 
     // Drawing
 
@@ -700,7 +707,7 @@ void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipeline);
 
-    for (int32_t i = 0; i < _depthPyramid.mipLevels; ++i)
+    for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i)
     {
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipelineLayout, 0, 1, &_depthPyramidDescriptorSets[i], 0, nullptr);
 
@@ -994,13 +1001,14 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Loading scene objects to device
     */
 
-    static struct _ObjectInstanceData {
+    struct _ObjectInstanceData {
         const leo::Shape* shape = nullptr;
         const leo::Transform* transform = nullptr;
     };
 
     std::map<const leo::Material*, Material*> loadedMaterialsCache;
     std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
+    std::map<const leo::ImageTexture*, VkSampler> loadedImageSamplersCache;
     std::map<const leo::Shape*, ShapeData*> shapeDataCache;
     std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> objectInstances;
 
@@ -1023,9 +1031,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
                 const leo::ImageTexture* sceneTexture = materialTextures[i];
                 AllocatedImage* loadedImage = nullptr;
+                VkSampler loadedImageSampler = VK_NULL_HANDLE;
                 if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
                     _materialImagesData.push_back(std::make_unique<AllocatedImage>());
                     loadedImage = _materialImagesData.back().get();
+                    _materialImagesSamplers.emplace_back();
+                    loadedImageSampler = _materialImagesSamplers.back();
 
                     uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                     uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
@@ -1104,15 +1115,17 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                     samplerInfo.maxLod = static_cast<float>(loadedImage->mipLevels);
                     samplerInfo.mipLodBias = 0.0f;
 
-                    VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &loadedImage->textureSampler));
+                    VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &loadedImageSampler));
 
                     loadedImagesCache[sceneTexture] = loadedImage;
+                    loadedImageSamplersCache[sceneTexture] = loadedImageSampler;
                 }
                 else {
                     loadedImage = loadedImagesCache[sceneTexture];
+                    loadedImageSampler = loadedImageSamplersCache[sceneTexture];
                 }
 
-                loadedMaterial->textures[i].sampler = loadedImage->textureSampler;
+                loadedMaterial->textures[i].sampler = loadedImageSampler;
                 loadedMaterial->textures[i].view = loadedImage->view;
             }
 
@@ -1246,7 +1259,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     */
 
     std::vector<GPUBatch> commandBufferData(_objectsBatches.size(), GPUBatch{});
-    size_t offset = 0;
+    uint32_t offset = 0;
     for (int i = 0; i < _objectsBatches.size(); ++i) {
         GPUBatch& gpuBatch = commandBufferData[i];
         gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
@@ -1273,7 +1286,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
         offset = 0;
         for (int i = 0; i < _objectsBatches.size(); ++i) {
-            size_t stride = _objectsBatches[i].nbObjects;
+            uint32_t stride = _objectsBatches[i].nbObjects;
             GPUBatch& gpuBatch = commandBufferPtr[i];
             gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
             gpuBatch.command.instanceCount = 0;
@@ -1284,7 +1297,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         }
         vkUnmapMemory(_device, _gpuBatches.deviceMemory);
     }
-    _testBatchesSize = _objectsBatches.size();
+    _testBatchesSize = static_cast<uint32_t>(_objectsBatches.size());
 
     /*
     * Indirect Command buffer reset
@@ -1300,13 +1313,13 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Instances buffer
     */
 
-    uint32_t nbObjects = static_cast<size_t>(scene->objects.size());
+    uint32_t nbObjects = static_cast<uint32_t>(scene->objects.size());
 
     std::vector<GPUObjectEntry> objects(nbObjects);
     {
-        int entryIdx = 0;
-        for (int batchIdx = 0; batchIdx < _objectsBatches.size(); ++batchIdx) {
-            for (int i = 0; i < _objectsBatches[batchIdx].nbObjects; ++i) {
+        uint32_t entryIdx = 0;
+        for (uint32_t batchIdx = 0; batchIdx < _objectsBatches.size(); ++batchIdx) {
+            for (uint32_t i = 0; i < _objectsBatches[batchIdx].nbObjects; ++i) {
                 objects[entryIdx].batchId = batchIdx;
                 objects[entryIdx].dataId = entryIdx;
                 entryIdx++;
@@ -1324,7 +1337,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     void* debugData;
     vkMapMemory(_device, _debugCullingBuffer.deviceMemory, 0, nbObjects * sizeof(DebugCulling), 0, &debugData);
     DebugCulling* debugDataPtr = (DebugCulling*)debugData;
-    for (int i = 0; i < nbObjects; ++i) {
+    for (uint32_t i = 0; i < nbObjects; ++i) {
         debugDataPtr[i] = {};
         debugDataPtr[i].radius = 42;
     }
@@ -1522,7 +1535,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     indexMapInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorImageInfo depthPyramidInfo = {};
-    depthPyramidInfo.sampler = _depthImage.textureSampler;
+    depthPyramidInfo.sampler = _depthImageSampler;
     depthPyramidInfo.imageView = _depthPyramid.view;
     depthPyramidInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -1544,6 +1557,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
 }
 
 void VulkanRenderer::_testWriteDepthBufferToDisc() {
+    VkFormat depthBufferFormat = VK_FORMAT_D32_SFLOAT;
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
     uint32_t width = _vulkan->getProperties().swapChainExtent.width;
     uint32_t height = _vulkan->getProperties().swapChainExtent.height;
@@ -1553,7 +1567,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
     AllocatedBuffer copyBuffer;
     _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
 
-    _transitionImageLayout(_depthImage, _depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    _transitionImageLayout(_depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
 
@@ -1581,7 +1595,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
     // ppm header
     file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
 
-    for (int i = 0; i < width * height; ++i) {
+    for (uint32_t i = 0; i < width * height; ++i) {
         float val = dataPtr[i];
         val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
         file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
@@ -1597,9 +1611,9 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
 
 void VulkanRenderer::_testWriteDepthPyramidToDisc() {
     vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    int mip = 4;
-    uint32_t width = _depthPyramidWidth / pow(2, mip);
-    uint32_t height = _depthPyramidHeight / pow(2, mip);
+    uint32_t mip = 4;
+    uint32_t width = _depthPyramidWidth / static_cast<uint32_t>(pow(2, mip));
+    uint32_t height = _depthPyramidHeight / static_cast<uint32_t>(pow(2, mip));
 
     VkDeviceSize size = width * height * 4;
 
@@ -1634,7 +1648,7 @@ void VulkanRenderer::_testWriteDepthPyramidToDisc() {
     // ppm header
     file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
 
-    for (int i = 0; i < width * height; ++i) {
+    for (uint32_t i = 0; i < width * height; ++i) {
         float val = dataPtr[i];
         val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
         file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;

@@ -243,7 +243,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
 	layoutInfo.pNext = nullptr;
 
 	layoutInfo.pBindings = _bindings.data();
-	layoutInfo.bindingCount = _bindings.size();
+	layoutInfo.bindingCount = static_cast<uint32_t>(_bindings.size());
 
 	layout = _cache.createDescriptorLayout(layoutInfo);
 
@@ -255,7 +255,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
 		w.dstSet = set;
 	}
 
-	vkUpdateDescriptorSets(_device, _writes.size(), _writes.data(), 0, nullptr);
+	vkUpdateDescriptorSets(_device, static_cast<uint32_t>(_writes.size()), _writes.data(), 0, nullptr);
 
 	return true;
 }
@@ -268,7 +268,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set)
 	layoutInfo.pNext = nullptr;
 
 	layoutInfo.pBindings = _bindings.data();
-	layoutInfo.bindingCount = _bindings.size();
+	layoutInfo.bindingCount = static_cast<uint32_t>(_bindings.size());
 
 	//allocate descriptor
 	if (_allocator.allocate(set, _cache.createDescriptorLayout(layoutInfo))) { return false; }
@@ -278,7 +278,7 @@ bool DescriptorBuilder::build(VkDescriptorSet& set)
 		w.dstSet = set;
 	}
 
-	vkUpdateDescriptorSets(_device, _writes.size(), _writes.data(), 0, nullptr);
+	vkUpdateDescriptorSets(_device, static_cast<uint32_t>(_writes.size()), _writes.data(), 0, nullptr);
 
 	return true;
 }

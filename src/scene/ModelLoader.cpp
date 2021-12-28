@@ -135,11 +135,11 @@ namespace leo {
         }
 
         bool oddRow = false;
-        for (int y = 0; y < ySegments; ++y)
+        for (uint32_t y = 0; y < ySegments; ++y)
         {
             if (!oddRow) // even rows: y == 0, y == 2; and so on
             {
-                for (int x = 0; x <= xSegments; ++x)
+                for (uint32_t x = 0; x <= xSegments; ++x)
                 {
                     mesh->indices.push_back(y * (xSegments + 1) + x);
                     mesh->indices.push_back((y + 1) * (xSegments + 1) + x);

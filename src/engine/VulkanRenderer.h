@@ -201,9 +201,9 @@ private:
 
 	// Data shared between framebuffers
 	AllocatedImage _framebufferColor;
-	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 	AllocatedImage _framebufferDepth;
 	AllocatedImage _depthImage;
+	VkSampler _depthImageSampler = VK_NULL_HANDLE;
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
@@ -212,6 +212,7 @@ private:
 
 	// Scene data
 	std::vector<std::unique_ptr<AllocatedImage>> _materialImagesData;
+	std::vector<VkSampler> _materialImagesSamplers;
 	std::vector<std::unique_ptr<ShapeData>> _shapeData;
 
 	// Indexes and utility containers to group similar objects in the scene

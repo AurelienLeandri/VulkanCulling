@@ -9,12 +9,12 @@
 
 VkPipelineLayout ShaderPass::reflectShaderModules(const Parameters& parameters)
 {
-	static struct SetLayoutInfo {
+	struct _SetLayoutInfo {
 		VkDescriptorSetLayoutCreateInfo createInfo = {};
 		std::map<uint32_t, VkDescriptorSetLayoutBinding> bindings;
 	};
 
-	std::map<uint32_t, SetLayoutInfo> reflectedSetLayouts;
+	std::map<uint32_t, _SetLayoutInfo> reflectedSetLayouts;
 	std::vector<VkPushConstantRange> pushConstantRanges;
 
 	_device = parameters.device;
@@ -51,7 +51,7 @@ VkPipelineLayout ShaderPass::reflectShaderModules(const Parameters& parameters)
 				reflectedSetLayouts[reflSet.set].createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			}
 
-			SetLayoutInfo& layoutInfo = reflectedSetLayouts[reflSet.set];
+			_SetLayoutInfo& layoutInfo = reflectedSetLayouts[reflSet.set];
 
 			std::map<uint32_t, VkDescriptorSetLayoutBinding>& bindings = layoutInfo.bindings;
 			for (size_t i = 0; i < reflSet.binding_count; ++i) {
@@ -120,9 +120,9 @@ VkPipelineLayout ShaderPass::reflectShaderModules(const Parameters& parameters)
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = _descriptorSetLayouts.size();
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(_descriptorSetLayouts.size());
 	pipelineLayoutInfo.pSetLayouts = _descriptorSetLayouts.data();
-	pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
+	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
