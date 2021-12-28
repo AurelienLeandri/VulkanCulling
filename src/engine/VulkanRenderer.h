@@ -140,6 +140,7 @@ public:
 	void iterate();
 
 private:
+	void _createRendererData();
 	void _createCommandPools();
 	void _createRenderPass();
 	void _createFramebuffersImage();

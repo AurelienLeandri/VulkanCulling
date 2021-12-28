@@ -35,13 +35,13 @@ int main(int argc, const char** argv) {
 	std::cout << "Loading scene" << std::endl;
 	if (application.loadScene(scenePath)) {
 		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
-		return 1;
+		return 2;
 	}
 
 	std::cout << "Starting application" << std::endl;
 	if (application.start()) {
 		std::cerr << "Error while running the application. Exiting." << std::endl;
-		return 3;
+		return 2;
 	}
 
 	return 0;
