@@ -139,7 +139,7 @@ void VulkanRenderer::_cleanup()
     _cullingPipelineLayout = VK_NULL_HANDLE;
 }
 
-void VulkanRenderer::_createRendererData()
+void VulkanRenderer::init()
 {
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan->getQueueFamilyIndices();
     size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
@@ -558,11 +558,6 @@ void VulkanRenderer::_createRendererData()
     }
 }
 
-void VulkanRenderer::init()
-{
-    _createRendererData();
-}
-
 void VulkanRenderer::iterate()
 {
     FrameData& frameData = _framesData[_currentFrame];
@@ -740,33 +735,6 @@ void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
     }
 
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &_framebufferDepthReadBarrier);
-}
-
-void VulkanRenderer::_createCommandPools()
-{
-}
-
-void VulkanRenderer::_createGlobalBuffers()
-{
-    /*
-    * Creating camera buffers
-    */
-
-    size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
-    VkDeviceSize cameraBufferSize = nbSwapChainImages * _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
-
-    _createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _cameraDataBuffer);
-
-    /*
-    * Creating scene data buffer
-    */
-
-    size_t sceneDataBufferSize = sizeof (GPUSceneData);
-    _createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _sceneDataBuffer);
 }
 
 void VulkanRenderer::_updateCamera(uint32_t currentImage) {
@@ -1039,24 +1007,28 @@ void VulkanRenderer::_generateMipmaps(AllocatedImage& imageData, VkFormat imageF
 
 void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 {
-    std::map<const leo::Material*, Material*> loadedMaterialsCache;
-    std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
-    std::map<const leo::Shape*, ShapeData*> shapeDataCache;
+    /*
+    * Loading scene objects to device
+    */
 
     static struct _ObjectInstanceData {
         const leo::Shape* shape = nullptr;
         const leo::Transform* transform = nullptr;
     };
-    std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> nbObjectsPerBatch;
+
+    std::map<const leo::Material*, Material*> loadedMaterialsCache;
+    std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
+    std::map<const leo::Shape*, ShapeData*> shapeDataCache;
+    std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> objectInstances;
+
     for (const leo::SceneObject& sceneObject : scene->objects) {
         const leo::PerformanceMaterial* sceneMaterial = static_cast<const leo::PerformanceMaterial*>(sceneObject.material.get());
         const leo::Shape* sceneShape = sceneObject.shape.get();
         Material* loadedMaterial = nullptr;
         ShapeData* loadedShape = nullptr;
 
-        /*
-        * Load material data on the device
-        */
+        // Load material data on the device
+
         if (loadedMaterialsCache.find(sceneMaterial) == loadedMaterialsCache.end()) {
             loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
 
@@ -1126,11 +1098,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                     vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
                     stagingBuffer = {};
 
-                    // Image view
-
                     _vulkan->createImageView(loadedImage->image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, loadedImage->mipLevels, loadedImage->view);
-
-                    // Texture sampler
 
                     VkSamplerCreateInfo samplerInfo = {};
                     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1173,9 +1141,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             loadedMaterial = loadedMaterialsCache[sceneMaterial];
         }
 
+
         /*
         * Load shape data on the device
         */
+
         if (shapeDataCache.find(sceneShape) == shapeDataCache.end()) {
             _shapeData.push_back(std::make_unique<ShapeData>());
             loadedShape = _shapeData.back().get();
@@ -1200,20 +1170,28 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             loadedShape = shapeDataCache[sceneShape];
         }
 
+
         /*
         * Incrementing the counter for the given pair of material and shape data.
         */
-        if (nbObjectsPerBatch.find(loadedMaterial) == nbObjectsPerBatch.end()) {
-            nbObjectsPerBatch[loadedMaterial] = {};
-        }
-        if (nbObjectsPerBatch[loadedMaterial].find(loadedShape) == nbObjectsPerBatch[loadedMaterial].end()) {
-            nbObjectsPerBatch[loadedMaterial][loadedShape] = {};
-        }
-        nbObjectsPerBatch[loadedMaterial][loadedShape].push_back({ sceneShape, sceneObject.transform.get() });
-    }
-    _nbMaterials = nbObjectsPerBatch.size();
 
-    for (const auto& materialShapesPair : nbObjectsPerBatch) {
+        if (objectInstances.find(loadedMaterial) == objectInstances.end()) {
+            objectInstances[loadedMaterial] = {};
+        }
+        if (objectInstances[loadedMaterial].find(loadedShape) == objectInstances[loadedMaterial].end()) {
+            objectInstances[loadedMaterial][loadedShape] = {};
+        }
+        objectInstances[loadedMaterial][loadedShape].push_back({ sceneShape, sceneObject.transform.get() });
+    }
+
+    _nbMaterials = objectInstances.size();
+
+
+    /*
+    * Initializing the object batches used to compute draw indirect commands
+    */
+
+    for (const auto& materialShapesPair : objectInstances) {
         const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
@@ -1228,6 +1206,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                 });
         }
     }
+
+
+    /*
+    * Filling global scene data
+    */
 
     // TODO: Put actual values (maybe from options and/or leo::Scene)
     GPUSceneData sceneData;
@@ -1249,7 +1232,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
     std::vector<GPUObjectData> objectData(objectsDataBufferSize);
     int i = 0;
-    for (const auto& materialShapesPair : nbObjectsPerBatch) {
+    for (const auto& materialShapesPair : objectInstances) {
         const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
@@ -1370,6 +1353,10 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         _gpuIndexToObjectId
     );
 
+    /*
+    * Culling global data buffer
+    */
+
     GPUCullingGlobalData globalData;
     glm::mat4 projectionT = glm::transpose(_projectionMatrix);
     globalData.frustum[0] = projectionT[3] + projectionT[0];
@@ -1394,7 +1381,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     );
 
     /*
-    * Setup descriptors
+    * Setup descriptors. Global descriptors depend partially on the scene being loaded, so we create them here.
     */
 
     _createGlobalDescriptors(nbObjects);
@@ -1427,15 +1414,6 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     _gpuBatchesResetBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     _gpuBatchesResetBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
     _gpuBatchesResetBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(_vulkan->getQueueFamilyIndices().graphicsFamily.value());
-}
-
-void VulkanRenderer::_createRenderPass()
-{
-}
-
-void VulkanRenderer::_createFramebuffersImage()
-{
-    
 }
 
 void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
@@ -1489,19 +1467,6 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
         .bindBuffer(0, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
         .build(_objectsDataDescriptorSet, _objectsDataDescriptorSetLayout);
 }
-
-void VulkanRenderer::_createFramebuffers()
-{
-    
-}
-
-void VulkanRenderer::_createCommandBuffers() {
-}
-
-void VulkanRenderer::_createSyncObjects() {
-    
-}
-
 
 VkCommandBuffer VulkanRenderer::_beginSingleTimeCommands(VkCommandPool& commandPool) {
     VkCommandBufferAllocateInfo allocInfo = VulkanUtils::createCommandBufferAllocateInfo(commandPool, 1);
@@ -1593,17 +1558,6 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
         .bindImage(6, depthPyramidInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(7, debugBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .build(_cullingDescriptorSet, _cullingDescriptorSetLayout);
-}
-
-void VulkanRenderer::_createDepthPyramidDescriptors()
-{
-    
-}
-
-void VulkanRenderer::_createOcclusionCullingData()
-{
-    
-
 }
 
 void VulkanRenderer::_testWriteDepthBufferToDisc() {
@@ -1710,60 +1664,6 @@ void VulkanRenderer::_testWriteDepthPyramidToDisc() {
     vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
     vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
 }
-
-/*
-void VulkanRenderer::_testWriteDepthBufferToDisc() {
-    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    int mip = 0;
-    uint32_t width = _depthPyramidWidth / pow(2, mip);
-    uint32_t height = _depthPyramidHeight / pow(2, mip);
-
-    VkDeviceSize size = width * height * 4;
-
-    AllocatedBuffer copyBuffer;
-    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
-
-    _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
-
-    VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = mip;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    vkCmdCopyImageToBuffer(cmd, _depthPyramid.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
-
-    _endSingleTimeCommands(cmd, _mainCommandPool);
-
-    void* data = nullptr;
-    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
-    float* dataPtr = static_cast<float*>(data);
-
-    std::ofstream file("bleubleu.ppm", std::ios::out | std::ios::binary);
-
-    // ppm header
-    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
-
-    for (int i = 0; i < width * height; ++i) {
-        float val = dataPtr[i];
-        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
-    }
-    file.flush();
-
-    file.close();
-    vkUnmapMemory(_device, copyBuffer.deviceMemory);
-
-    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
-    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
-}
-*/
 
 void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass)
 {

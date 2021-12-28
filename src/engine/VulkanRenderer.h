@@ -140,23 +140,13 @@ public:
 	void iterate();
 
 private:
-	void _createRendererData();
-	void _createCommandPools();
-	void _createRenderPass();
-	void _createFramebuffersImage();
-	void _createFramebuffers();
-	void _createCommandBuffers();
-	void _createSyncObjects();
 	void _updateCamera(uint32_t currentImage);
 
-	void _createGlobalBuffers();
 	void _fillConstantGlobalBuffers(const leo::Scene* scene);
-	void _createGlobalDescriptors(uint32_t nbObjects);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass);
 	void _createCullingDescriptors(uint32_t nbObjects);
-	void _createDepthPyramidDescriptors();
-	void _createOcclusionCullingData();
 	void _computeDepthPyramid(VkCommandBuffer commandBuffer);
+	void _createGlobalDescriptors(uint32_t nbObjects);
 
 	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
 	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
