@@ -76,11 +76,6 @@ struct GPUObjectData {
 	glm::vec4 sphereBounds;
 };
 
-struct AllocatedBuffer {
-	VkBuffer buffer = VK_NULL_HANDLE;
-	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
-};
-
 struct ShapeData {
 	AllocatedBuffer vertexBuffer;
 	AllocatedBuffer indexBuffer;
@@ -147,16 +142,6 @@ private:
 	void _createCullingDescriptors(uint32_t nbObjects);
 	void _computeDepthPyramid(VkCommandBuffer commandBuffer);
 	void _createGlobalDescriptors(uint32_t nbObjects);
-
-	void _createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedBuffer& buffer);
-	void _copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	void _createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
-	void _transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
-	void _copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
-	void _generateMipmaps(AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
-
-	VkCommandBuffer _beginSingleTimeCommands(VkCommandPool& commandPool);
-	void _endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
 
 	void _cleanup();
 

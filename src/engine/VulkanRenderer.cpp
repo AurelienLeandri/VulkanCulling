@@ -330,7 +330,7 @@ void VulkanRenderer::init()
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthImage);
-    _transitionImageLayout(_depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    _vulkan->transitionImageLayout(_mainCommandPool, _depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
     _vulkan->createImageView(_depthImage.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
     _depthImage.mipLevels = 1;
 
@@ -410,14 +410,14 @@ void VulkanRenderer::init()
 
     // Camera dynamic buffer
     VkDeviceSize cameraBufferSize = nbSwapChainImages * _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
-    _createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    _vulkan->createBuffer(_mainCommandPool, cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _cameraDataBuffer);
 
 
     // Global scene data buffer
     size_t sceneDataBufferSize = sizeof(GPUSceneData);
-    _createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    _vulkan->createBuffer(_mainCommandPool, sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _sceneDataBuffer);
 
@@ -452,7 +452,7 @@ void VulkanRenderer::init()
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthPyramid);
-    _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    _vulkan->transitionImageLayout(_mainCommandPool, _depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, _depthPyramid.mipLevels, _depthPyramid.view);
 
     _depthPyramidLevelViews.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
@@ -750,250 +750,6 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     vkUnmapMemory(_device, _cameraDataBuffer.deviceMemory);
 }
 
-void VulkanRenderer::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties, AllocatedBuffer& buffer)
-{
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VK_CHECK(vkCreateBuffer(_device, &bufferInfo, nullptr, &buffer.buffer));
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(_device, buffer.buffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = _vulkan->findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    // TODO: This should not be called for every resource but instead we should use offsets
-    // and put several buffers into one allocation.
-    VK_CHECK(vkAllocateMemory(_device, &allocInfo, nullptr, &buffer.deviceMemory));
-
-    VK_CHECK(vkBindBufferMemory(_device, buffer.buffer, buffer.deviceMemory, 0));
-}
-
-void VulkanRenderer::_copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
-
-    VkBufferCopy copyRegion{};
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
-}
-
-void VulkanRenderer::_createGPUBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer)
-{
-    _createBuffer(size,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        buffer);
-
-    if (data) {
-        AllocatedBuffer stagingBuffer;
-        _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuffer);
-
-        void* dstData = nullptr;
-        vkMapMemory(_device, stagingBuffer.deviceMemory, 0, size, 0, &dstData);
-        memcpy(dstData, data, static_cast<size_t>(size));
-        vkUnmapMemory(_device, stagingBuffer.deviceMemory);
-
-        _copyBuffer(stagingBuffer.buffer, buffer.buffer, size);
-
-        vkDestroyBuffer(_device, stagingBuffer.buffer, nullptr);
-        vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
-        stagingBuffer = {};
-    }
-}
-
-void VulkanRenderer::_transitionImageLayout(AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspect)
-{
-    // TODO: Write a barrier helper and use it instead of this function.
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
-
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = imageData.image;
-    barrier.subresourceRange.aspectMask = aspect;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = imageData.mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = 0;
-
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    }
-    else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    }
-    else {
-        throw VulkanRendererException("Unsupported layout transition.");
-    }
-
-    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
-}
-
-void VulkanRenderer::_copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect) {
-    // TODO: Try to setup a command buffer to record several operations and then flush everything once,
-    // instead of calling beginSingleTimeCommands and endSingleTimeCommands each time.
-    // Could also be done for uniforms and other stuff that creates single-time command buffers several times.
-    // For example pass the commandBuffer as parameter and initialize it before doing all the createBuffer/Image, copyBuffer/image stuff.
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
-
-    VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = aspect;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
-}
-
-void VulkanRenderer::_generateMipmaps(AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight) {
-    // Check if image format supports linear blitting
-    _vulkan->findSupportedFormat({ imageFormat }, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
-
-    VkCommandBuffer commandBuffer = _beginSingleTimeCommands(_mainCommandPool);
-
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = imageData.image;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.subresourceRange.levelCount = 1;
-
-    int32_t mipWidth = texWidth;
-    int32_t mipHeight = texHeight;
-
-    for (uint32_t i = 1; i < imageData.mipLevels; i++) {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        VkImageBlit blit = {};
-        blit.srcOffsets[0] = { 0, 0, 0 };
-        blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
-        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.srcSubresource.mipLevel = i - 1;
-        blit.srcSubresource.baseArrayLayer = 0;
-        blit.srcSubresource.layerCount = 1;
-        blit.dstOffsets[0] = { 0, 0, 0 };
-        blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
-        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        blit.dstSubresource.mipLevel = i;
-        blit.dstSubresource.baseArrayLayer = 0;
-        blit.dstSubresource.layerCount = 1;
-
-        vkCmdBlitImage(commandBuffer, imageData.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageData.image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
-
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
-
-        if (mipWidth > 1) mipWidth /= 2;
-        if (mipHeight > 1) mipHeight /= 2;
-    }
-
-    barrier.subresourceRange.baseMipLevel = imageData.mipLevels - 1;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
-
-    _endSingleTimeCommands(commandBuffer, _mainCommandPool);
-}
 
 void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 {
@@ -1073,20 +829,20 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
 
-                    _transitionImageLayout(*loadedImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                    _vulkan->transitionImageLayout(_mainCommandPool, *loadedImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
                     AllocatedBuffer stagingBuffer;
                     VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
-                    _createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer);
+                    _vulkan->createBuffer(_mainCommandPool, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer);
 
                     void* data = nullptr;
                     vkMapMemory(_device, stagingBuffer.deviceMemory, 0, imageSize, 0, &data);
                     memcpy(data, sceneTexture->data, static_cast<size_t>(imageSize));
                     vkUnmapMemory(_device, stagingBuffer.deviceMemory);
 
-                    _copyBufferToImage(stagingBuffer.buffer, loadedImage->image, texWidth, texHeight);
+                    _vulkan->copyBufferToImage(_mainCommandPool, stagingBuffer.buffer, loadedImage->image, texWidth, texHeight);
 
-                    _generateMipmaps(*loadedImage, imageFormat, texWidth, texHeight);
+                    _vulkan->generateMipmaps(_mainCommandPool, *loadedImage, imageFormat, texWidth, texHeight);
 
                     vkDestroyBuffer(_device, stagingBuffer.buffer, nullptr);
                     vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
@@ -1149,12 +905,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             const leo::Mesh* mesh = static_cast<const leo::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
 
             // Vertex buffer
-            _createGPUBuffer(sizeof(leo::Vertex) * mesh->vertices.size(),
+            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(leo::Vertex) * mesh->vertices.size(),
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
                 loadedShape->vertexBuffer);
 
             // Index buffer
-            _createGPUBuffer(sizeof(mesh->indices[0]) * mesh->indices.size(),
+            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(mesh->indices[0]) * mesh->indices.size(),
                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
                 loadedShape->indexBuffer);
 
@@ -1248,7 +1004,8 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         }
     }
 
-    _createGPUBuffer(objectsDataBufferSize,
+    _vulkan->createGPUBuffer(_mainCommandPool,
+        objectsDataBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objectData.data(),
         _objectsDataBuffer
@@ -1275,7 +1032,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     //);
 
     VkDeviceSize commandBufferSize = _objectsBatches.size() * sizeof(GPUBatch);
-    _createBuffer(commandBufferSize,
+    _vulkan->createBuffer(_mainCommandPool, commandBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         _gpuBatches);
@@ -1303,7 +1060,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Indirect Command buffer reset
     */
 
-    _createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
+    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUBatch),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         commandBufferData.data(),
         _gpuResetBatches
@@ -1326,14 +1083,15 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             }
         }
     }
-    _createGPUBuffer(nbObjects * sizeof(GPUObjectEntry),
+    _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(GPUObjectEntry),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objects.data(),
         _gpuObjectEntries
     );
 
     VkDeviceSize debugSize = nbObjects * sizeof(DebugCulling);
-    _createBuffer(debugSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, _debugCullingBuffer);
+    _vulkan->createBuffer(_mainCommandPool, debugSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, _debugCullingBuffer);
     void* debugData;
     vkMapMemory(_device, _debugCullingBuffer.deviceMemory, 0, nbObjects * sizeof(DebugCulling), 0, &debugData);
     DebugCulling* debugDataPtr = (DebugCulling*)debugData;
@@ -1343,7 +1101,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     }
     vkUnmapMemory(_device, _debugCullingBuffer.deviceMemory);
 
-    _createGPUBuffer(nbObjects * sizeof(uint32_t),
+    _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objects.data(),
         _gpuIndexToObjectId
@@ -1370,7 +1128,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     camera.setPosition(glm::vec3(0.f, 2.5f, 0.f));
     camera.setFront(glm::vec3(0, 0, 1));
     globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
-    _createGPUBuffer(sizeof(GPUCullingGlobalData),
+    _vulkan->createGPUBuffer(_mainCommandPool, sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         &globalData,
         _gpuCullingGlobalData
@@ -1464,35 +1222,6 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)
         .build(_objectsDataDescriptorSet, _objectsDataDescriptorSetLayout);
 }
 
-VkCommandBuffer VulkanRenderer::_beginSingleTimeCommands(VkCommandPool& commandPool) {
-    VkCommandBufferAllocateInfo allocInfo = VulkanUtils::createCommandBufferAllocateInfo(commandPool, 1);
-
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(_device, &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-}
-
-void VulkanRenderer::_endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool) {
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(_vulkan->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-
-    vkFreeCommandBuffers(_vulkan->getLogicalDevice(), commandPool, 1, &commandBuffer);
-}
-
 void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
 {
     DescriptorAllocator::Options cullingDescriptorAllocatorOptions = {};
@@ -1565,11 +1294,12 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
     VkDeviceSize size = width * height * 4;
 
     AllocatedBuffer copyBuffer;
-    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
+    _vulkan->createBuffer(_mainCommandPool, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
 
-    _transitionImageLayout(_depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+    _vulkan->transitionImageLayout(_mainCommandPool, _depthImage, depthBufferFormat,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
+    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
 
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
@@ -1584,7 +1314,7 @@ void VulkanRenderer::_testWriteDepthBufferToDisc() {
 
     vkCmdCopyImageToBuffer(cmd, _depthImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
 
-    _endSingleTimeCommands(cmd, _mainCommandPool);
+    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
     
     void* data = nullptr;
     vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
@@ -1618,11 +1348,13 @@ void VulkanRenderer::_testWriteDepthPyramidToDisc() {
     VkDeviceSize size = width * height * 4;
 
     AllocatedBuffer copyBuffer;
-    _createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
+    _vulkan->createBuffer(_mainCommandPool, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
 
-    _transitionImageLayout(_depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    _vulkan->transitionImageLayout(_mainCommandPool, _depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    VkCommandBuffer cmd = _beginSingleTimeCommands(_mainCommandPool);
+    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
 
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
@@ -1637,7 +1369,7 @@ void VulkanRenderer::_testWriteDepthPyramidToDisc() {
 
     vkCmdCopyImageToBuffer(cmd, _depthPyramid.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
 
-    _endSingleTimeCommands(cmd, _mainCommandPool);
+    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
 
     void* data = nullptr;
     vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
