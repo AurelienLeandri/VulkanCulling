@@ -306,7 +306,6 @@ void VulkanRenderer::init()
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _framebufferColor);
     _vulkan->createImageView(_framebufferColor.image, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, _framebufferColor.view);
-    _framebufferColor.mipLevels = 1;
 
     // Multisampled depth attachment
     _vulkan->createImage(
@@ -320,7 +319,6 @@ void VulkanRenderer::init()
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _framebufferDepth);
     _vulkan->createImageView(_framebufferDepth.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _framebufferDepth.view);
-    _framebufferDepth.mipLevels = 1;
 
     // Depth resolve attachment (a depth buffer is required by some shaders and algorithms)
     _vulkan->createImage(swapChainExtent.width, swapChainExtent.height, 1,
@@ -331,7 +329,6 @@ void VulkanRenderer::init()
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthImage);
     _vulkan->createImageView(_depthImage.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
-    _depthImage.mipLevels = 1;
 
     // Layout of the depth image resolve attachment is initially set to a depth-stencil attachment
     VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
@@ -455,9 +452,9 @@ void VulkanRenderer::init()
     // Depth pyramid for occlusion culling
     _depthPyramidWidth = previousPow2(instanceProperties.swapChainExtent.width);
     _depthPyramidHeight = previousPow2(instanceProperties.swapChainExtent.height);
-    _depthPyramid.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(instanceProperties.swapChainExtent.width, instanceProperties.swapChainExtent.height)))) + 1;
+    uint32_t depthPyramidMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(instanceProperties.swapChainExtent.width, instanceProperties.swapChainExtent.height)))) + 1;
 
-    _vulkan->createImage(_depthPyramidWidth, _depthPyramidHeight, _depthPyramid.mipLevels,
+    _vulkan->createImage(_depthPyramidWidth, _depthPyramidHeight, depthPyramidMipLevels,
         VK_SAMPLE_COUNT_1_BIT,
         VK_FORMAT_R32_SFLOAT,
         VK_IMAGE_TILING_OPTIMAL,
@@ -821,7 +818,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
                     uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                     uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
 
-                    loadedImage->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+                    uint32_t imageMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
                     uint32_t nbChannels = 0;
                     VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
@@ -849,7 +846,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
 
                     // Image handle and memory
 
-                    _vulkan->createImage(texWidth, texHeight, loadedImage->mipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
+                    _vulkan->createImage(texWidth, texHeight, imageMipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
 
