@@ -7,15 +7,13 @@ struct ObjectData{
 	vec4 sphereBounds;
 };
 
-struct DrawCommand
+struct IndirectDrawCommand
 {
 	uint    indexCount;
     uint    instanceCount;
     uint    firstIndex;
     int     vertexOffset;
     uint    firstInstance;
-	uint batchID;
-	uint dataID;
 };
 
 struct GPUInstance {
@@ -48,9 +46,9 @@ layout (std430, set = 0, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
-layout (std430, set = 0, binding = 3)  buffer DrawBuffer {
-	DrawCommand drawsCommands[];
-} drawBuffer;
+layout (std430, set = 0, binding = 3)  buffer IndirectDrawCommandBuffer {
+	IndirectDrawCommand drawsCommands[];
+} indirectIndirectDrawCommandBuffer;
 
 layout (std430, set = 0, binding = 4) readonly buffer InstanceBuffer {
 	GPUInstance gpuInstances[];
@@ -62,28 +60,10 @@ layout (std430, set = 0, binding = 5) buffer IndexMap {
 
 layout(set = 0, binding = 6) uniform sampler2D depthPyramid;
 
-struct DebugCullingData {
-	vec3 posSphere;
-	float offset0;
-	vec2 uv;
-	float radius;
-	float width;
-	float height;
-	float zSphere;
-	float zBuffer;
-	uint mipLevel;
-	uint projectSphere;
-};
-
-layout(std140, set = 0, binding = 7) buffer DebugCulling {
-	DebugCullingData data[];
-} debugBuffer;
-
-
 // 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
 bool projectSphere(vec3 C, float r, out vec4 aabb)
 {
-	C.y *= -1;  // Convention used by the paper
+	C.y *= -1;  // convention used by the function
 	float znear = globalData.zNear;
 	float P00 = globalData.P00;
 	float P11 = globalData.P11;
@@ -113,11 +93,8 @@ bool IsVisible(uint objectDataIndex)
 	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
 	center.z *= -1;  // z is negative in view space.
 	float radius = sphereBounds.w;
-	//debugBuffer.data[objectDataIndex].radius = radius;
 
 	bool visible = true;
-	
-	//debugBuffer.data[objectDataIndex].posSphere = center;
 	
 	for (int i = 0; i < 6; ++i) {
 		visible = visible && (dot(globalData.frustum[i].xyz, center) < radius);
@@ -128,56 +105,25 @@ bool IsVisible(uint objectDataIndex)
 	vec4 aabb;
 	if (projectSphere(center, radius, aabb))
 	{
-		//debugBuffer.data[objectDataIndex].projectSphere = 1;
-
 		float width = (aabb.z - aabb.x) * globalData.pyramidWidth;
 		float height = (aabb.w - aabb.y) * globalData.pyramidHeight;
-		//debugBuffer.data[objectDataIndex].width = width;
 
-		//debugBuffer.data[objectDataIndex].height = height;
-
-		
 		float level = max(floor(log2(max(width, height))) - 1, 0);
-		//debugBuffer.data[objectDataIndex].mipLevel = uint(level);
-
 		
 		float zNear = globalData.zNear;
 		float zFar = globalData.zFar;
 		
 		vec2 uv = (aabb.xy + aabb.zw) * 0.5;
-		//debugBuffer.data[objectDataIndex].uv = uv;
 
 		float depth = textureLod(depthPyramid, uv, level).x;
-		//depth = (2.0 * zNear) / (zFar + zNear - depth * (zFar - zNear));
-		//debugBuffer.data[objectDataIndex].zBuffer = depth;
 
 		float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
 		center.z *= -1;
 		vec4 projectedSphere = camera.proj * (vec4(center, 1.0) + vec4(0, 0, radius, 0));
 		projectedSphere /= projectedSphere.w;
 		depthSphere = projectedSphere.z;
-		//debugBuffer.data[objectDataIndex].zSphere = depthSphere;
 
 		visible = visible && depthSphere <= depth;
-		
-		/*
-		uint gID = gl_GlobalInvocationID.x;
-		uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
-		uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
-		if (dataIndex == 0) {  // Moyen
-			drawBuffer.drawsCommands[batchIndex].firstIndex = uint(depth * 1000.0);
-			//drawBuffer.drawsCommands[batchIndex].firstIndex = uint(depthSphere * 1000.0);
-			//drawBuffer.drawsCommands[batchIndex].firstIndex = uint(level);
-		}
-		else if (dataIndex == 1) {  // Petit
-			drawBuffer.drawsCommands[batchIndex].vertexOffset = int(depth * 1000.0);
-			//drawBuffer.drawsCommands[batchIndex].vertexOffset = int(depthSphere * 1000.0);
-			//drawBuffer.drawsCommands[batchIndex].vertexOffset = int(level);
-		}
-		else if (dataIndex == 2) {  // Grand
-			drawBuffer.drawsCommands[batchIndex].firstInstance = uint(depth * 1000.0);
-		}
-		*/
 	}
 	
 	return visible;
@@ -191,9 +137,9 @@ void main()
 		uint batchIndex = instanceBuffer.gpuInstances[gID].batchID;
 		uint dataIndex = instanceBuffer.gpuInstances[gID].dataID;
 		if (IsVisible(dataIndex)) {
-			uint count = atomicAdd(drawBuffer.drawsCommands[batchIndex].instanceCount, 1);
+			uint count = atomicAdd(indirectIndirectDrawCommandBuffer.drawsCommands[batchIndex].instanceCount, 1);
 			
-			uint instanceIndex = drawBuffer.drawsCommands[batchIndex].firstInstance + count;
+			uint instanceIndex = indirectIndirectDrawCommandBuffer.drawsCommands[batchIndex].firstInstance + count;
 			objectDataIndices.map[instanceIndex] = dataIndex;
 		}
 	}

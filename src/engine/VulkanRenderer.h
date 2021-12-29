@@ -39,23 +39,8 @@ struct GPUObjectEntry {
 	uint32_t dataId = 0;
 };
 
-struct GPUBatch {
+struct GPUIndirectDrawCommand {
 	VkDrawIndexedIndirectCommand command = {};
-	uint32_t batchId = 0;
-	uint32_t dataId = 0;
-};
-
-struct DebugCulling {
-	alignas (16) glm::vec3 posSphere = glm::vec3(0);
-	float offset0 = 0;
-	glm::vec2 uv = glm::vec2(0);
-	float radius = 0;
-	float width = 0;
-	float height = 0;
-	float zSphere = 0;
-	float zBuffer = 0;
-	uint32_t mipLevel = 0;
-	uint32_t projectSphere = 0;
 };
 
 struct GPUCullingGlobalData {
@@ -102,13 +87,11 @@ struct RenderableObject {
 	size_t nbElements = 0;
 };
 
-struct ObjectsBatch {
+struct DrawCallInfo {
 	const Material* material = nullptr;
 	const ShapeData* shape = nullptr;
 	uint32_t nbObjects = 0;
 	uint32_t primitivesPerObject = 0;
-	uint32_t stride = 0;
-	uint32_t offset = 0;
 };
 
 struct GlobalBuffers {
@@ -201,7 +184,7 @@ private:
 	std::vector<std::unique_ptr<ShapeData>> _shapeData;
 
 	// Indexes and utility containers to group similar objects in the scene
-	std::vector<ObjectsBatch> _objectsBatches;
+	std::vector<DrawCallInfo> _drawCalls;
 	size_t _nbMaterials = 0;
 
 	VkPipeline _cullingPipeline = VK_NULL_HANDLE;
@@ -215,7 +198,6 @@ private:
 	glm::mat4 _projectionMatrix = glm::mat4(1);
 	glm::mat4 _invProjectionMatrix = glm::mat4(1);
 	uint32_t _nbInstances = 0;
-	uint32_t _testBatchesSize = 0;
 	DescriptorAllocator _cullingDescriptorAllocator;
 	AllocatedBuffer _gpuObjectEntries = {};
 	AllocatedBuffer _gpuBatches = {};
@@ -239,7 +221,6 @@ private:
 	std::vector<VkImageMemoryBarrier> _depthPyramidMipLevelBarriers;
 	VkImageMemoryBarrier _framebufferDepthWriteBarrier = {};
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
-	AllocatedBuffer _debugCullingBuffer;
 
 	// Other
 	float _zNear = 0.1f;

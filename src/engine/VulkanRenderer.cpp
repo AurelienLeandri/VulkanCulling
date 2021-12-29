@@ -113,7 +113,7 @@ void VulkanRenderer::_cleanup()
     }
     _shapeData.clear();
 
-    _objectsBatches.clear();
+    _drawCalls.clear();
 
     vkDestroyBuffer(_device, _gpuBatches.buffer, nullptr);
     vkFreeMemory(_device, _gpuBatches.deviceMemory, nullptr);
@@ -594,7 +594,7 @@ void VulkanRenderer::iterate()
 
     VkBufferCopy indirectCopy;
     indirectCopy.dstOffset = 0;
-    indirectCopy.size = static_cast<uint32_t>(_objectsBatches.size() * sizeof(GPUBatch));
+    indirectCopy.size = static_cast<uint32_t>(_drawCalls.size() * sizeof(GPUIndirectDrawCommand));
     indirectCopy.srcOffset = 0;
     vkCmdCopyBuffer(_framesData[imageIndex].commandBuffer, _gpuResetBatches.buffer, _gpuBatches.buffer, 1, &indirectCopy);
 
@@ -640,8 +640,8 @@ void VulkanRenderer::iterate()
         graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
 
     uint32_t offset = 0;
-    uint32_t stride = sizeof(GPUBatch);
-    for (const ObjectsBatch& batch : _objectsBatches) {
+    uint32_t stride = sizeof(GPUIndirectDrawCommand);
+    for (const DrawCallInfo& batch : _drawCalls) {
         const Material* material = batch.material;
 
         VkPipeline materialPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
@@ -948,13 +948,9 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         for (const auto& shapeNbPair : materialShapesPair.second) {
             const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
 
-            _objectsBatches.push_back({
-                material,  // material
-                shape,  // shape
+            _drawCalls.push_back({ material, shape,
                 static_cast<uint32_t>(shapeNbPair.second.size()),  // nbObjects
                 shape->nbElements, // primitivesPerObject
-                0,  // stride
-                0,  // offset
                 });
         }
     }
@@ -1015,52 +1011,28 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Indirect Command buffer
     */
 
-    std::vector<GPUBatch> commandBufferData(_objectsBatches.size(), GPUBatch{});
+    std::vector<GPUIndirectDrawCommand> commandBufferData(_drawCalls.size(), GPUIndirectDrawCommand{});
     uint32_t offset = 0;
-    for (int i = 0; i < _objectsBatches.size(); ++i) {
-        GPUBatch& gpuBatch = commandBufferData[i];
+    for (int i = 0; i < _drawCalls.size(); ++i) {
+        GPUIndirectDrawCommand& gpuBatch = commandBufferData[i];
         gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
         gpuBatch.command.instanceCount = 0;
-        gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
-        _nbInstances += _objectsBatches[i].nbObjects;
-        offset += _objectsBatches[i].nbObjects;
+        gpuBatch.command.indexCount = _drawCalls[i].primitivesPerObject;
+        _nbInstances += _drawCalls[i].nbObjects;
+        offset += _drawCalls[i].nbObjects;
     }
-    //_createGPUBuffer(commandBufferData.size() * sizeof(GPUBatch),
-    //    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-    //    commandBufferData.data(),
-    //    _gpuBatches
-    //);
 
-    VkDeviceSize commandBufferSize = _objectsBatches.size() * sizeof(GPUBatch);
-    _vulkan->createBuffer(_mainCommandPool, commandBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _gpuBatches);
-    {
-        void* voidDataPtr = nullptr;
-        GPUBatch* commandBufferPtr = nullptr;
-        vkMapMemory(_device, _gpuBatches.deviceMemory, 0, commandBufferSize, 0, &voidDataPtr);
-        commandBufferPtr = static_cast<GPUBatch*>(voidDataPtr);
-        offset = 0;
-        for (int i = 0; i < _objectsBatches.size(); ++i) {
-            uint32_t stride = _objectsBatches[i].nbObjects;
-            GPUBatch& gpuBatch = commandBufferPtr[i];
-            gpuBatch.command.firstInstance = offset;  // Used to access i in the model matrix since we dont use instancing.
-            gpuBatch.command.instanceCount = 0;
-            gpuBatch.command.indexCount = _objectsBatches[i].primitivesPerObject;
-            gpuBatch.command.firstIndex = 0;
-            gpuBatch.command.vertexOffset = 0;
-            offset += stride;
-        }
-        vkUnmapMemory(_device, _gpuBatches.deviceMemory);
-    }
-    _testBatchesSize = static_cast<uint32_t>(_objectsBatches.size());
+    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        commandBufferData.data(),
+        _gpuBatches
+    );
 
     /*
     * Indirect Command buffer reset
     */
 
-    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUBatch),
+    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         commandBufferData.data(),
         _gpuResetBatches
@@ -1075,8 +1047,8 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     std::vector<GPUObjectEntry> objects(nbObjects);
     {
         uint32_t entryIdx = 0;
-        for (uint32_t batchIdx = 0; batchIdx < _objectsBatches.size(); ++batchIdx) {
-            for (uint32_t i = 0; i < _objectsBatches[batchIdx].nbObjects; ++i) {
+        for (uint32_t batchIdx = 0; batchIdx < _drawCalls.size(); ++batchIdx) {
+            for (uint32_t i = 0; i < _drawCalls[batchIdx].nbObjects; ++i) {
                 objects[entryIdx].batchId = batchIdx;
                 objects[entryIdx].dataId = entryIdx;
                 entryIdx++;
@@ -1088,18 +1060,6 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         objects.data(),
         _gpuObjectEntries
     );
-
-    VkDeviceSize debugSize = nbObjects * sizeof(DebugCulling);
-    _vulkan->createBuffer(_mainCommandPool, debugSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, _debugCullingBuffer);
-    void* debugData;
-    vkMapMemory(_device, _debugCullingBuffer.deviceMemory, 0, nbObjects * sizeof(DebugCulling), 0, &debugData);
-    DebugCulling* debugDataPtr = (DebugCulling*)debugData;
-    for (uint32_t i = 0; i < nbObjects; ++i) {
-        debugDataPtr[i] = {};
-        debugDataPtr[i].radius = 42;
-    }
-    vkUnmapMemory(_device, _debugCullingBuffer.deviceMemory);
 
     _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1268,11 +1228,6 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     depthPyramidInfo.imageView = _depthPyramid.view;
     depthPyramidInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkDescriptorBufferInfo debugBufferInfo = {};
-    debugBufferInfo.buffer = _debugCullingBuffer.buffer;
-    debugBufferInfo.offset = 0;
-    debugBufferInfo.range = VK_WHOLE_SIZE;
-
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator)
         .bindBuffer(0, globalDataBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(1, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1281,7 +1236,6 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
         .bindBuffer(4, instancesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(5, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindImage(6, depthPyramidInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(7, debugBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .build(_cullingDescriptorSet, _cullingDescriptorSetLayout);
 }
 
