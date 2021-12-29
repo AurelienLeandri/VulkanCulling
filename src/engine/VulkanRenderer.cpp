@@ -48,99 +48,169 @@ void VulkanRenderer::_cleanup()
 {
     vkDeviceWaitIdle(_device);
 
-    vkDestroyCommandPool(_device, _mainCommandPool, nullptr);
-
-    vkDestroyRenderPass(_device, _renderPass, nullptr);
-    _renderPass = VK_NULL_HANDLE;
-
-
-    // Destroying UBOs
-    for (FrameData& frameData : _framesData) {
-        vkDestroyFramebuffer(_device, frameData.framebuffer, nullptr);
-        vkFreeCommandBuffers(_device, frameData.commandPool, 1, &frameData.commandBuffer);
-        vkDestroyCommandPool(_device, frameData.commandPool, nullptr);
-        vkDestroySemaphore(_device, frameData.presentSemaphore, nullptr);
-        vkDestroySemaphore(_device, frameData.renderSemaphore, nullptr);
-        vkDestroyFence(_device, frameData.renderFinishedFence, nullptr);
-    }
-    _framesData.clear();
-
-    vkDestroyBuffer(_device, _sceneDataBuffer.buffer, nullptr);
-    vkFreeMemory(_device, _sceneDataBuffer.deviceMemory, nullptr);
-    _sceneDataBuffer = {};
-    vkDestroyBuffer(_device, _cameraDataBuffer.buffer, nullptr);
-    vkFreeMemory(_device, _cameraDataBuffer.deviceMemory, nullptr);
-    _cameraDataBuffer = {};
-    vkDestroyBuffer(_device, _objectsDataBuffer.buffer, nullptr);
-    vkFreeMemory(_device, _objectsDataBuffer.deviceMemory, nullptr);
-    _objectsDataBuffer = {};
-
-    // Destroy descriptors
-    _globalDescriptorAllocator.cleanup();
-    _cullingDescriptorAllocator.cleanup();
-    _globalDescriptorLayoutCache.cleanup();
-
-    // Cleanup of the framebuffers shared data
-    vkDestroyImageView(_device, _framebufferColor.view, nullptr);
-    vkDestroyImage(_device, _framebufferColor.image, nullptr);
-    vkFreeMemory(_device, _framebufferColor.memory, nullptr);
-    _framebufferColor = {};
-
-    vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
-    vkDestroyImage(_device, _framebufferDepth.image, nullptr);
-    vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
-    _framebufferDepth = {};
+    /*
+    * Cleanup descriptors and secondary data managers
+    */
 
     _materialBuilder.cleanup();
+    _cullingDescriptorAllocator.cleanup();
+    _depthPyramidDescriptorAllocator.cleanup();
+    _globalDescriptorAllocator.cleanup();
+    _globalDescriptorLayoutCache.cleanup();
+    _materialDescriptorSets.clear();
+    _depthPyramidDescriptorSets.clear();
+    _globalDataDescriptorSet = VK_NULL_HANDLE;
+    _globalDataDescriptorSetLayout = VK_NULL_HANDLE;
+    _objectsDataDescriptorSet = VK_NULL_HANDLE;
+    _objectsDataDescriptorSetLayout = VK_NULL_HANDLE;
+    _cullingDescriptorSet = VK_NULL_HANDLE;
+    _cullingDescriptorSetLayout = VK_NULL_HANDLE;
 
-    for (VkSampler& sampler : _materialImagesSamplers) {
-        vkDestroySampler(_device, sampler, nullptr);
+    /*
+    * Cleaning up scene data
+    */
+
+    if (_sceneLoaded) {
+        // Culling and indirect draw buffers
+
+        vkFreeMemory(_device, _gpuCullingGlobalData.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _gpuCullingGlobalData.buffer, nullptr);
+        _gpuCullingGlobalData = {};
+
+        vkFreeMemory(_device, _gpuIndexToObjectId.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _gpuIndexToObjectId.buffer, nullptr);
+        _gpuIndexToObjectId = {};
+
+        vkFreeMemory(_device, _gpuObjectInstances.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _gpuObjectInstances.buffer, nullptr);
+        _gpuObjectInstances = {};
+
+        vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
+        _gpuResetBatches = {};
+
+        vkFreeMemory(_device, _gpuBatches.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _gpuBatches.buffer, nullptr);
+        _gpuBatches = {};
+
+        // Scene objects data
+
+        vkFreeMemory(_device, _objectsDataBuffer.deviceMemory, nullptr);
+        vkDestroyBuffer(_device, _objectsDataBuffer.buffer, nullptr);
+        _objectsDataBuffer = {};
+
+        for (const std::unique_ptr<ShapeData>& shapeData : _shapeData) {
+            vkFreeMemory(_device, shapeData->indexBuffer.deviceMemory, nullptr);
+            vkDestroyBuffer(_device, shapeData->indexBuffer.buffer, nullptr);
+            vkFreeMemory(_device, shapeData->vertexBuffer.deviceMemory, nullptr);
+            vkDestroyBuffer(_device, shapeData->vertexBuffer.buffer, nullptr);
+        }
+        _shapeData.clear();
+
+        for (VkSampler materialImageSampler : _materialImagesSamplers) {
+            vkDestroySampler(_device, materialImageSampler, nullptr);
+        }
+        _materialImagesSamplers.clear();
+
+        for (const std::unique_ptr<AllocatedImage>& materialImage : _materialImagesData) {
+            vkDestroyImageView(_device, materialImage->view, nullptr);
+            vkFreeMemory(_device, materialImage->memory, nullptr);
+            vkDestroyImage(_device, materialImage->image, nullptr);
+        }
+        _materialImagesData.clear();
     }
-    _materialImagesSamplers.clear();
 
-    for (std::unique_ptr<AllocatedImage>& imageData : _materialImagesData) {
-        vkDestroyImageView(_device, imageData->view, nullptr);
-        vkDestroyImage(_device, imageData->image, nullptr);
-        vkFreeMemory(_device, imageData->memory, nullptr);
+    /*
+    * Cleanup initial renderer data
+    */
+
+    // Depth pyramid
+
+    for (VkImageView view : _depthPyramidLevelViews) {
+        vkDestroyImageView(_device, view, nullptr);
     }
-    _materialImagesData.clear();
+    _depthPyramidLevelViews.clear();
 
-    for (std::unique_ptr<ShapeData>& shapeData : _shapeData) {
-        vkDestroyBuffer(_device, shapeData->vertexBuffer.buffer, nullptr);
-        vkFreeMemory(_device, shapeData->vertexBuffer.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, shapeData->indexBuffer.buffer, nullptr);
-        vkFreeMemory(_device, shapeData->indexBuffer.deviceMemory, nullptr);
-    }
-    _shapeData.clear();
+    vkDestroyImageView(_device, _depthPyramid.view, nullptr);
+    vkFreeMemory(_device, _depthPyramid.memory, nullptr);
+    vkDestroyImage(_device, _depthPyramid.image, nullptr);
+    _depthPyramid = {};
 
-    _drawCalls.clear();
+    vkDestroySampler(_device, _depthImageSampler, nullptr);
+    _depthImageSampler = VK_NULL_HANDLE;
 
-    vkDestroyBuffer(_device, _gpuBatches.buffer, nullptr);
-    vkFreeMemory(_device, _gpuBatches.deviceMemory, nullptr);
-    _gpuBatches = {};
+    // Global data for shaders
 
-    vkDestroyBuffer(_device, _gpuIndexToObjectId.buffer, nullptr);
-    vkFreeMemory(_device, _gpuIndexToObjectId.deviceMemory, nullptr);
-    _gpuIndexToObjectId = {};
+    vkFreeMemory(_device, _sceneDataBuffer.deviceMemory, nullptr);
+    vkDestroyBuffer(_device, _sceneDataBuffer.buffer, nullptr);
+    _sceneDataBuffer = {};
 
-    vkDestroyBuffer(_device, _gpuObjectInstances.buffer, nullptr);
-    vkFreeMemory(_device, _gpuObjectInstances.deviceMemory, nullptr);
-    _gpuObjectInstances = {};
+    vkFreeMemory(_device, _cameraDataBuffer.deviceMemory, nullptr);
+    vkDestroyBuffer(_device, _cameraDataBuffer.buffer, nullptr);
+    _cameraDataBuffer = {};
 
-    vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
-    vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
-    _gpuResetBatches = {};
-
-    vkDestroyBuffer(_device, _gpuCullingGlobalData.buffer, nullptr);
-    vkFreeMemory(_device, _gpuCullingGlobalData.deviceMemory, nullptr);
-    _gpuCullingGlobalData = {};
-
+    // Culling pipelines and passes
 
     _cullShaderPass.cleanup();
     vkDestroyPipeline(_device, _cullingPipeline, nullptr);
     _cullingPipeline = VK_NULL_HANDLE;
     vkDestroyPipelineLayout(_device, _cullingPipelineLayout, nullptr);
     _cullingPipelineLayout = VK_NULL_HANDLE;
+
+    _depthPyramidShaderPass.cleanup();
+    vkDestroyPipeline(_device, _depthPyramidPipeline, nullptr);
+    _depthPyramidPipeline = VK_NULL_HANDLE;
+    vkDestroyPipelineLayout(_device, _depthPyramidPipelineLayout, nullptr);
+    _depthPyramidPipelineLayout = VK_NULL_HANDLE;
+
+    /*
+    * Frames data
+    */
+
+    for (FrameData& frameData : _framesData) {
+        vkDestroySemaphore(_device, frameData.presentSemaphore, nullptr);
+        vkDestroySemaphore(_device, frameData.renderSemaphore, nullptr);
+        vkDestroyFence(_device, frameData.renderFinishedFence, nullptr);
+        vkDestroyFramebuffer(_device, frameData.framebuffer, nullptr);
+    }
+
+    /*
+    * Framebuffer attachments
+    */
+
+    vkDestroyImageView(_device, _depthImage.view, nullptr);
+    vkFreeMemory(_device, _depthImage.memory, nullptr);
+    vkDestroyImage(_device, _depthImage.image, nullptr);
+    _depthImage = {};
+
+    vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
+    vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
+    vkDestroyImage(_device, _framebufferDepth.image, nullptr);
+    _framebufferDepth = {};
+
+    vkDestroyImageView(_device, _framebufferColor.view, nullptr);
+    vkFreeMemory(_device, _framebufferColor.memory, nullptr);
+    vkDestroyImage(_device, _framebufferColor.image, nullptr);
+    _framebufferColor = {};
+
+    /*
+    * Render pass
+    */
+
+    vkDestroyRenderPass(_device, _renderPass, nullptr);
+    _renderPass = VK_NULL_HANDLE;
+
+    /*
+    * Command pools
+    */
+
+    for (FrameData& frameData : _framesData) {
+        vkDestroyCommandPool(_device, frameData.commandPool, nullptr);
+    }
+    _framesData.clear();
+
+    vkDestroyCommandPool(_device, _mainCommandPool, nullptr);
+    _mainCommandPool = VK_NULL_HANDLE;
 }
 
 void VulkanRenderer::init()
@@ -812,8 +882,6 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
                 if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
                     _materialImagesData.push_back(std::make_unique<AllocatedImage>());
                     loadedImage = _materialImagesData.back().get();
-                    _materialImagesSamplers.emplace_back();
-                    loadedImageSampler = _materialImagesSamplers.back();
 
                     uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                     uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
@@ -901,7 +969,9 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
                     samplerInfo.maxLod = static_cast<float>(loadedImage->mipLevels);
                     samplerInfo.mipLodBias = 0.0f;
 
-                    VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &loadedImageSampler));
+                    _materialImagesSamplers.emplace_back();
+                    VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &_materialImagesSamplers.back()));
+                    loadedImageSampler = _materialImagesSamplers.back();
 
                     loadedImagesCache[sceneTexture] = loadedImage;
                     loadedImageSamplersCache[sceneTexture] = loadedImageSampler;
@@ -1168,6 +1238,8 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     _gpuBatchesResetBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     _gpuBatchesResetBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
     _gpuBatchesResetBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(_vulkan->getQueueFamilyIndices().graphicsFamily.value());
+
+    _sceneLoaded = true;
 }
 
 void VulkanRenderer::_createGlobalDescriptors(uint32_t nbObjects)

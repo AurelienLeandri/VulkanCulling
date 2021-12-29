@@ -86,9 +86,12 @@ void DescriptorAllocator::cleanup()
 	for (VkDescriptorPool& pool : _poolsInUse) {
 		vkDestroyDescriptorPool(_device, pool, nullptr);
 	}
+	_poolsInUse.clear();
+
 	for (VkDescriptorPool& pool : _availablePools) {
 		vkDestroyDescriptorPool(_device, pool, nullptr);
 	}
+	_availablePools.clear();
 }
 
 VkDescriptorPool DescriptorAllocator::_createPool()
@@ -122,6 +125,8 @@ void DescriptorLayoutCache::cleanup()
 	for (auto& entry : _cache) {
 		vkDestroyDescriptorSetLayout(_device, entry.second, nullptr);
 	}
+
+	_cache.clear();
 }
 
 VkDescriptorSetLayout DescriptorLayoutCache::createDescriptorLayout(const VkDescriptorSetLayoutCreateInfo& info)

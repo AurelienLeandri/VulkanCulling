@@ -229,6 +229,8 @@ private:
 	VkImageMemoryBarrier _framebufferDepthWriteBarrier = {};
 	VkImageMemoryBarrier _framebufferDepthReadBarrier = {};
 
+	bool _sceneLoaded = false;
+
 	// Other
 	float _zNear = 0.1f;
 	float _zFar = 300.f;
