@@ -653,29 +653,9 @@ void VulkanInstance::createGPUBuffer(VkCommandPool cmdPool, VkDeviceSize size, V
     }
 }
 
-void VulkanInstance::transitionImageLayout(VkCommandPool cmdPool, AllocatedImage& imageData, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspect)
+/*
+void VulkanInstance::transitionImageLayout(VkCommandBuffer commandBuffer, AllocatedImage& imageData, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage)
 {
-    // TODO: Write a barrier helper and use it instead of this function.
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(cmdPool);
-
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = imageData.image;
-    barrier.subresourceRange.aspectMask = aspect;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = imageData.mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = 0;
-
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
-
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -728,11 +708,9 @@ void VulkanInstance::transitionImageLayout(VkCommandPool cmdPool, AllocatedImage
     else {
         throw VulkanRendererException("Unsupported layout transition.");
     }
-
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-    endSingleTimeCommands(commandBuffer, cmdPool);
 }
+*/
 
 void VulkanInstance::copyBufferToImage(VkCommandPool cmdPool, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect) {
     // TODO: Try to setup a command buffer to record several operations and then flush everything once,

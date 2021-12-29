@@ -330,9 +330,21 @@ void VulkanRenderer::init()
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthImage);
-    _vulkan->transitionImageLayout(_mainCommandPool, _depthImage, depthBufferFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
     _vulkan->createImageView(_depthImage.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1, _depthImage.view);
     _depthImage.mipLevels = 1;
+
+    // Layout of the depth image resolve attachment is initially set to a depth-stencil attachment
+    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
+    VkImageMemoryBarrier depthLayoutTransitionBarrier = VulkanUtils::createImageBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        _depthImage.image,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        0, 0, 0,
+        _depthImage.mipLevels
+    );
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &depthLayoutTransitionBarrier);
+    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
 
 
     /*
@@ -452,8 +464,20 @@ void VulkanRenderer::init()
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         _depthPyramid);
-    _vulkan->transitionImageLayout(_mainCommandPool, _depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     _vulkan->createImageView(_depthPyramid.image, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, _depthPyramid.mipLevels, _depthPyramid.view);
+
+    // Set initial layout of depth pyramid to general
+    cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
+    VkImageMemoryBarrier depthPyramidLayoutBarrier = VulkanUtils::createImageBarrier(
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
+        _depthPyramid.image,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 0, 0,
+        _depthPyramid.mipLevels
+    );
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &depthPyramidLayoutBarrier);
+    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
 
     _depthPyramidLevelViews.resize(_depthPyramid.mipLevels, VK_NULL_HANDLE);
     for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i) {
@@ -829,7 +853,16 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
 
-                    _vulkan->transitionImageLayout(_mainCommandPool, *loadedImage, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
+                    VkImageMemoryBarrier textureCopyDstBarrier = VulkanUtils::createImageBarrier(
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        loadedImage->image,
+                        VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                        0, loadedImage->mipLevels
+                    );
+                    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &textureCopyDstBarrier);
+                    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
 
                     AllocatedBuffer stagingBuffer;
                     VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
@@ -1247,115 +1280,6 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
         .bindBuffer(5, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindImage(6, depthPyramidInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT)
         .build(_cullingDescriptorSet, _cullingDescriptorSetLayout);
-}
-
-void VulkanRenderer::_testWriteDepthBufferToDisc() {
-    VkFormat depthBufferFormat = VK_FORMAT_D32_SFLOAT;
-    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    uint32_t width = _vulkan->getProperties().swapChainExtent.width;
-    uint32_t height = _vulkan->getProperties().swapChainExtent.height;
-
-    VkDeviceSize size = width * height * 4;
-
-    AllocatedBuffer copyBuffer;
-    _vulkan->createBuffer(_mainCommandPool, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
-
-    _vulkan->transitionImageLayout(_mainCommandPool, _depthImage, depthBufferFormat,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
-
-    VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    vkCmdCopyImageToBuffer(cmd, _depthImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
-
-    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
-    
-    void* data = nullptr;
-    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
-    float* dataPtr = static_cast<float*>(data);
-
-    std::ofstream file("bleubleu.ppm", std::ios::out | std::ios::binary);
-
-    // ppm header
-    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
-
-    for (uint32_t i = 0; i < width * height; ++i) {
-        float val = dataPtr[i];
-        val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
-        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
-    }
-    file.flush();
-
-    file.close();
-    vkUnmapMemory(_device, copyBuffer.deviceMemory);
-
-    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
-    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
-}
-
-void VulkanRenderer::_testWriteDepthPyramidToDisc() {
-    vkQueueWaitIdle(_vulkan->getGraphicsQueue());
-    uint32_t mip = 4;
-    uint32_t width = _depthPyramidWidth / static_cast<uint32_t>(pow(2, mip));
-    uint32_t height = _depthPyramidHeight / static_cast<uint32_t>(pow(2, mip));
-
-    VkDeviceSize size = width * height * 4;
-
-    AllocatedBuffer copyBuffer;
-    _vulkan->createBuffer(_mainCommandPool, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, copyBuffer);
-
-    _vulkan->transitionImageLayout(_mainCommandPool, _depthPyramid, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
-
-    VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = mip;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-
-    vkCmdCopyImageToBuffer(cmd, _depthPyramid.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copyBuffer.buffer, 1, &region);
-
-    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
-
-    void* data = nullptr;
-    vkMapMemory(_device, copyBuffer.deviceMemory, 0, size, 0, &data);
-    float* dataPtr = static_cast<float*>(data);
-
-    std::ofstream file("pleupleu.ppm", std::ios::out | std::ios::binary);
-
-    // ppm header
-    file << "P3\n" << width << "\n" << height << "\n" << 255 << "\n";
-
-    for (uint32_t i = 0; i < width * height; ++i) {
-        float val = dataPtr[i];
-        val = (2 * _zNear) / (_zFar + _zNear - val * (_zFar - _zNear));
-        file << int(val * 255.f) << " " << int(val * 255.f) << " " << int(val * 255.f) << std::endl;
-    }
-    file.flush();
-
-    file.close();
-    vkUnmapMemory(_device, copyBuffer.deviceMemory);
-
-    vkDestroyBuffer(_device, copyBuffer.buffer, nullptr);
-    vkFreeMemory(_device, copyBuffer.deviceMemory, nullptr);
 }
 
 void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass)

@@ -138,9 +138,6 @@ private:
 
 	void _cleanup();
 
-	void _testWriteDepthBufferToDisc();
-	void _testWriteDepthPyramidToDisc();
-
 private:
 	Options _options;
 
