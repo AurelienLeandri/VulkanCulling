@@ -1,6 +1,6 @@
 #include "Sphere.h"
 
-namespace leo {
+namespace leoscene {
 	Sphere::Sphere(const glm::vec3& position, float radius)
 		: data({ position, radius })
 	{

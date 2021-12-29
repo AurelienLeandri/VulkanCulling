@@ -4,7 +4,7 @@
 
 #include <memory>
 
-namespace leo {
+namespace leoscene {
 	class ImageTexture : public Texture
 	{
 	public:

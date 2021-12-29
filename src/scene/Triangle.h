@@ -5,7 +5,7 @@
 
 #include <array>
 
-namespace leo {
+namespace leoscene {
 	class Triangle : public Shape {
 	public:
 		struct alignas(16) Data {

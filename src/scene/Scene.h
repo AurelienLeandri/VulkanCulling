@@ -5,7 +5,7 @@
 
 #include <vector>
 
-namespace leo {
+namespace leoscene {
 	class Light;
 
 	class Scene {

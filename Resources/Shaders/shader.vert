@@ -31,12 +31,7 @@ layout(std430, set = 1, binding = 0) readonly buffer ObjectBuffer{
 void main() {
 	uint dataIndex = objectDataIndices.map[gl_InstanceIndex];
 	gl_Position = camera.viewProj * objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0);
-	// gl_Position = vec4(inPosition, 1.0);
-    // fragNormal = normalize(vec3(transpose(inverse(camera.model)) * vec4(inNormal, 0.0)));
-    fragNormal = inNormal;
-	//fragNormal = (objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0)).xyz;
-	//fragNormal = (objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0)).xyz / 10;
-	//fragNormal = (gl_Position / gl_Position.w).xyz;
+    fragNormal = inNormal;  // NOTE: Not used for now
 	fragTexCoord = vec2(inTexCoord.x, 1.0 - inTexCoord.y);
 	fragCoord = vec3(objectBuffer.objects[dataIndex].model * vec4(inPosition, 1.0));
 }

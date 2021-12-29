@@ -2,7 +2,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace leo {
+namespace leoscene {
 
 	Camera::Camera() :
 		Camera(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0), glm::radians(90.f))

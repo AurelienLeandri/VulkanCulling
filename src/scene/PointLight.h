@@ -3,7 +3,7 @@
 #include "Light.h"
 #include "GeometryIncludes.h"
 
-namespace leo {
+namespace leoscene {
 	class PointLight : public Light {
 	public:
 		glm::vec3 position;

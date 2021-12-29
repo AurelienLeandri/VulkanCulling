@@ -1,6 +1,6 @@
 #include "PerformanceMaterial.h"
 
-namespace leo {
+namespace leoscene {
     Material::Type PerformanceMaterial::getType() const
     {
         return Type::PERFORMANCE;

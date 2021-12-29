@@ -13,7 +13,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-namespace leo {
+namespace leoscene {
     namespace {
         void processNode(
             aiNode* node,

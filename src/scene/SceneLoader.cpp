@@ -15,7 +15,7 @@
 
 // TODO: Pre-transform all objects. Dont store the model transforms because we assume no object is animated.
 
-namespace leo {
+namespace leoscene {
 	namespace {
 		void loadCameraEntry(std::stringstream& entry, Camera* camera, size_t lineNb);
 		void loadModelEntry(

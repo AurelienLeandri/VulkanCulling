@@ -3,7 +3,7 @@
 #include "Light.h"
 #include "GeometryIncludes.h"
 
-namespace leo {
+namespace leoscene {
 	class DirectionalLight : public Light {
 	public:
 		DirectionalLight(glm::vec3 direction, glm::vec3 emission);

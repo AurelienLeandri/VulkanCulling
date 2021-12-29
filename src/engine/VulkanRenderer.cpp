@@ -123,9 +123,9 @@ void VulkanRenderer::_cleanup()
     vkFreeMemory(_device, _gpuIndexToObjectId.deviceMemory, nullptr);
     _gpuIndexToObjectId = {};
 
-    vkDestroyBuffer(_device, _gpuObjectEntries.buffer, nullptr);
-    vkFreeMemory(_device, _gpuObjectEntries.deviceMemory, nullptr);
-    _gpuObjectEntries = {};
+    vkDestroyBuffer(_device, _gpuObjectInstances.buffer, nullptr);
+    vkFreeMemory(_device, _gpuObjectInstances.deviceMemory, nullptr);
+    _gpuObjectInstances = {};
 
     vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
     vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
@@ -751,26 +751,26 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
 }
 
 
-void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
+void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
 {
     /*
     * Loading scene objects to device
     */
 
     struct _ObjectInstanceData {
-        const leo::Shape* shape = nullptr;
-        const leo::Transform* transform = nullptr;
+        const leoscene::Shape* shape = nullptr;
+        const leoscene::Transform* transform = nullptr;
     };
 
-    std::map<const leo::Material*, Material*> loadedMaterialsCache;
-    std::map<const leo::ImageTexture*, AllocatedImage*> loadedImagesCache;
-    std::map<const leo::ImageTexture*, VkSampler> loadedImageSamplersCache;
-    std::map<const leo::Shape*, ShapeData*> shapeDataCache;
+    std::map<const leoscene::Material*, Material*> loadedMaterialsCache;
+    std::map<const leoscene::ImageTexture*, AllocatedImage*> loadedImagesCache;
+    std::map<const leoscene::ImageTexture*, VkSampler> loadedImageSamplersCache;
+    std::map<const leoscene::Shape*, ShapeData*> shapeDataCache;
     std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> objectInstances;
 
-    for (const leo::SceneObject& sceneObject : scene->objects) {
-        const leo::PerformanceMaterial* sceneMaterial = static_cast<const leo::PerformanceMaterial*>(sceneObject.material.get());
-        const leo::Shape* sceneShape = sceneObject.shape.get();
+    for (const leoscene::SceneObject& sceneObject : scene->objects) {
+        const leoscene::PerformanceMaterial* sceneMaterial = static_cast<const leoscene::PerformanceMaterial*>(sceneObject.material.get());
+        const leoscene::Shape* sceneShape = sceneObject.shape.get();
         Material* loadedMaterial = nullptr;
         ShapeData* loadedShape = nullptr;
 
@@ -780,12 +780,12 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
 
             static const size_t nbTexturesInMaterial = 5;
-            std::array<const leo::ImageTexture*, nbTexturesInMaterial> materialTextures = {
+            std::array<const leoscene::ImageTexture*, nbTexturesInMaterial> materialTextures = {
                 sceneMaterial->diffuseTexture.get(), sceneMaterial->specularTexture.get(), sceneMaterial->ambientTexture.get(), sceneMaterial->normalsTexture.get(), sceneMaterial->heightTexture.get()
             };
 
             for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
-                const leo::ImageTexture* sceneTexture = materialTextures[i];
+                const leoscene::ImageTexture* sceneTexture = materialTextures[i];
                 AllocatedImage* loadedImage = nullptr;
                 VkSampler loadedImageSampler = VK_NULL_HANDLE;
                 if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
@@ -802,11 +802,11 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                     uint32_t nbChannels = 0;
                     VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
                     switch (sceneTexture->layout) {
-                    case leo::ImageTexture::Layout::R:
+                    case leoscene::ImageTexture::Layout::R:
                         imageFormat = VK_FORMAT_R8_UNORM;
                         nbChannels = 1;
                         break;
-                    case leo::ImageTexture::Layout::RGBA:
+                    case leoscene::ImageTexture::Layout::RGBA:
                         if (i == 3) { // Normals texture
                             imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
                         }
@@ -902,10 +902,10 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             _shapeData.push_back(std::make_unique<ShapeData>());
             loadedShape = _shapeData.back().get();
 
-            const leo::Mesh* mesh = static_cast<const leo::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
+            const leoscene::Mesh* mesh = static_cast<const leoscene::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
 
             // Vertex buffer
-            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(leo::Vertex) * mesh->vertices.size(),
+            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(leoscene::Vertex) * mesh->vertices.size(),
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
                 loadedShape->vertexBuffer);
 
@@ -960,7 +960,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     * Filling global scene data
     */
 
-    // TODO: Put actual values (maybe from options and/or leo::Scene)
+    // TODO: Put actual values (maybe from options and/or leoscene::Scene)
     GPUSceneData sceneData;
     sceneData.ambientColor = { 1, 0, 0, 0 };
     sceneData.sunlightColor = { 0, 1, 0, 0 };
@@ -989,7 +989,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
                 objectData[i].modelMatrix = modelMatrix;
 
                 // Computing sphere bounds of the object in world space
-                const glm::vec4& sphereBounds = static_cast<const leo::Mesh*>(instanceData.shape)->boundingSphere;
+                const glm::vec4& sphereBounds = static_cast<const leoscene::Mesh*>(instanceData.shape)->boundingSphere;
                 glm::vec4 transformedSphere = modelMatrix * glm::vec4(sphereBounds.x, sphereBounds.y, sphereBounds.z, 1);
                 float maxScale = glm::max(glm::max(glm::length(modelMatrix[0]), glm::length(modelMatrix[1])), glm::length(modelMatrix[2]));
                 transformedSphere.w = maxScale * sphereBounds.w;
@@ -1006,6 +1006,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         objectData.data(),
         _objectsDataBuffer
     );
+
 
     /*
     * Indirect Command buffer
@@ -1028,6 +1029,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         _gpuBatches
     );
 
+
     /*
     * Indirect Command buffer reset
     */
@@ -1038,13 +1040,14 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         _gpuResetBatches
     );
 
+
     /*
     * Instances buffer
     */
 
     uint32_t nbObjects = static_cast<uint32_t>(scene->objects.size());
 
-    std::vector<GPUObjectEntry> objects(nbObjects);
+    std::vector<GPUObjectInstance> objects(nbObjects);
     {
         uint32_t entryIdx = 0;
         for (uint32_t batchIdx = 0; batchIdx < _drawCalls.size(); ++batchIdx) {
@@ -1055,10 +1058,10 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
             }
         }
     }
-    _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(GPUObjectEntry),
+    _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(GPUObjectInstance),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objects.data(),
-        _gpuObjectEntries
+        _gpuObjectInstances
     );
 
     _vulkan->createGPUBuffer(_mainCommandPool, nbObjects * sizeof(uint32_t),
@@ -1066,6 +1069,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
         objects.data(),
         _gpuIndexToObjectId
     );
+
 
     /*
     * Culling global data buffer
@@ -1084,15 +1088,20 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
     globalData.pyramidWidth = _depthPyramidWidth;
     globalData.pyramidHeight = _depthPyramidHeight;
     globalData.nbInstances = nbObjects;
-    leo::Camera camera;
+
+    // Set an arbitrary view matrix into the global data.
+    // NOTE: This is used only for debugging the frustum by swapping the player's camera with this one in the culling shader.
+    leoscene::Camera camera;
     camera.setPosition(glm::vec3(0.f, 2.5f, 0.f));
     camera.setFront(glm::vec3(0, 0, 1));
     globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
+
     _vulkan->createGPUBuffer(_mainCommandPool, sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         &globalData,
         _gpuCullingGlobalData
     );
+
 
     /*
     * Setup descriptors. Global descriptors depend partially on the scene being loaded, so we create them here.
@@ -1100,6 +1109,7 @@ void VulkanRenderer::loadSceneToDevice(const leo::Scene* scene)
 
     _createGlobalDescriptors(nbObjects);
     _createCullingDescriptors(nbObjects);
+
 
     /*
     * Culling data barriers
@@ -1214,7 +1224,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     drawBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo instancesInfo = {};
-    instancesInfo.buffer = _gpuObjectEntries.buffer;
+    instancesInfo.buffer = _gpuObjectInstances.buffer;
     instancesInfo.offset = 0;
     instancesInfo.range = VK_WHOLE_SIZE;
 
@@ -1375,7 +1385,7 @@ void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& 
     shaderPass.destroyShaderModules();
 }
 
-void VulkanRenderer::setCamera(const leo::Camera* camera)
+void VulkanRenderer::setCamera(const leoscene::Camera* camera)
 {
     _camera = camera;
 

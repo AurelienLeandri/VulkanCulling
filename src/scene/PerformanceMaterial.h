@@ -6,7 +6,7 @@
 
 #include <memory>
 
-namespace leo {
+namespace leoscene {
 	class ImageTexture;
 	class PerformanceMaterial : public Material
 	{

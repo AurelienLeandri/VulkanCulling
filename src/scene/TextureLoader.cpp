@@ -5,7 +5,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-namespace leo {
+namespace leoscene {
     namespace {
         ImageTexture::Layout pickLayout(TextureLoader::LoadingOptions options, int nbChannels);
         bool isImageInfoValid(ImageTexture::Layout& layout, int nbChannels);

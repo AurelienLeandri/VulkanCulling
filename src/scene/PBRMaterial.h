@@ -2,7 +2,7 @@
 
 #include "Material.h"
 
-namespace leo {
+namespace leoscene {
 	class PBRMaterial : public Material
 	{
 	};

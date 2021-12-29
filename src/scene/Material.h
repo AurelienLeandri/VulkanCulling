@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace leo {
+namespace leoscene {
 	class BxDF;
 	class Material {
 	public:

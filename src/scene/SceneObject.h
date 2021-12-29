@@ -4,7 +4,7 @@
 
 #include <memory>
 
-namespace leo {
+namespace leoscene {
 	class Transform;
 	class Material;
 	class Shape;

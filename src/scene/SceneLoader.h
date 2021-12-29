@@ -3,7 +3,7 @@
 #include <memory>
 #include <exception>
 
-namespace leo {
+namespace leoscene {
 	class Scene;
 	class Camera;
 

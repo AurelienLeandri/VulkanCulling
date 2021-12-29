@@ -2,7 +2,7 @@
 
 #include "GeometryIncludes.h"
 
-namespace leo {
+namespace leoscene {
     struct TransformParameters {
         glm::vec3 translation = glm::vec3(0);
         glm::vec3 rotation_rads = glm::vec3(0);

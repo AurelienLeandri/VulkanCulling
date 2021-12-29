@@ -1,6 +1,6 @@
 #include "DirectionalLight.h"
 
-namespace leo {
+namespace leoscene {
 	DirectionalLight::DirectionalLight(glm::vec3 direction, glm::vec3 emission) :
 		direction(direction), emission(emission)
 	{

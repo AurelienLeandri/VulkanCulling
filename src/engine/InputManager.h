@@ -7,7 +7,7 @@
 
 #include <ctime>
 
-namespace leo {
+namespace leoscene {
 	class Camera;
 }
 
@@ -30,7 +30,7 @@ public:
 
 public:
 	void init(GLFWwindow* window);
-	void setCamera(leo::Camera* camera);
+	void setCamera(leoscene::Camera* camera);
 	bool processInput();
 	void processMouseMovement(float xoffset, float yoffset);
 
@@ -47,7 +47,7 @@ private:
 
 private:
 	Application& _application;
-	leo::Camera* _camera = nullptr;
+	leoscene::Camera* _camera = nullptr;
 	GLFWwindow* _window = nullptr;
 	std::clock_t _frameClock = std::clock();
 	float _currentYaw = 0;

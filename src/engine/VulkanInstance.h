@@ -11,7 +11,7 @@ struct AllocatedImage {
 	VkImage image = VK_NULL_HANDLE;
 	VkDeviceMemory memory = VK_NULL_HANDLE;
 	VkImageView view = VK_NULL_HANDLE;
-	uint32_t mipLevels = 0;
+	uint32_t mipLevels = 1;
 };
 
 struct AllocatedBuffer {

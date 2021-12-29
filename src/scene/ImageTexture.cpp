@@ -1,6 +1,6 @@
 #include "ImageTexture.h"
 
-namespace leo {
+namespace leoscene {
 
 	const std::shared_ptr<const ImageTexture> ImageTexture::white = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new unsigned char[3]{255, 255, 255});
 	const std::shared_ptr<const ImageTexture> ImageTexture::black = std::make_shared<const ImageTexture>(1, 1, Type::FLOAT, Layout::RGBA, new unsigned char[3]{ 0, 0, 0 });

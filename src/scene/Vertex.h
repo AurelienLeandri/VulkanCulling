@@ -2,7 +2,7 @@
 
 #include "GeometryIncludes.h"
 
-namespace leo {
+namespace leoscene {
 	struct alignas(16) Vertex {
 		glm::vec3 position = glm::vec3(0);
 		glm::vec3 normal = glm::vec3(0, 0, 1);

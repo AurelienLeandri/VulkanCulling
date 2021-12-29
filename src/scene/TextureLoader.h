@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace leo {
+namespace leoscene {
 	class TextureLoader {
 	public:
 		struct LoadingOptions {

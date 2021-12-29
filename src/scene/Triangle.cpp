@@ -1,6 +1,6 @@
 #include "Triangle.h"
 
-namespace leo {
+namespace leoscene {
 	Triangle::Triangle(const Vertex& v0, const Vertex& v1, const Vertex& v2)
 		: data({v0, v1, v2})
 	{

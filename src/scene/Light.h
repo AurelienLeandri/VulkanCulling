@@ -2,7 +2,7 @@
 
 #include "GeometryIncludes.h"
 
-namespace leo {
+namespace leoscene {
 
     class Light
     {

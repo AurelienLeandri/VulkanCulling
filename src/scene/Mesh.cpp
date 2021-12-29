@@ -1,6 +1,6 @@
 #include "Mesh.h"
 
-namespace leo {
+namespace leoscene {
 	Mesh::Mesh(size_t nbVertices, size_t nbIndices)
 		: vertices(nbVertices), indices(nbIndices)
 	{

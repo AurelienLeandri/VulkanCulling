@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace leo {
+namespace leoscene {
 	struct SceneObject;
 	class Transform;
 	class Material;

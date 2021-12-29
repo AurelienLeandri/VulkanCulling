@@ -24,7 +24,7 @@ void InputManager::init(GLFWwindow* window)
     _frameClock = std::clock();
 }
 
-void InputManager::setCamera(leo::Camera* camera)
+void InputManager::setCamera(leoscene::Camera* camera)
 {
     _camera = camera;
 }

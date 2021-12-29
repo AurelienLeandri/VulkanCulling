@@ -2,7 +2,7 @@
 
 #include "Shape.h"
 
-namespace leo {
+namespace leoscene {
 	class Sphere : public Shape {
 	public:
 		struct alignas(16) Data {
