@@ -19,10 +19,7 @@ Application::Application()
     _inputManager = std::make_unique<InputManager>(*this);
 }
 
-Application::~Application()
-{
-    _cleanUp();
-}
+Application::~Application() = default;
 
 int Application::init()
 {
@@ -65,10 +62,10 @@ int Application::_initMembers() {
     return 0;
 }
 
-void Application::_cleanUp()
+void Application::cleanup()
 {
-    _renderer.reset();
-    _vulkan.reset();
+    _renderer->cleanup();
+    _vulkan->cleanup();
     _window.reset();
     _camera.reset();
 }

@@ -26,10 +26,10 @@ public:
 	int loadScene(const std::string& filePath);
 	int start();
 	int stop();
+	void cleanup();
 
 private:
 	int _initMembers();
-	void _cleanUp();
 
 private:
 	std::unique_ptr<VulkanRenderer> _renderer;

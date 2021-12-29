@@ -44,6 +44,8 @@ int main(int argc, const char** argv) {
 		return 2;
 	}
 
+	application.cleanup();
+
 	return 0;
 }
 

@@ -119,13 +119,13 @@ public:
 	};
 
 	VulkanRenderer(VulkanInstance* vulkan, Options options = {});
-	~VulkanRenderer();
 
 public:
 	void setCamera(const leoscene::Camera* camera);
 	void init();
 	void loadSceneToDevice(const leoscene::Scene* scene);
 	void iterate();
+	void cleanup();
 
 private:
 	void _updateCamera(uint32_t currentImage);
@@ -135,8 +135,6 @@ private:
 	void _createCullingDescriptors(uint32_t nbObjects);
 	void _computeDepthPyramid(VkCommandBuffer commandBuffer);
 	void _createGlobalDescriptors(uint32_t nbObjects);
-
-	void _cleanup();
 
 private:
 	Options _options;

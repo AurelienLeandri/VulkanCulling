@@ -44,7 +44,6 @@ public:
 
 public:
 	VulkanInstance(GLFWwindow* application);
-	~VulkanInstance();
 	VulkanInstance(const VulkanInstance& other) = delete;
 	VulkanInstance(const VulkanInstance&& other) = delete;
 	VulkanInstance& operator=(const VulkanInstance& other) = delete;
@@ -53,7 +52,7 @@ public:
 public:
 	void init();
 	void recreateSwapChain();
-	void waitForIdleDevice() const;
+	void cleanup();
 
 	// Utility
 	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
@@ -87,8 +86,6 @@ public:
 	void cleanupSwapChain();
 
 private:
-	void _cleanup();
-
 	// Device
 	int _ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndices& indices, SwapChainSupportDetails& swapChainSupportDetails);
 	QueueFamilyIndices _findRequiredQueueFamilies(VkPhysicalDevice device);

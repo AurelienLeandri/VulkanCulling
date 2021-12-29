@@ -39,12 +39,7 @@ VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
     _framesData.resize(_vulkan->getSwapChainSize());
 }
 
-VulkanRenderer::~VulkanRenderer()
-{
-    _cleanup();
-}
-
-void VulkanRenderer::_cleanup()
+void VulkanRenderer::cleanup()
 {
     vkDeviceWaitIdle(_device);
 

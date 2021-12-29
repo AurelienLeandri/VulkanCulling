@@ -209,12 +209,7 @@ void VulkanInstance::init()
     _createSwapChain();
 }
 
-VulkanInstance::~VulkanInstance()
-{
-    _cleanup();
-}
-
-void VulkanInstance::_cleanup()
+void VulkanInstance::cleanup()
 {
     cleanupSwapChain();
 
@@ -258,11 +253,6 @@ void VulkanInstance::recreateSwapChain()
 
     cleanupSwapChain();
     _createSwapChain();
-}
-
-void VulkanInstance::waitForIdleDevice() const
-{
-    vkDeviceWaitIdle(_device);
 }
 
 void VulkanInstance::cleanupSwapChain() {
