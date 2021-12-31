@@ -131,7 +131,6 @@ private:
 	std::vector<VkImageView> _swapChainImageViews;
 
 	// Allocator
-	public:
 	VmaAllocator _allocator;
 
 	Properties _properties;

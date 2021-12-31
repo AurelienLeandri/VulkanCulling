@@ -590,7 +590,7 @@ void VulkanInstance::copyDataToImage(VkCommandPool commandPool, uint32_t width, 
     AllocatedImage& image, const void* data, VkImageAspectFlags aspect)
 {
     AllocatedBuffer stagingBuffer;
-    VkDeviceSize imageSize = static_cast<uint64_t>(width) * height * nbChannels;
+    uint32_t imageSize = width * height * nbChannels;
     createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);
 
     copyDataToBuffer(imageSize, stagingBuffer, data, 0);
@@ -627,7 +627,7 @@ void VulkanInstance::createGPUBuffer(VkCommandPool cmdPool, VkDeviceSize size, V
     if (data) {
         AllocatedBuffer stagingBuffer;
         createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);
-        copyDataToBuffer(size, stagingBuffer, data);
+        copyDataToBuffer(static_cast<uint32_t>(size), stagingBuffer, data);
         copyBufferToBuffer(cmdPool, stagingBuffer.buffer, buffer.buffer, size);
         destroyBuffer(stagingBuffer);
     }
@@ -654,10 +654,6 @@ void VulkanInstance::copyBufferToBuffer(VkCommandPool cmdPool, VkBuffer srcBuffe
 }
 
 void VulkanInstance::copyBufferToImage(VkCommandPool cmdPool, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect) {
-    // TODO: Try to setup a command buffer to record several operations and then flush everything once,
-    // instead of calling beginSingleTimeCommands and endSingleTimeCommands each time.
-    // Could also be done for uniforms and other stuff that creates single-time command buffers several times.
-    // For example pass the commandBuffer as parameter and initialize it before doing all the createBuffer/Image, copyBuffer/image stuff.
     VkCommandBuffer commandBuffer = beginSingleTimeCommands(cmdPool);
 
     VkBufferImageCopy region = {};

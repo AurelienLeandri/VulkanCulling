@@ -200,7 +200,6 @@ void VulkanRenderer::init()
 
     VkCommandPoolCreateInfo poolInfo = VulkanUtils::createCommandPoolInfo(queueFamilyIndices.graphicsFamily.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-    // TODO: maybe make a command pool for transfer operations only, for switching layouts, transfering data and stuff.
     VK_CHECK(vkCreateCommandPool(_device, &poolInfo, nullptr, &_mainCommandPool));
 
     for (FrameData& frameData : _framesData) {
@@ -759,6 +758,7 @@ void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipeline);
 
+    // TODO: Per-level barriers that would switch between read and write layout for the depth pyramid update.
     for (uint32_t i = 0; i < _depthPyramid.mipLevels; ++i)
     {
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _depthPyramidPipelineLayout, 0, 1, &_depthPyramidDescriptorSets[i], 0, nullptr);
@@ -795,8 +795,8 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
-    size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
-    _vulkan->copyDataToBuffer(sizeof(GPUCameraData), _cameraDataBuffer, &cameraData, cameraBufferPadding * currentImage);
+    uint32_t cameraBufferPadding = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)));
+    _vulkan->copyDataToBuffer(static_cast<uint32_t>(sizeof(GPUCameraData)), _cameraDataBuffer, &cameraData, cameraBufferPadding * currentImage);
 }
 
 
