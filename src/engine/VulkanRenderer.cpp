@@ -68,37 +68,19 @@ void VulkanRenderer::cleanup()
     if (_sceneLoaded) {
         // Culling and indirect draw buffers
 
-        vkFreeMemory(_device, _gpuCullingGlobalData.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _gpuCullingGlobalData.buffer, nullptr);
-        _gpuCullingGlobalData = {};
-
-        vkFreeMemory(_device, _gpuIndexToObjectId.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _gpuIndexToObjectId.buffer, nullptr);
-        _gpuIndexToObjectId = {};
-
-        vkFreeMemory(_device, _gpuObjectInstances.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _gpuObjectInstances.buffer, nullptr);
-        _gpuObjectInstances = {};
-
-        vkFreeMemory(_device, _gpuResetBatches.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _gpuResetBatches.buffer, nullptr);
-        _gpuResetBatches = {};
-
-        vkFreeMemory(_device, _gpuBatches.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _gpuBatches.buffer, nullptr);
-        _gpuBatches = {};
+        _vulkan->destroyBuffer(_gpuCullingGlobalData);
+        _vulkan->destroyBuffer(_gpuIndexToObjectId);
+        _vulkan->destroyBuffer(_gpuObjectInstances);
+        _vulkan->destroyBuffer(_gpuResetBatches);
+        _vulkan->destroyBuffer(_gpuBatches);
 
         // Scene objects data
 
-        vkFreeMemory(_device, _objectsDataBuffer.deviceMemory, nullptr);
-        vkDestroyBuffer(_device, _objectsDataBuffer.buffer, nullptr);
-        _objectsDataBuffer = {};
+        _vulkan->destroyBuffer(_objectsDataBuffer);
 
         for (const std::unique_ptr<ShapeData>& shapeData : _shapeData) {
-            vkFreeMemory(_device, shapeData->indexBuffer.deviceMemory, nullptr);
-            vkDestroyBuffer(_device, shapeData->indexBuffer.buffer, nullptr);
-            vkFreeMemory(_device, shapeData->vertexBuffer.deviceMemory, nullptr);
-            vkDestroyBuffer(_device, shapeData->vertexBuffer.buffer, nullptr);
+            _vulkan->destroyBuffer(shapeData->indexBuffer);
+            _vulkan->destroyBuffer(shapeData->vertexBuffer);
         }
         _shapeData.clear();
 
@@ -109,8 +91,7 @@ void VulkanRenderer::cleanup()
 
         for (const std::unique_ptr<AllocatedImage>& materialImage : _materialImagesData) {
             vkDestroyImageView(_device, materialImage->view, nullptr);
-            vkFreeMemory(_device, materialImage->memory, nullptr);
-            vkDestroyImage(_device, materialImage->image, nullptr);
+            _vulkan->destroyImage(*materialImage);
         }
         _materialImagesData.clear();
     }
@@ -127,22 +108,15 @@ void VulkanRenderer::cleanup()
     _depthPyramidLevelViews.clear();
 
     vkDestroyImageView(_device, _depthPyramid.view, nullptr);
-    vkFreeMemory(_device, _depthPyramid.memory, nullptr);
-    vkDestroyImage(_device, _depthPyramid.image, nullptr);
-    _depthPyramid = {};
+    _vulkan->destroyImage(_depthPyramid);
 
     vkDestroySampler(_device, _depthImageSampler, nullptr);
     _depthImageSampler = VK_NULL_HANDLE;
 
     // Global data for shaders
 
-    vkFreeMemory(_device, _sceneDataBuffer.deviceMemory, nullptr);
-    vkDestroyBuffer(_device, _sceneDataBuffer.buffer, nullptr);
-    _sceneDataBuffer = {};
-
-    vkFreeMemory(_device, _cameraDataBuffer.deviceMemory, nullptr);
-    vkDestroyBuffer(_device, _cameraDataBuffer.buffer, nullptr);
-    _cameraDataBuffer = {};
+    _vulkan->destroyBuffer(_sceneDataBuffer);
+    _vulkan->destroyBuffer(_cameraDataBuffer);
 
     // Culling pipelines and passes
 
@@ -174,19 +148,13 @@ void VulkanRenderer::cleanup()
     */
 
     vkDestroyImageView(_device, _depthImage.view, nullptr);
-    vkFreeMemory(_device, _depthImage.memory, nullptr);
-    vkDestroyImage(_device, _depthImage.image, nullptr);
-    _depthImage = {};
+    _vulkan->destroyImage(_depthImage);
 
     vkDestroyImageView(_device, _framebufferDepth.view, nullptr);
-    vkFreeMemory(_device, _framebufferDepth.memory, nullptr);
-    vkDestroyImage(_device, _framebufferDepth.image, nullptr);
-    _framebufferDepth = {};
+    _vulkan->destroyImage(_framebufferDepth);
 
     vkDestroyImageView(_device, _framebufferColor.view, nullptr);
-    vkFreeMemory(_device, _framebufferColor.memory, nullptr);
-    vkDestroyImage(_device, _framebufferColor.image, nullptr);
-    _framebufferColor = {};
+    _vulkan->destroyImage(_framebufferColor);
 
     /*
     * Render pass
@@ -483,17 +451,15 @@ void VulkanRenderer::init()
     */
 
     // Camera dynamic buffer
-    VkDeviceSize cameraBufferSize = nbSwapChainImages * _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
-    _vulkan->createBuffer(_mainCommandPool, cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _cameraDataBuffer);
+    uint32_t minAlignment = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)));
+    VkDeviceSize cameraBufferSize = nbSwapChainImages * minAlignment;
+    _vulkan->createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, _cameraDataBuffer, minAlignment);
 
 
     // Global scene data buffer
     size_t sceneDataBufferSize = sizeof(GPUSceneData);
-    _vulkan->createBuffer(_mainCommandPool, sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        _sceneDataBuffer);
+    _vulkan->createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU, _sceneDataBuffer);
 
 
     // Depth texture sampler with max reduction mode; used to access the single sample depth image or the depth pyramid
@@ -829,11 +795,8 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
 
-    void* data = nullptr;
     size_t cameraBufferPadding = _vulkan->padUniformBufferSize(sizeof(GPUCameraData));
-    vkMapMemory(_device, _cameraDataBuffer.deviceMemory, cameraBufferPadding * currentImage, sizeof (GPUCameraData), 0, &data);
-    memcpy(data, &cameraData, sizeof (GPUCameraData));
-    vkUnmapMemory(_device, _cameraDataBuffer.deviceMemory);
+    _vulkan->copyDataToBuffer(sizeof(GPUCameraData), _cameraDataBuffer, &cameraData, cameraBufferPadding * currentImage);
 }
 
 
@@ -924,22 +887,9 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
                     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &textureCopyDstBarrier);
                     _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
 
-                    AllocatedBuffer stagingBuffer;
-                    VkDeviceSize imageSize = static_cast<uint64_t>(texWidth) * texHeight * nbChannels;
-                    _vulkan->createBuffer(_mainCommandPool, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer);
-
-                    void* data = nullptr;
-                    vkMapMemory(_device, stagingBuffer.deviceMemory, 0, imageSize, 0, &data);
-                    memcpy(data, sceneTexture->data, static_cast<size_t>(imageSize));
-                    vkUnmapMemory(_device, stagingBuffer.deviceMemory);
-
-                    _vulkan->copyBufferToImage(_mainCommandPool, stagingBuffer.buffer, loadedImage->image, texWidth, texHeight);
+                    _vulkan->copyDataToImage(_mainCommandPool, texWidth, texHeight, nbChannels, *loadedImage, sceneTexture->data);
 
                     _vulkan->generateMipmaps(_mainCommandPool, *loadedImage, imageFormat, texWidth, texHeight);
-
-                    vkDestroyBuffer(_device, stagingBuffer.buffer, nullptr);
-                    vkFreeMemory(_device, stagingBuffer.deviceMemory, nullptr);
-                    stagingBuffer = {};
 
                     _vulkan->createImageView(loadedImage->image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, loadedImage->mipLevels, loadedImage->view);
 
@@ -1060,12 +1010,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     sceneData.ambientColor = { 1, 0, 0, 0 };
     sceneData.sunlightColor = { 0, 1, 0, 0 };
     sceneData.sunlightDirection = { 0, 0, 0, 1 };
-
-    void* data = nullptr;
-    vkMapMemory(_device, _sceneDataBuffer.deviceMemory, 0, sizeof(GPUSceneData), 0, &data);
-    memcpy(data, &sceneData, sizeof(GPUSceneData));
-    vkUnmapMemory(_device, _sceneDataBuffer.deviceMemory);
-
+    _vulkan->copyDataToBuffer(sizeof(GPUSceneData), _sceneDataBuffer, &sceneData);
 
     /*
     * Per-object data

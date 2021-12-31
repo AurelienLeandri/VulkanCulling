@@ -19,11 +19,10 @@ endif()
 
 project(${NAME} VERSION 1.0.0)
  
-# 1. Finding Vulkan from script or .env.cmake
 if (DEFINED VULKAN_INCLUDE_PATH AND DEFINED VULKAN_LIB_PATH)
   set(VULKAN_FOUND "True")
 else()
-  find_package(Vulkan REQUIRED) # throws error if could not find Vulkan
+  find_package(Vulkan REQUIRED)
   set (VULKAN_INCLUDE_PATH "$ENV{VULKAN_SDK}/Include")
   set (VULKAN_LIB_PATH "$ENV{VULKAN_SDK}/Lib")
   set(VULKAN_FOUND "True")
@@ -34,15 +33,17 @@ else()
     message(STATUS "Using Vulkan lib at: ${VULKAN_LIB_PATH}")
 endif()
 
-# 2. Finding GLFW3 from .env.cmake
 if (NOT DEFINED GLFW_LIB_PATH OR NOT DEFINED GLFW_INCLUDE_PATH)
   message(FATAL_ERROR "GLFW_LIB_PATH and GLFW_INCLUDE_PATH are not set in .env.cmake!")
 endif()
 
 message("Using GLFW lib found in ${GLFW_LIB_PATH}")
 
-# 2. Finding Assimp from .env.cmake (please set)
 if (NOT DEFINED ASSIMP_INCLUDE_PATH OR NOT DEFINED ASSIMP_LIB_PATH)
+  message(FATAL_ERROR "ASSIMP_LIB_PATH and ASSIMP_INCLUDE_PATH is not set in .env.cmake!")
+endif()
+
+if (NOT DEFINED VMA_INCLUDE_PATH OR NOT DEFINED VMA_LIB_PATH)
   message(FATAL_ERROR "ASSIMP_LIB_PATH and ASSIMP_INCLUDE_PATH is not set in .env.cmake!")
 endif()
 
@@ -75,15 +76,17 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   ${VULKAN_INCLUDE_PATH}
   ${GLFW_INCLUDE_PATH}
   ${ASSIMP_INCLUDE_PATH}
+  ${VMA_INCLUDE_PATH}
   )
 
 target_link_directories(${PROJECT_NAME} PUBLIC
   ${VULKAN_LIB_PATH}
   ${GLFW_LIB_PATH}
   ${ASSIMP_LIB_PATH}
+  ${VMA_LIB_PATH}
 )
 
-target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 assimp-vc140-mt)
+target_link_libraries(${PROJECT_NAME} glfw3 vulkan-1 assimp-vc140-mt VulkanMemoryAllocator)
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
