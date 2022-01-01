@@ -1,5 +1,9 @@
 #include "engine/Application.h"
 
+#define _CRTDBG_MAP_ALLOC
+#include <stdio.h> 
+#include <crtdbg.h>
+
 #include <iostream>
 
 namespace {
@@ -24,27 +28,29 @@ int main(int argc, const char** argv) {
 		}
 	}
 
-	Application application;
+	{
+		Application application;
 
-	std::cout << "Initializing application" << std::endl;
-	if (application.init()) {
-		std::cerr << "Error. Application failed to initialize. Exiting." << std::endl;
-		return 2;
+		std::cout << "Initializing application" << std::endl;
+		if (application.init()) {
+			std::cerr << "Error. Application failed to initialize. Exiting." << std::endl;
+			return 2;
+		}
+
+		std::cout << "Loading scene" << std::endl;
+		if (application.loadScene(scenePath)) {
+			std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
+			return 2;
+		}
+
+		std::cout << "Starting application" << std::endl;
+		if (application.start()) {
+			std::cerr << "Error while running the application. Exiting." << std::endl;
+			return 2;
+		}
+
+		application.cleanup();
 	}
-
-	std::cout << "Loading scene" << std::endl;
-	if (application.loadScene(scenePath)) {
-		std::cerr << "Error: Scene loading failed. Exiting." << std::endl;
-		return 2;
-	}
-
-	std::cout << "Starting application" << std::endl;
-	if (application.start()) {
-		std::cerr << "Error while running the application. Exiting." << std::endl;
-		return 2;
-	}
-
-	application.cleanup();
 
 	return 0;
 }

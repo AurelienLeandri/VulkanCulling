@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ModelLoader.h"
+
 #include <memory>
 #include <exception>
 
@@ -18,6 +20,17 @@ namespace leoscene {
 
 	class SceneLoader {
 	public:
-		static void loadScene(const char* filePath, Scene* scene, Camera* camera);
+		void loadScene(const char* filePath, Scene* scene, Camera* camera);
+		
+	private:
+		void _loadModelEntry(
+			std::stringstream& entry,
+			std::unordered_map<std::string, Model>& models,
+			const std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms,
+			const std::string& fileDirectoryPath,
+			size_t lineNb);
+
+	private:
+		ModelLoader _modelLoader;
 	};
 }

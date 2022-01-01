@@ -16,12 +16,6 @@
 namespace leoscene {
 	namespace {
 		void loadCameraEntry(std::stringstream& entry, Camera* camera, size_t lineNb);
-		void loadModelEntry(
-			std::stringstream& entry,
-			std::unordered_map<std::string, Model>& models,
-			const std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms,
-			const std::string& fileDirectoryPath,
-			size_t lineNb);
 		void loadTransformEntry(std::stringstream& entry, std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms, size_t lineNb);
 		void addModelInstance(std::stringstream& entry,
 			Scene* scene,
@@ -65,7 +59,7 @@ namespace leoscene {
 					loadCameraEntry(ss, camera, lineNb);
 				}
 				else if (entryType == "t") loadTransformEntry(ss, transforms, lineNb);
-				else if (entryType == "m") loadModelEntry(ss, models, transforms, fileDirectoryPath, lineNb);
+				else if (entryType == "m") _loadModelEntry(ss, models, transforms, fileDirectoryPath, lineNb);
 				else if (entryType == "o") addModelInstance(ss, scene, models, transforms, lineNb);
 				else {
 					throw SceneLoaderException("Could not start reading line. First character of the line does not correspond to any type of entry.", lineNb);
@@ -83,6 +77,39 @@ namespace leoscene {
 		}
 	}
 
+	void SceneLoader::_loadModelEntry(
+		std::stringstream& entry,
+		std::unordered_map<std::string, Model>& models,
+		const std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms,
+		const std::string& fileDirectoryPath,
+		size_t lineNb)
+	{
+		std::string modelPath;
+		std::string modelName;
+		entry >> modelName >> modelPath;
+		if (entry.fail() || !modelName.size() || !modelPath.size()) {
+			throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
+		}
+		if (models.find(modelName) != models.end()) {
+			throw SceneLoaderException("A model with that name was already created. No duplicates are allowed for model entries. Choose a different name.", lineNb);
+		}
+
+		if (modelPath.rfind("__sphere", 0) == 0) {  // Sphere
+			uint32_t xSegments;
+			uint32_t ySegments;
+			entry >> xSegments >> ySegments;
+			if (entry.fail() || !xSegments || !ySegments) {
+				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
+			}
+			models[modelName] = _modelLoader.loadSphereModel(xSegments, ySegments);
+			static std::shared_ptr<Material> sphereMaterial = std::make_shared<PerformanceMaterial>();
+			models[modelName].objects[0].material = sphereMaterial;
+		}
+		else {
+			models[modelName] = _modelLoader.loadModel((fileDirectoryPath + "/" + modelPath).c_str());
+		}
+	}
+
 	namespace {
 		void loadCameraEntry(std::stringstream& entry, Camera* camera, size_t lineNb)
 		{
@@ -94,39 +121,6 @@ namespace leoscene {
 				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
 			}
 			*camera = Camera(position, target, glm::vec3(0, 1, 0), glm::radians(fov));
-		}
-
-		void loadModelEntry(
-			std::stringstream& entry,
-			std::unordered_map<std::string, Model>& models,
-			const std::unordered_map<std::string, std::shared_ptr<const Transform>> &transforms,
-			const std::string& fileDirectoryPath,
-			size_t lineNb)
-		{
-			std::string modelPath;
-			std::string modelName;
-			entry >> modelName >> modelPath;
-			if (entry.fail() || !modelName.size() || !modelPath.size()) {
-				throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
-			}
-			if (models.find(modelName) != models.end()) {
-				throw SceneLoaderException("A model with that name was already created. No duplicates are allowed for model entries. Choose a different name.", lineNb);
-			}
-
-			if (modelPath.rfind("__sphere", 0) == 0) {  // Sphere
-				uint32_t xSegments;
-				uint32_t ySegments;
-				entry >> xSegments >> ySegments;
-				if (entry.fail() || !xSegments || !ySegments) {
-					throw SceneLoaderException("Could not read the line. Some of the tokens are invalid or absent. Check format and values.", lineNb);
-				}
-				models[modelName] = ModelLoader::loadSphereModel(xSegments, ySegments);
-				static std::shared_ptr<Material> sphereMaterial = std::make_shared<PerformanceMaterial>();
-				models[modelName].objects[0].material = sphereMaterial;
-			}
-			else {
-				models[modelName] = ModelLoader::loadModel((fileDirectoryPath + "/" + modelPath).c_str());
-			}
 		}
 
 		void loadTransformEntry(std::stringstream& entry, std::unordered_map<std::string, std::shared_ptr<const Transform>>& transforms, size_t lineNb)

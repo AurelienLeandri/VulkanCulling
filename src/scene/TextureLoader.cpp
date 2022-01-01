@@ -12,8 +12,6 @@ namespace leoscene {
         void rgbToLuminance(const unsigned char* src, unsigned char* dest, int width, int height, int srcNbCHannels);
     }
 
-    std::unordered_map<std::string, std::shared_ptr<ImageTexture>> TextureLoader::_fileTexturesCache;
-
     std::shared_ptr<ImageTexture> TextureLoader::loadTexture(const char* filePath, TextureLoader::LoadingOptions options)
     {
         auto cacheIterator = _fileTexturesCache.find(filePath);

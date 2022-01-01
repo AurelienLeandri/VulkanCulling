@@ -72,9 +72,10 @@ void Application::cleanup()
 int Application::loadScene(const std::string& filePath)
 {
     leoscene::Scene scene;
+    leoscene::SceneLoader sceneLoader;
 
     try {
-        leoscene::SceneLoader::loadScene(filePath.c_str(), &scene, _camera.get());
+        sceneLoader.loadScene(filePath.c_str(), &scene, _camera.get());
     }
     catch (leoscene::SceneLoaderException e) {
         std::cerr << e.what() << std::endl;
