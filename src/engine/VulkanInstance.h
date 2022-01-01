@@ -53,8 +53,9 @@ public:
 
 public:
 	void init();
-	void recreateSwapChain();
 	void cleanup();
+	void cleanupSwapChain();
+	void recreateSwapChain();
 
 	// Utility
 	
@@ -94,7 +95,6 @@ public:
 	VkPhysicalDevice& getPhysicalDevice();
 	VkInstance& getInstance();
 	size_t getSwapChainSize() const;
-	void cleanupSwapChain();
 
 private:
 	// Device

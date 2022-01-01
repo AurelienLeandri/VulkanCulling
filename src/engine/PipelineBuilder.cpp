@@ -63,7 +63,13 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device, VkRenderPass pass)
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	pipelineInfo.pDynamicState = nullptr;
+	std::array<VkDynamicState, 2> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	VkPipelineDynamicStateCreateInfo dynamicStatesInfo{};
+	dynamicStatesInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStatesInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+	dynamicStatesInfo.pDynamicStates = dynamicStates.data();
+
+	pipelineInfo.pDynamicState = &dynamicStatesInfo;
 
 	VkPipeline newPipeline;
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS) {

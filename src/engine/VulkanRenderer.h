@@ -126,13 +126,20 @@ public:
 	void loadSceneToDevice(const leoscene::Scene* scene);
 	void iterate();
 	void cleanup();
+	void cleanupSwapChainDependentObjects();
+	void recreateSwapChainDependentObjects();
 
 private:
 	void _updateCamera(uint32_t currentImage);
-
+	void _createMainRenderPass();
 	void _fillConstantGlobalBuffers(const leoscene::Scene* scene);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass);
 	void _createCullingDescriptors(uint32_t nbObjects);
+	void _createDepthPyramidDescriptors();
+	void _createFramebuffers();
+	void _createDepthPyramid();
+	void _createDepthSampler();
+	void _createBarriers();
 	void _computeDepthPyramid(VkCommandBuffer commandBuffer);
 	void _createGlobalDescriptors(uint32_t nbObjects);
 
@@ -177,6 +184,7 @@ private:
 	AllocatedImage _framebufferDepth;
 	AllocatedImage _depthImage;
 	VkSampler _depthImageSampler = VK_NULL_HANDLE;
+	VkFormat _depthBufferFormat = VK_FORMAT_UNDEFINED;
 
 	// Synchronization-related data for the iterate() function.
 	static const int _MAX_FRAMES_IN_FLIGHT = 2;
@@ -187,6 +195,7 @@ private:
 	std::vector<std::unique_ptr<AllocatedImage>> _materialImagesData;
 	std::vector<VkSampler> _materialImagesSamplers;
 	std::vector<std::unique_ptr<ShapeData>> _shapeData;
+	uint32_t _totalInstancesNb = 0;
 
 	// Indexes and utility containers to group similar objects in the scene
 	std::vector<DrawCallInfo> _drawCalls;

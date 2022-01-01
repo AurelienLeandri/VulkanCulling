@@ -257,6 +257,7 @@ bool VulkanInstance::QueueFamilyIndices::hasMandatoryFamilies()
 
 void VulkanInstance::recreateSwapChain()
 {
+    // TODO: Get width and height from the application instead.
     // Minimization: we wait until the window is expanded
     int width = 0, height = 0;
     glfwGetFramebufferSize(_window, &width, &height);
@@ -265,7 +266,11 @@ void VulkanInstance::recreateSwapChain()
         glfwWaitEvents();
     }
 
-    cleanupSwapChain();
+    VkExtent2D swapChainExtent{};
+    swapChainExtent.width = static_cast<uint32_t>(width);
+    swapChainExtent.height = static_cast<uint32_t>(height);
+    _properties.swapChainExtent = swapChainExtent;
+
     _createSwapChain();
 }
 

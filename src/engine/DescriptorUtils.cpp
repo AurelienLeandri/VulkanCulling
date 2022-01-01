@@ -92,6 +92,8 @@ void DescriptorAllocator::cleanup()
 		vkDestroyDescriptorPool(_device, pool, nullptr);
 	}
 	_availablePools.clear();
+
+	_currentPool = VK_NULL_HANDLE;
 }
 
 VkDescriptorPool DescriptorAllocator::_createPool()
