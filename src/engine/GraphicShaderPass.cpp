@@ -102,6 +102,8 @@ VkPipelineLayout ShaderPass::reflectShaderModules(const Parameters& parameters)
 
 			pushConstantRanges.push_back(pcs);
 		}
+
+		spvReflectDestroyShaderModule(&spvmodule);
 	}
 
 	this->_descriptorSetLayouts.resize(reflectedSetLayouts.size(), VK_NULL_HANDLE);
