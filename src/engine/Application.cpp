@@ -7,7 +7,6 @@
 
 #include <scene/Scene.h>
 #include <scene/SceneLoader.h>
-#include <scene/DirectionalLight.h>
 
 #include "VulkanRenderer.h"
 #include "DebugUtils.h"
@@ -81,9 +80,6 @@ int Application::loadScene(const std::string& filePath)
         std::cerr << e.what() << std::endl;
         return -1;
     }
-
-    // TODO: load lights from scene file
-    scene.lights.push_back(std::make_shared<leoscene::DirectionalLight>(glm::vec3(0, -1, 0), glm::vec3(1000)));
 
     _renderer->setCamera(_camera.get());
     _renderer->loadSceneToDevice(&scene);

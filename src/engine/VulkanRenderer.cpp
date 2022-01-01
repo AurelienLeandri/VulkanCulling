@@ -2,8 +2,6 @@
 
 #include <scene/Scene.h>
 #include <scene/PerformanceMaterial.h>
-#include <scene/DirectionalLight.h>
-#include <scene/PointLight.h>
 #include <scene/Mesh.h>
 #include <scene/Transform.h>
 #include <scene/Camera.h>
