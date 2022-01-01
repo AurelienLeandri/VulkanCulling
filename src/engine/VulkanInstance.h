@@ -69,11 +69,14 @@ public:
 	void generateMipmaps(VkCommandPool cmdPool, AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& buffer, uint32_t minAlignment = 0);
-	void createGPUBuffer(VkCommandPool cmdPool, VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
+	void createGPUBufferFromCPUData(VkCommandPool cmdPool, VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
 	void copyDataToBuffer(uint32_t size, AllocatedBuffer& buffer, const void* data, uint32_t offset = 0);
 	void destroyBuffer(AllocatedBuffer& buffer);
 	void copyBufferToBuffer(VkCommandPool cmdPool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	size_t padUniformBufferSize(size_t originalSize);
+
+	void* mapBuffer(AllocatedBuffer& buffer);
+	void unmapBuffer(AllocatedBuffer& buffer);
 
 	VkCommandBuffer beginSingleTimeCommands(VkCommandPool& commandPool);
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);

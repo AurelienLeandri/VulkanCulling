@@ -625,7 +625,7 @@ void VulkanInstance::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
     }
 }
 
-void VulkanInstance::createGPUBuffer(VkCommandPool cmdPool, VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer)
+void VulkanInstance::createGPUBufferFromCPUData(VkCommandPool cmdPool, VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer)
 {
     createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VMA_MEMORY_USAGE_GPU_ONLY, buffer);
 
@@ -687,6 +687,18 @@ void VulkanInstance::destroyImage(AllocatedImage& image)
 {
     vmaDestroyImage(_allocator, image.image, image.vmaAllocation);
     image = {};
+}
+
+void* VulkanInstance::mapBuffer(AllocatedBuffer& buffer)
+{
+    void* data = nullptr;
+    vmaMapMemory(_allocator, buffer.vmaAllocation, &data);
+    return data;
+}
+
+void VulkanInstance::unmapBuffer(AllocatedBuffer& buffer)
+{
+    vmaUnmapMemory(_allocator, buffer.vmaAllocation);
 }
 
 void VulkanInstance::generateMipmaps(VkCommandPool cmdPool, AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight) {

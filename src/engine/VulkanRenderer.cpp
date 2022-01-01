@@ -747,175 +747,178 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
         const leoscene::Shape* shape = nullptr;
         const leoscene::Transform* transform = nullptr;
     };
-
-    std::map<const leoscene::Material*, Material*> loadedMaterialsCache;
-    std::map<const leoscene::ImageTexture*, AllocatedImage*> loadedImagesCache;
-    std::map<const leoscene::ImageTexture*, VkSampler> loadedImageSamplersCache;
-    std::map<const leoscene::Shape*, ShapeData*> shapeDataCache;
     std::map<const Material*, std::map<const ShapeData*, std::vector<_ObjectInstanceData>>> objectInstances;
 
-    for (const leoscene::SceneObject& sceneObject : scene->objects) {
-        const leoscene::PerformanceMaterial* sceneMaterial = static_cast<const leoscene::PerformanceMaterial*>(sceneObject.material.get());
-        const leoscene::Shape* sceneShape = sceneObject.shape.get();
-        Material* loadedMaterial = nullptr;
-        ShapeData* loadedShape = nullptr;
+    {
+        std::map<const leoscene::Material*, Material*> loadedMaterialsCache;
+        std::map<const leoscene::ImageTexture*, AllocatedImage*> loadedImagesCache;
+        std::map<const leoscene::ImageTexture*, VkSampler> loadedImageSamplersCache;
+        std::map<const leoscene::Shape*, ShapeData*> shapeDataCache;
 
-        // Load material data on the device
+        for (const leoscene::SceneObject& sceneObject : scene->objects) {
+            const leoscene::PerformanceMaterial* sceneMaterial = static_cast<const leoscene::PerformanceMaterial*>(sceneObject.material.get());
+            const leoscene::Shape* sceneShape = sceneObject.shape.get();
+            Material* loadedMaterial = nullptr;
+            ShapeData* loadedShape = nullptr;
 
-        if (loadedMaterialsCache.find(sceneMaterial) == loadedMaterialsCache.end()) {
-            loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
+            // Load material data on the device
 
-            static const size_t nbTexturesInMaterial = 5;
-            std::array<const leoscene::ImageTexture*, nbTexturesInMaterial> materialTextures = {
-                sceneMaterial->diffuseTexture.get(), sceneMaterial->specularTexture.get(), sceneMaterial->ambientTexture.get(), sceneMaterial->normalsTexture.get(), sceneMaterial->heightTexture.get()
-            };
+            if (loadedMaterialsCache.find(sceneMaterial) == loadedMaterialsCache.end()) {
+                loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
 
-            for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
-                const leoscene::ImageTexture* sceneTexture = materialTextures[i];
-                AllocatedImage* loadedImage = nullptr;
-                VkSampler loadedImageSampler = VK_NULL_HANDLE;
-                if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
-                    _materialImagesData.push_back(std::make_unique<AllocatedImage>());
-                    loadedImage = _materialImagesData.back().get();
+                static const size_t nbTexturesInMaterial = 5;
+                std::array<const leoscene::ImageTexture*, nbTexturesInMaterial> materialTextures = {
+                    sceneMaterial->diffuseTexture.get(), sceneMaterial->specularTexture.get(), sceneMaterial->ambientTexture.get(), sceneMaterial->normalsTexture.get(), sceneMaterial->heightTexture.get()
+                };
 
-                    uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
-                    uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
+                for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
+                    const leoscene::ImageTexture* sceneTexture = materialTextures[i];
+                    AllocatedImage* loadedImage = nullptr;
+                    VkSampler loadedImageSampler = VK_NULL_HANDLE;
+                    if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
+                        _materialImagesData.push_back(std::make_unique<AllocatedImage>());
+                        loadedImage = _materialImagesData.back().get();
 
-                    uint32_t imageMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+                        uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
+                        uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
 
-                    uint32_t nbChannels = 0;
-                    VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
-                    switch (sceneTexture->layout) {
-                    case leoscene::ImageTexture::Layout::R:
-                        imageFormat = VK_FORMAT_R8_UNORM;
-                        nbChannels = 1;
-                        break;
-                    case leoscene::ImageTexture::Layout::RGBA:
-                        if (i == 3) { // Normals texture
-                            imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                        uint32_t imageMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+
+                        uint32_t nbChannels = 0;
+                        VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
+                        switch (sceneTexture->layout) {
+                        case leoscene::ImageTexture::Layout::R:
+                            imageFormat = VK_FORMAT_R8_UNORM;
+                            nbChannels = 1;
+                            break;
+                        case leoscene::ImageTexture::Layout::RGBA:
+                            if (i == 3) { // Normals texture
+                                imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                            }
+                            else {
+                                imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                            }
+                            nbChannels = 4;
+                            break;
+                        default:
+                            break;
                         }
-                        else {
-                            imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+
+                        if (!nbChannels || imageFormat == VkFormat::VK_FORMAT_UNDEFINED) {
+                            throw VulkanRendererException("A texture on a sceneMaterial has a format that is not expected. Something is very very wrong.");
                         }
-                        nbChannels = 4;
-                        break;
-                    default:
-                        break;
+
+                        // Image handle and memory
+
+                        _vulkan->createImage(texWidth, texHeight, imageMipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
+
+                        VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
+                        VkImageMemoryBarrier textureCopyDstBarrier = VulkanUtils::createImageBarrier(
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            loadedImage->image,
+                            VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                            0, loadedImage->mipLevels
+                        );
+                        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &textureCopyDstBarrier);
+                        _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
+
+                        _vulkan->copyDataToImage(_mainCommandPool, texWidth, texHeight, nbChannels, *loadedImage, sceneTexture->data);
+
+                        _vulkan->generateMipmaps(_mainCommandPool, *loadedImage, imageFormat, texWidth, texHeight);
+
+                        _vulkan->createImageView(loadedImage->image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, loadedImage->mipLevels, loadedImage->view);
+
+                        VkSamplerCreateInfo samplerInfo = {};
+                        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+                        samplerInfo.magFilter = VK_FILTER_LINEAR;
+                        samplerInfo.minFilter = VK_FILTER_LINEAR;
+                        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+                        samplerInfo.anisotropyEnable = VK_TRUE;
+
+                        samplerInfo.maxAnisotropy = _vulkan->getProperties().maxSamplerAnisotropy;
+
+                        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+                        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+                        samplerInfo.compareEnable = VK_FALSE;
+                        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+                        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+                        samplerInfo.minLod = 0.0f;
+                        samplerInfo.maxLod = static_cast<float>(loadedImage->mipLevels);
+                        samplerInfo.mipLodBias = 0.0f;
+
+                        _materialImagesSamplers.emplace_back();
+                        VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &_materialImagesSamplers.back()));
+                        loadedImageSampler = _materialImagesSamplers.back();
+
+                        loadedImagesCache[sceneTexture] = loadedImage;
+                        loadedImageSamplersCache[sceneTexture] = loadedImageSampler;
+                    }
+                    else {
+                        loadedImage = loadedImagesCache[sceneTexture];
+                        loadedImageSampler = loadedImageSamplersCache[sceneTexture];
                     }
 
-                    if (!nbChannels || imageFormat == VkFormat::VK_FORMAT_UNDEFINED) {
-                        throw VulkanRendererException("A texture on a sceneMaterial has a format that is not expected. Something is very very wrong.");
-                    }
-
-                    // Image handle and memory
-
-                    _vulkan->createImage(texWidth, texHeight, imageMipLevels, VK_SAMPLE_COUNT_1_BIT, imageFormat, VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, *loadedImage);
-
-                    VkCommandBuffer cmd = _vulkan->beginSingleTimeCommands(_mainCommandPool);
-                    VkImageMemoryBarrier textureCopyDstBarrier = VulkanUtils::createImageBarrier(
-                        VK_IMAGE_LAYOUT_UNDEFINED,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        loadedImage->image,
-                        VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                        0, loadedImage->mipLevels
-                    );
-                    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &textureCopyDstBarrier);
-                    _vulkan->endSingleTimeCommands(cmd, _mainCommandPool);
-
-                    _vulkan->copyDataToImage(_mainCommandPool, texWidth, texHeight, nbChannels, *loadedImage, sceneTexture->data);
-
-                    _vulkan->generateMipmaps(_mainCommandPool, *loadedImage, imageFormat, texWidth, texHeight);
-
-                    _vulkan->createImageView(loadedImage->image, imageFormat, VK_IMAGE_ASPECT_COLOR_BIT, loadedImage->mipLevels, loadedImage->view);
-
-                    VkSamplerCreateInfo samplerInfo = {};
-                    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-                    samplerInfo.magFilter = VK_FILTER_LINEAR;
-                    samplerInfo.minFilter = VK_FILTER_LINEAR;
-                    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-                    samplerInfo.anisotropyEnable = VK_TRUE;
-
-                    samplerInfo.maxAnisotropy = _vulkan->getProperties().maxSamplerAnisotropy;
-
-                    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-                    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-                    samplerInfo.compareEnable = VK_FALSE;
-                    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-                    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-                    samplerInfo.minLod = 0.0f;
-                    samplerInfo.maxLod = static_cast<float>(loadedImage->mipLevels);
-                    samplerInfo.mipLodBias = 0.0f;
-
-                    _materialImagesSamplers.emplace_back();
-                    VK_CHECK(vkCreateSampler(_device, &samplerInfo, nullptr, &_materialImagesSamplers.back()));
-                    loadedImageSampler = _materialImagesSamplers.back();
-
-                    loadedImagesCache[sceneTexture] = loadedImage;
-                    loadedImageSamplersCache[sceneTexture] = loadedImageSampler;
-                }
-                else {
-                    loadedImage = loadedImagesCache[sceneTexture];
-                    loadedImageSampler = loadedImageSamplersCache[sceneTexture];
+                    loadedMaterial->textures[i].sampler = loadedImageSampler;
+                    loadedMaterial->textures[i].view = loadedImage->view;
                 }
 
-                loadedMaterial->textures[i].sampler = loadedImageSampler;
-                loadedMaterial->textures[i].view = loadedImage->view;
+                _materialBuilder.setupMaterialDescriptorSets(*loadedMaterial);
+
+                loadedMaterialsCache[sceneMaterial] = loadedMaterial;
+            }
+            else {
+                loadedMaterial = loadedMaterialsCache[sceneMaterial];
             }
 
-            _materialBuilder.setupMaterialDescriptorSets(*loadedMaterial);
 
-            loadedMaterialsCache[sceneMaterial] = loadedMaterial;
+            /*
+            * Load shape data on the device
+            */
+
+            if (shapeDataCache.find(sceneShape) == shapeDataCache.end()) {
+                _shapeData.push_back(std::make_unique<ShapeData>());
+                loadedShape = _shapeData.back().get();
+
+                const leoscene::Mesh* mesh = static_cast<const leoscene::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
+
+                // Vertex buffer
+                _vulkan->createGPUBufferFromCPUData(_mainCommandPool, sizeof(leoscene::Vertex) * mesh->vertices.size(),
+                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
+                    loadedShape->vertexBuffer);
+
+                // Index buffer
+                _vulkan->createGPUBufferFromCPUData(_mainCommandPool, sizeof(mesh->indices[0]) * mesh->indices.size(),
+                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
+                    loadedShape->indexBuffer);
+
+                loadedShape->nbElements = static_cast<uint32_t>(mesh->indices.size());
+
+                shapeDataCache[sceneShape] = loadedShape;
+            }
+            else {
+                loadedShape = shapeDataCache[sceneShape];
+            }
+
+
+            /*
+            * Incrementing the counter for the given pair of material and shape data.
+            */
+
+            if (objectInstances.find(loadedMaterial) == objectInstances.end()) {
+                objectInstances[loadedMaterial] = {};
+            }
+            if (objectInstances[loadedMaterial].find(loadedShape) == objectInstances[loadedMaterial].end()) {
+                objectInstances[loadedMaterial][loadedShape] = {};
+            }
+            objectInstances[loadedMaterial][loadedShape].push_back({ sceneShape, sceneObject.transform.get() });
         }
-        else {
-            loadedMaterial = loadedMaterialsCache[sceneMaterial];
-        }
 
-
-        /*
-        * Load shape data on the device
-        */
-
-        if (shapeDataCache.find(sceneShape) == shapeDataCache.end()) {
-            _shapeData.push_back(std::make_unique<ShapeData>());
-            loadedShape = _shapeData.back().get();
-
-            const leoscene::Mesh* mesh = static_cast<const leoscene::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
-
-            // Vertex buffer
-            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(leoscene::Vertex) * mesh->vertices.size(),
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh->vertices.data(),
-                loadedShape->vertexBuffer);
-
-            // Index buffer
-            _vulkan->createGPUBuffer(_mainCommandPool, sizeof(mesh->indices[0]) * mesh->indices.size(),
-                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh->indices.data(),
-                loadedShape->indexBuffer);
-
-            loadedShape->nbElements = static_cast<uint32_t>(mesh->indices.size());
-
-            shapeDataCache[sceneShape] = loadedShape;
-        }
-        else {
-            loadedShape = shapeDataCache[sceneShape];
-        }
-
-
-        /*
-        * Incrementing the counter for the given pair of material and shape data.
-        */
-
-        if (objectInstances.find(loadedMaterial) == objectInstances.end()) {
-            objectInstances[loadedMaterial] = {};
-        }
-        if (objectInstances[loadedMaterial].find(loadedShape) == objectInstances[loadedMaterial].end()) {
-            objectInstances[loadedMaterial][loadedShape] = {};
-        }
-        objectInstances[loadedMaterial][loadedShape].push_back({ sceneShape, sceneObject.transform.get() });
     }
 
     _nbMaterials = objectInstances.size();
@@ -953,37 +956,39 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     * Per-object data
     */
 
-    size_t objectsDataBufferSize = scene->objects.size() * sizeof(GPUObjectData);
+    {
+        size_t objectsDataBufferSize = scene->objects.size() * sizeof(GPUObjectData);
 
-    std::vector<GPUObjectData> objectData(objectsDataBufferSize);
-    int i = 0;
-    for (const auto& materialShapesPair : objectInstances) {
-        const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
-        for (const auto& shapeNbPair : materialShapesPair.second) {
-            const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
-            for (const _ObjectInstanceData& instanceData : shapeNbPair.second) {
-                const glm::mat4& modelMatrix = instanceData.transform->getMatrix();
-                objectData[i].modelMatrix = modelMatrix;
+        AllocatedBuffer stagingBuffer;
+        _vulkan->createBuffer(objectsDataBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);
 
-                // Computing sphere bounds of the object in world space
-                const glm::vec4& sphereBounds = static_cast<const leoscene::Mesh*>(instanceData.shape)->boundingSphere;
-                glm::vec4 transformedSphere = modelMatrix * glm::vec4(sphereBounds.x, sphereBounds.y, sphereBounds.z, 1);
-                float maxScale = glm::max(glm::max(glm::length(modelMatrix[0]), glm::length(modelMatrix[1])), glm::length(modelMatrix[2]));
-                transformedSphere.w = maxScale * sphereBounds.w;
-                objectData[i].sphereBounds = transformedSphere;
+        GPUObjectData* objectDataPtr = static_cast<GPUObjectData*>(_vulkan->mapBuffer(stagingBuffer));
+        int i = 0;
+        for (const auto& materialShapesPair : objectInstances) {
+            const Material* material = materialShapesPair.first;  // TODO: assuming material is Performance for now
+            for (const auto& shapeNbPair : materialShapesPair.second) {
+                const ShapeData* shape = shapeNbPair.first;  // TODO: assuming the shape is a mesh for now
+                for (const _ObjectInstanceData& instanceData : shapeNbPair.second) {
+                    const glm::mat4& modelMatrix = instanceData.transform->getMatrix();
+                    objectDataPtr[i].modelMatrix = modelMatrix;
 
-                i++;
+                    // Computing sphere bounds of the object in world space
+                    const glm::vec4& sphereBounds = static_cast<const leoscene::Mesh*>(instanceData.shape)->boundingSphere;
+                    glm::vec4 transformedSphere = modelMatrix * glm::vec4(sphereBounds.x, sphereBounds.y, sphereBounds.z, 1);
+                    float maxScale = glm::max(glm::max(glm::length(modelMatrix[0]), glm::length(modelMatrix[1])), glm::length(modelMatrix[2]));
+                    transformedSphere.w = maxScale * sphereBounds.w;
+                    objectDataPtr[i].sphereBounds = transformedSphere;
+
+                    i++;
+                }
             }
         }
+        _vulkan->unmapBuffer(stagingBuffer);
+
+        _vulkan->createBuffer(objectsDataBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY, _objectsDataBuffer);
+        _vulkan->copyBufferToBuffer(_mainCommandPool, stagingBuffer.buffer, _objectsDataBuffer.buffer, objectsDataBufferSize);
+        _vulkan->destroyBuffer(stagingBuffer);
     }
-
-    _vulkan->createGPUBuffer(_mainCommandPool,
-        objectsDataBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        objectData.data(),
-        _objectsDataBuffer
-    );
-
 
     /*
     * Indirect Command buffer
@@ -1000,7 +1005,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
         offset += _drawCalls[i].nbObjects;
     }
 
-    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
+    _vulkan->createGPUBufferFromCPUData(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         commandBufferData.data(),
         _gpuBatches
@@ -1011,7 +1016,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     * Indirect Command buffer reset
     */
 
-    _vulkan->createGPUBuffer(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
+    _vulkan->createGPUBufferFromCPUData(_mainCommandPool, commandBufferData.size() * sizeof(GPUIndirectDrawCommand),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         commandBufferData.data(),
         _gpuResetBatches
@@ -1035,13 +1040,13 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
             }
         }
     }
-    _vulkan->createGPUBuffer(_mainCommandPool, _totalInstancesNb * sizeof(GPUObjectInstance),
+    _vulkan->createGPUBufferFromCPUData(_mainCommandPool, _totalInstancesNb * sizeof(GPUObjectInstance),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objects.data(),
         _gpuObjectInstances
     );
 
-    _vulkan->createGPUBuffer(_mainCommandPool, _totalInstancesNb * sizeof(uint32_t),
+    _vulkan->createGPUBufferFromCPUData(_mainCommandPool, _totalInstancesNb * sizeof(uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         objects.data(),
         _gpuIndexToObjectId
@@ -1073,7 +1078,7 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     camera.setFront(glm::vec3(0, 0, 1));
     globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
 
-    _vulkan->createGPUBuffer(_mainCommandPool, sizeof(GPUCullingGlobalData),
+    _vulkan->createGPUBufferFromCPUData(_mainCommandPool, sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         &globalData,
         _gpuCullingGlobalData
