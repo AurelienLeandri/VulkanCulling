@@ -14,16 +14,5 @@ VulkanRendererException::VulkanRendererException(const char* message) :
 
 const char* VulkanRendererException::what() const noexcept
 {
-	std::stringstream ss;
-	if (_error) {
-		ss << "Vulkan error: " << _error << ".";
-		if (_message) {
-			ss << " ";
-		}
-	}
-	if (_message) {
-		ss << _message;
-	}
-	ss << std::endl;
-	return ss.str().c_str();
+	return _message;
 }

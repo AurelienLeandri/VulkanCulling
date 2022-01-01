@@ -95,8 +95,7 @@ int Application::start()
             _renderer->iterate();
         }
     } catch (const VulkanRendererException& e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << "Error during frame update." << std::endl;
+        std::cerr << "Vulkan renderer error: " << e.what() << std::endl;
         return -1;
     }
 
