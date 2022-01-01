@@ -1,4 +1,4 @@
-#include "GraphicShaderPass.h"
+#include "ShaderPass.h"
 
 #include "ShaderBuilder.h"
 #include "DebugUtils.h"

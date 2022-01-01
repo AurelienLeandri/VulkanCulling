@@ -1,6 +1,6 @@
 #include "PipelineBuilder.h"
 
-#include "GraphicShaderPass.h"
+#include "ShaderPass.h"
 
 #include <iostream>
 #include <unordered_map>

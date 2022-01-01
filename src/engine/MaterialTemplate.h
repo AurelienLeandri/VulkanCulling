@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GraphicShaderPass.h"
+#include "ShaderPass.h"
 
 #include <vulkan/vulkan.h>
 

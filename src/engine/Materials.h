@@ -2,7 +2,7 @@
 
 #include "VulkanUtils.h"
 #include "DescriptorUtils.h"
-#include "GraphicShaderPass.h"
+#include "ShaderPass.h"
 
 #include <vector>
 #include <unordered_map>
