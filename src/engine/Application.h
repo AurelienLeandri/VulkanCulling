@@ -15,6 +15,14 @@ namespace leoscene {
 
 class Window;
 
+struct ApplicationState
+{
+	bool frustumCulling = true;
+	bool occlusionCulling = true;
+	bool makeAllObjectsTransparent = false;
+	bool lockFrustumCullingCamera = false;
+};
+
 class Application
 {
 public:
@@ -25,7 +33,6 @@ public:
 	int init();
 	int loadScene(const std::string& filePath);
 	int start();
-	int stop();
 	void cleanup();
 
 private:
@@ -37,6 +44,7 @@ private:
 	std::unique_ptr<VulkanInstance> _vulkan;
 	std::unique_ptr<leoscene::Camera> _camera;
 	std::unique_ptr<Window> _window;
+	std::unique_ptr<ApplicationState> _state;
 
 	friend class InputManager;
 };

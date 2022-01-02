@@ -11,7 +11,7 @@ namespace leoscene {
 	class Camera;
 }
 
-class Application;
+struct ApplicationState;
 
 class InputManager
 {
@@ -25,33 +25,40 @@ private:
 		DOWN
 	};
 
-public:
-	InputManager(Application& application);
+	enum class ApplicationToggle {
+		FRUSTUM_CULLING,
+		OCCLUSION_CULLING,
+		MAKE_ALL_OBJECTS_TRANSPARENT,
+		LOCK_FRUSTUM_CULLING_CAMERA
+	};
 
 public:
-	void init(GLFWwindow* window);
+	InputManager();
+
+public:
+	void init(GLFWwindow* window, ApplicationState* applicationState);
 	void setCamera(leoscene::Camera* camera);
 	bool processInput();
 	void processMouseMovement(float xoffset, float yoffset);
 
-public:
-	// TODO: refactor this
-	static bool framebufferResized;
+private:
+	void _updateApplicationCamera(CameraMovement direction, float deltaTime);
+	void _updateApplicationState(ApplicationToggle toggle);
 
 private:
-	void _processKeyboard(CameraMovement direction, float deltaTime);
-
-private:
-	static void _framebufferResizeCallback(GLFWwindow* window, int width, int height);
 	static void _mouseCallback(GLFWwindow* window, double xpos, double ypos);
 
 private:
-	Application& _application;
 	leoscene::Camera* _camera = nullptr;
 	GLFWwindow* _window = nullptr;
+	ApplicationState* _applicationState = nullptr;
 	std::clock_t _frameClock = std::clock();
 	float _currentYaw = 0;
 	float _currentPitch = 0;
+	bool oPressed = false;
+	bool fPressed = false;
+	bool tPressed = false;
+	bool lPressed = false;
 
 private:
 	static const float _MOVEMENT_SPEED;

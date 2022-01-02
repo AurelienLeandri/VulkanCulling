@@ -1,24 +1,22 @@
 #include "InputManager.h"
 
-#include "Application.h"
 #include "Window.h"
+#include "Application.h"
 
 #include <scene/Camera.h>
 
-bool InputManager::framebufferResized = false;
 const float InputManager::_MOVEMENT_SPEED = 5.f;
 
-InputManager::InputManager(Application& application) :
-    _application(application)
+InputManager::InputManager()
 {
 }
 
-void InputManager::init(GLFWwindow* window)
+void InputManager::init(GLFWwindow* window, ApplicationState* applicationState)
 {
     _window = window;
+    _applicationState = applicationState;
     glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetWindowUserPointer(_window, &_application);
-    glfwSetFramebufferSizeCallback(_window, _framebufferResizeCallback);
+    glfwSetWindowUserPointer(_window, this);
     glfwSetCursorPosCallback(_window, _mouseCallback);
 
     _frameClock = std::clock();
@@ -33,25 +31,54 @@ bool InputManager::processInput()
 {
     glfwPollEvents();
 
-    // Keyboard
     float deltaTime = (float(std::clock()) - _frameClock) / (float)CLOCKS_PER_SEC;
     _frameClock = std::clock();
-    if (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::FORWARD, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::BACKWARD, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::LEFT, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::RIGHT, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::DOWN, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        _processKeyboard(CameraMovement::UP, deltaTime);
-    return !(glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwWindowShouldClose(_window));
 
-    // Closing window
-    return glfwWindowShouldClose(_window);
+    // Keys for camera update
+    if (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::FORWARD, deltaTime);
+    if (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::BACKWARD, deltaTime);
+    if (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::LEFT, deltaTime);
+    if (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::RIGHT, deltaTime);
+    if (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::DOWN, deltaTime);
+    if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        _updateApplicationCamera(CameraMovement::UP, deltaTime);
+
+    // Keys for application state update
+    if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_PRESS && !oPressed)
+        oPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_RELEASE && oPressed) {
+        oPressed = false;
+        _updateApplicationState(ApplicationToggle::OCCLUSION_CULLING);
+    }
+
+    if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_PRESS && !fPressed)
+        fPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_RELEASE && fPressed) {
+        fPressed = false;
+        _updateApplicationState(ApplicationToggle::FRUSTUM_CULLING);
+    }
+
+    if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_PRESS && !tPressed)
+        tPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_RELEASE && tPressed) {
+        tPressed = false;
+        _updateApplicationState(ApplicationToggle::MAKE_ALL_OBJECTS_TRANSPARENT);
+    }
+
+    if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_PRESS && !lPressed)
+        lPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_RELEASE && lPressed) {
+        lPressed = false;
+        _updateApplicationState(ApplicationToggle::LOCK_FRUSTUM_CULLING_CAMERA);
+    }
+
+    // Closing window if needed
+    return !(glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwWindowShouldClose(_window));
 }
 
 void InputManager::processMouseMovement(float xoffset, float yoffset)
@@ -77,7 +104,7 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     _camera->setFront(cameraFront);
 }
 
-void InputManager::_processKeyboard(CameraMovement direction, float deltaTime)
+void InputManager::_updateApplicationCamera(CameraMovement direction, float deltaTime)
 {
     float velocity = _MOVEMENT_SPEED * deltaTime;
     const glm::vec3& cameraFront = _camera->getFront();
@@ -104,10 +131,24 @@ void InputManager::_processKeyboard(CameraMovement direction, float deltaTime)
     }
 }
 
-void InputManager::_framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    framebufferResized = true;
+void InputManager::_updateApplicationState(ApplicationToggle toggle)
+{
+    switch (toggle) {
+    case ApplicationToggle::OCCLUSION_CULLING:
+        _applicationState->occlusionCulling = !_applicationState->occlusionCulling;
+        break;
+    case ApplicationToggle::FRUSTUM_CULLING:
+        _applicationState->frustumCulling = !_applicationState->frustumCulling;
+        break;
+    case ApplicationToggle::MAKE_ALL_OBJECTS_TRANSPARENT:
+        _applicationState->makeAllObjectsTransparent = !_applicationState->makeAllObjectsTransparent;
+        break;
+    case ApplicationToggle::LOCK_FRUSTUM_CULLING_CAMERA:
+        _applicationState->lockFrustumCullingCamera = !_applicationState->lockFrustumCullingCamera;
+        break;
+    }
 }
+
 
 void InputManager::_mouseCallback(GLFWwindow* window, double xpos, double ypos)
 {
@@ -128,6 +169,6 @@ void InputManager::_mouseCallback(GLFWwindow* window, double xpos, double ypos)
     lastX = xposf;
     lastY = yposf;
 
-    Application* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-    app->_inputManager->processMouseMovement(xoffset, yoffset);
+    InputManager* inputManager = static_cast<InputManager*>(glfwGetWindowUserPointer(window));
+    inputManager->processMouseMovement(xoffset, yoffset);
 }

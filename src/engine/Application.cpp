@@ -15,7 +15,8 @@
 Application::Application()
 {
     _window = std::make_unique<Window>(1600, 1200);
-    _inputManager = std::make_unique<InputManager>(*this);
+    _inputManager = std::make_unique<InputManager>();
+    _state = std::make_unique<ApplicationState>();
 }
 
 Application::~Application() = default;
@@ -36,7 +37,7 @@ int Application::_initMembers() {
         return -1;
     }
 
-    _inputManager->init(_window->window);
+    _inputManager->init(_window->window, _state.get());
     _camera = std::make_unique<leoscene::Camera>();
     _inputManager->setCamera(_camera.get());
 
@@ -90,7 +91,6 @@ int Application::loadScene(const std::string& filePath)
 
 int Application::start()
 {
-    //_renderer->start();
     try {
         while (_inputManager->processInput()) {
             _renderer->iterate();
@@ -100,11 +100,5 @@ int Application::start()
         return -1;
     }
 
-    return 0;
-}
-
-int Application::stop()
-{
-    //_renderer->stop();
     return 0;
 }
