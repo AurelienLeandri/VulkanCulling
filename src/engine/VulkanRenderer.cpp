@@ -604,6 +604,13 @@ void VulkanRenderer::iterate()
 
     vkCmdBeginRenderPass(_framesData[imageIndex].commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+    if (PFN_vkCmdSetDepthTestEnableEXT vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
+        vkCmdSetDepthTestEnableEXTfun(_framesData[imageIndex].commandBuffer, true);
+    }
+    else {
+        throw VulkanRendererException("Failed to load extension function vkCmdSetDepthTestEnableEXT.");
+    }
+
     _drawObjectsCommands(_framesData[imageIndex].commandBuffer, _framesData[imageIndex].framebuffer);
 
     if (_applicationState->makeAllObjectsTransparent) {
@@ -620,21 +627,14 @@ void VulkanRenderer::iterate()
 
         vkCmdClearAttachments(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(clearAttachments.size()), clearAttachments.data(), 1, &clearRectangle);
 
-        if (auto vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
+        if (PFN_vkCmdSetDepthTestEnableEXT vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
             vkCmdSetDepthTestEnableEXTfun(_framesData[imageIndex].commandBuffer, false);
         }
         else {
-            throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
+            throw VulkanRendererException("Failed to load extension function vkCmdSetDepthTestEnableEXT.");
         }
 
         _drawObjectsCommands(_framesData[imageIndex].commandBuffer, _framesData[imageIndex].framebuffer);
-
-        if (auto vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
-            vkCmdSetDepthTestEnableEXTfun(_framesData[imageIndex].commandBuffer, true);
-        }
-        else {
-            throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
-        }
     }
 
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
