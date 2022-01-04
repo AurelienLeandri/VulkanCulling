@@ -139,6 +139,7 @@ public:
 
 private:
 	void _updateDynamicData();
+	void _drawObjectsCommands(VkCommandBuffer cmd, VkFramebuffer framebuffer);
 	void _createMainRenderPass();
 	void _fillConstantGlobalBuffers(const leoscene::Scene* scene);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass);

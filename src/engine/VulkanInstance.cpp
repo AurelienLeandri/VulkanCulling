@@ -42,6 +42,7 @@ namespace {
 
     const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
     };
 }
 
@@ -178,16 +179,23 @@ void VulkanInstance::init()
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures = {};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
-    deviceFeatures.sampleRateShading = VK_FALSE;
-    deviceFeatures.multiDrawIndirect = VK_TRUE;
+    VkPhysicalDeviceFeatures2 deviceFeatures = {};
+    deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    deviceFeatures.features.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.features.sampleRateShading = VK_FALSE;
+    deviceFeatures.features.multiDrawIndirect = VK_TRUE;
+
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures{};
+    extendedDynamicStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    extendedDynamicStateFeatures.extendedDynamicState = true;
+
+    deviceFeatures.pNext = &extendedDynamicStateFeatures;
 
     VkDeviceCreateInfo logicalDeviceCreateInfo = {};
     logicalDeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     logicalDeviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
     logicalDeviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-    logicalDeviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+    logicalDeviceCreateInfo.pNext = &deviceFeatures;  // Attached to pNext instead of pEnabledFeatures as exepected (see VkPhysicalDeviceFeatures2).
 
     logicalDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     logicalDeviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
@@ -296,14 +304,31 @@ int VulkanInstance::_ratePhysicalDevice(VkPhysicalDevice device, QueueFamilyIndi
 
     VkPhysicalDeviceProperties& deviceProperties = deviceProperties2.properties;
 
-    VkPhysicalDeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+    VkPhysicalDeviceFeatures2 deviceFeatures{};
+    deviceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures{};
+    extendedDynamicStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    deviceFeatures.pNext = &extendedDynamicStateFeatures;
 
-    if (!deviceFeatures.geometryShader) {
+    vkGetPhysicalDeviceFeatures2(device, &deviceFeatures);
+
+    if (!deviceFeatures.features.geometryShader) {
         return 0;
     }
 
-    if (!deviceFeatures.samplerAnisotropy) {
+    if (!deviceFeatures.features.samplerAnisotropy) {
+        return 0;
+    }
+
+    if (!deviceFeatures.features.multiDrawIndirect) {
+        return 0;
+    }
+
+    if (!deviceFeatures.features.sampleRateShading) {
+        return 0;
+    }
+
+    if (!(static_cast<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT*>(deviceFeatures.pNext))->extendedDynamicState) {
         return 0;
     }
 

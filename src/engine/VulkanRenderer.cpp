@@ -589,14 +589,14 @@ void VulkanRenderer::iterate()
 
     // Drawing
 
-    VkRenderPassBeginInfo renderPassInfo = {};
+    VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = _renderPass;
     renderPassInfo.framebuffer = _framesData[imageIndex].framebuffer;
     renderPassInfo.renderArea.offset = { 0, 0 };
     renderPassInfo.renderArea.extent = _vulkan->getProperties().swapChainExtent;
 
-    std::array<VkClearValue, 2> clearValues = {};
+    std::array<VkClearValue, 2> clearValues{};
     clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
     clearValues[1].depthStencil = { 1.0f, 0 };
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -604,62 +604,39 @@ void VulkanRenderer::iterate()
 
     vkCmdBeginRenderPass(_framesData[imageIndex].commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    VkPipeline currentPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
-    VkPipelineLayout graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
-    vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
+    _drawObjectsCommands(_framesData[imageIndex].commandBuffer, _framesData[imageIndex].framebuffer);
 
-    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
+    if (_applicationState->makeAllObjectsTransparent) {
+        std::array<VkClearAttachment, 1> clearAttachments = {};
+        clearAttachments[0].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        clearAttachments[0].clearValue = clearValues[0];
+        clearAttachments[0].colorAttachment = 0;
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapChainExtent.width);
-    viewport.height = static_cast<float>(swapChainExtent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+        VkClearRect clearRectangle{};
+        clearRectangle.baseArrayLayer = 0;
+        clearRectangle.layerCount = 1;
+        clearRectangle.rect.offset = { 0, 0 };
+        clearRectangle.rect.extent = _vulkan->getProperties().swapChainExtent;
 
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapChainExtent;
+        vkCmdClearAttachments(_framesData[imageIndex].commandBuffer, static_cast<uint32_t>(clearAttachments.size()), clearAttachments.data(), 1, &clearRectangle);
 
-    vkCmdSetViewport(_framesData[imageIndex].commandBuffer, 0, 1, &viewport);
-    vkCmdSetScissor(_framesData[imageIndex].commandBuffer, 0, 1, &scissor);
-
-    // Global data descriptor set
-    vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 0, nullptr);
-
-    uint32_t offset = 0;
-    uint32_t stride = sizeof(GPUIndirectDrawCommand);
-    for (const DrawCallInfo& batch : _drawCalls) {
-        const Material* material = batch.material;
-
-        VkPipeline materialPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
-        if (currentPipeline != materialPipeline) {
-            currentPipeline = materialPipeline;
-            graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
-            vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
+        if (auto vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
+            vkCmdSetDepthTestEnableEXTfun(_framesData[imageIndex].commandBuffer, false);
+        }
+        else {
+            throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
         }
 
-        VkDeviceSize offsets[] = { 0 };
+        _drawObjectsCommands(_framesData[imageIndex].commandBuffer, _framesData[imageIndex].framebuffer);
 
-        // Materials data descriptor set
-        vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            graphicsPipelineLayout, 2, 1, &material->getDescriptorSet(ShaderPass::Type::FORWARD), 0, nullptr);
-
-        // Objects data descriptor set
-        vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            graphicsPipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
-
-        vkCmdBindVertexBuffers(_framesData[imageIndex].commandBuffer, 0, 1, &batch.shape->vertexBuffer.buffer, offsets);
-
-        vkCmdBindIndexBuffer(_framesData[imageIndex].commandBuffer, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexedIndirect(_framesData[imageIndex].commandBuffer, _gpuBatches.buffer, offset, 1, stride);
-
-        offset += stride;
+        if (auto vkCmdSetDepthTestEnableEXTfun = (PFN_vkCmdSetDepthTestEnableEXT)vkGetInstanceProcAddr(_vulkan->getInstance(), "vkCmdSetDepthTestEnableEXT")) {
+            vkCmdSetDepthTestEnableEXTfun(_framesData[imageIndex].commandBuffer, true);
+        }
+        else {
+            throw VulkanRendererException("Failed to load extension function vkCreateDebugUtilsMessengerEXT.");
+        }
     }
-    
+
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
     if (!_applicationState->lockCullingCamera) {
@@ -693,6 +670,65 @@ void VulkanRenderer::iterate()
     }
 
     _currentFrame = (_currentFrame + 1) % _MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanRenderer::_drawObjectsCommands(VkCommandBuffer cmd, VkFramebuffer framebuffer)
+{
+    VkPipeline currentPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
+    VkPipelineLayout graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
+
+    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapChainExtent.width);
+    viewport.height = static_cast<float>(swapChainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = swapChainExtent;
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    // Global data descriptor set
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 0, nullptr);
+
+    uint32_t offset = 0;
+    uint32_t stride = sizeof(GPUIndirectDrawCommand);
+    for (const DrawCallInfo& batch : _drawCalls) {
+        const Material* material = batch.material;
+
+        VkPipeline materialPipeline = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipeline(ShaderPass::Type::FORWARD);
+        if (currentPipeline != materialPipeline) {
+            currentPipeline = materialPipeline;
+            graphicsPipelineLayout = _materialBuilder.getMaterialTemplate(MaterialType::BASIC)->getPipelineLayout(ShaderPass::Type::FORWARD);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, currentPipeline);
+        }
+
+        VkDeviceSize offsets[] = { 0 };
+
+        // Materials data descriptor set
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphicsPipelineLayout, 2, 1, &material->getDescriptorSet(ShaderPass::Type::FORWARD), 0, nullptr);
+
+        // Objects data descriptor set
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphicsPipelineLayout, 1, 1, &_objectsDataDescriptorSet, 0, nullptr);
+
+        vkCmdBindVertexBuffers(cmd, 0, 1, &batch.shape->vertexBuffer.buffer, offsets);
+
+        vkCmdBindIndexBuffer(cmd, batch.shape->indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexedIndirect(cmd, _gpuBatches.buffer, offset, 1, stride);
+
+        offset += stride;
+    }
 }
 
 void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
