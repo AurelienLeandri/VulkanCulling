@@ -55,10 +55,10 @@ private:
 	std::clock_t _frameClock = std::clock();
 	float _currentYaw = 0;
 	float _currentPitch = 0;
-	bool oPressed = false;
-	bool fPressed = false;
-	bool tPressed = false;
-	bool lPressed = false;
+	bool _oPressed = false;
+	bool _fPressed = false;
+	bool _tPressed = false;
+	bool _lPressed = false;
 
 private:
 	static const float _MOVEMENT_SPEED;

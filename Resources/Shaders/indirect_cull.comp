@@ -1,4 +1,4 @@
-#version 460
+#version 430
 
 layout (local_size_x = 256) in;
 
@@ -21,8 +21,7 @@ struct GPUInstance {
 	uint dataID;
 };
 
-layout (std140, set = 0, binding = 0) uniform CullingGlobalData {
-	mat4 view;
+layout (set = 0, binding = 0) uniform CullingGlobalData {
 	vec4 frustum[6];  // Left/right/top/bottom frustum planes
 	float zNear;
 	float zFar;
@@ -31,34 +30,40 @@ layout (std140, set = 0, binding = 0) uniform CullingGlobalData {
 	int pyramidWidth;
 	int pyramidHeight;
 	uint nbInstances;
-	bool cullingEnabled;
 } globalData;
 
 
-layout (std140, set = 0, binding = 1) uniform CameraData {
+layout (set = 0, binding = 1) uniform CameraData {
     mat4 view;
     mat4 proj;
 	mat4 viewproj;
 	mat4 invProj;
 } camera;
 
-layout (std430, set = 0, binding = 2) readonly buffer ObjectBuffer{
+layout (set = 0, binding = 2) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 
-layout (std430, set = 0, binding = 3)  buffer IndirectDrawCommandBuffer {
+layout (set = 0, binding = 3)  buffer IndirectDrawCommandBuffer {
 	IndirectDrawCommand drawsCommands[];
 } indirectIndirectDrawCommandBuffer;
 
-layout (std430, set = 0, binding = 4) readonly buffer InstanceBuffer {
+layout (set = 0, binding = 4) readonly buffer InstanceBuffer {
 	GPUInstance gpuInstances[];
 } instanceBuffer;
 
-layout (std430, set = 0, binding = 5) buffer IndexMap {
+layout (set = 0, binding = 5) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
-layout(set = 0, binding = 6) uniform sampler2D depthPyramid;
+layout (set = 0, binding = 6) uniform sampler2D depthPyramid;
+
+layout (set = 0, binding = 7) uniform MiscDynamicData {
+	mat4 cullingViewMatrix;
+	vec4 forcedColoring;
+	int frustumCulling;
+	int occlusionCulling;
+} misc;
 
 // 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
 bool projectSphere(vec3 C, float r, out vec4 aabb)
@@ -90,7 +95,7 @@ bool projectSphere(vec3 C, float r, out vec4 aabb)
 bool IsVisible(uint objectDataIndex)
 {
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
-	vec3 center = (camera.view * vec4(sphereBounds.xyz, 1.f)).xyz;
+	vec3 center = (misc.cullingViewMatrix * vec4(sphereBounds.xyz, 1.f)).xyz;
 	center.z *= -1;  // z is negative in view space.
 	float radius = sphereBounds.w;
 
@@ -102,8 +107,10 @@ bool IsVisible(uint objectDataIndex)
 	
 	visible = visible && center.z + radius > globalData.zNear && center.z - radius < globalData.zFar;
 	
+	visible = visible || (misc.frustumCulling == 0);
+	
 	vec4 aabb;
-	if (projectSphere(center, radius, aabb))
+	if ((misc.occlusionCulling == 1) && projectSphere(center, radius, aabb))
 	{
 		float width = (aabb.z - aabb.x) * globalData.pyramidWidth;
 		float height = (aabb.w - aabb.y) * globalData.pyramidHeight;

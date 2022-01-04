@@ -9,6 +9,7 @@
 #include <scene/GeometryIncludes.h>
 
 #include "VulkanUtils.h"
+#include "Application.h"
 #include "DebugUtils.h"
 
 #include <iostream>
@@ -115,6 +116,7 @@ void VulkanRenderer::cleanup()
 
     _vulkan->destroyBuffer(_sceneDataBuffer);
     _vulkan->destroyBuffer(_cameraDataBuffer);
+    _vulkan->destroyBuffer(_miscDynamicDataBuffer);
 
     // Culling pipelines and passes
 
@@ -280,8 +282,10 @@ void VulkanRenderer::recreateSwapChainDependentObjects()
     _createBarriers();
 }
 
-void VulkanRenderer::init()
+void VulkanRenderer::init(const ApplicationState* applicationState)
 {
+    _applicationState = applicationState;
+
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan->getQueueFamilyIndices();
     size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
     const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
@@ -332,7 +336,6 @@ void VulkanRenderer::init()
         VK_CHECK(vkAllocateCommandBuffers(_device, &allocInfo, &frame.commandBuffer));
     }
 
-
     /*
     * Sync objects for rendering to each frame
     */
@@ -370,15 +373,16 @@ void VulkanRenderer::init()
     */
 
     // Camera dynamic buffer
-    uint32_t minAlignment = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)));
-    VkDeviceSize cameraBufferSize = nbSwapChainImages * minAlignment;
-    _vulkan->createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, _cameraDataBuffer, minAlignment);
+    size_t cameraBufferSize = sizeof(GPUCameraData);
+    _vulkan->createBuffer(cameraBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, _cameraDataBuffer);
 
+    // Misc. dynamic buffer
+    size_t dynamicDataBufferSize = sizeof(GPUDynamicData);
+    _vulkan->createBuffer(dynamicDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, _miscDynamicDataBuffer);
 
     // Global scene data buffer
     size_t sceneDataBufferSize = sizeof(GPUSceneData);
-    _vulkan->createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU, _sceneDataBuffer);
+    _vulkan->createBuffer(sceneDataBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, _sceneDataBuffer);
 
     // Depth Sampler
     _createDepthSampler();
@@ -531,7 +535,7 @@ void VulkanRenderer::iterate()
         recreateSwapChainDependentObjects();
     }
 
-    _updateCamera(static_cast<uint32_t>(_currentFrame));
+    _updateDynamicData();
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -570,9 +574,8 @@ void VulkanRenderer::iterate()
 
     vkCmdPipelineBarrier(_framesData[imageIndex].commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 1, &_gpuBatchesResetBarrier, 0, nullptr);
 
-    uint32_t uniformOffset = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)) * _currentFrame);
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-        _cullingPipelineLayout, 0, 1, &_cullingDescriptorSet, 1, &uniformOffset);
+        _cullingPipelineLayout, 0, 1, &_cullingDescriptorSet, 0, nullptr);
 
     uint32_t groupCountX = static_cast<uint32_t>((_nbInstances / 256) + 1);
     vkCmdDispatch(_framesData[imageIndex].commandBuffer, groupCountX, 1, 1);
@@ -624,7 +627,7 @@ void VulkanRenderer::iterate()
 
     // Global data descriptor set
     vkCmdBindDescriptorSets(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 1, &uniformOffset);
+        graphicsPipelineLayout, 0, 1, &_globalDataDescriptorSet, 0, nullptr);
 
     uint32_t offset = 0;
     uint32_t stride = sizeof(GPUIndirectDrawCommand);
@@ -659,7 +662,9 @@ void VulkanRenderer::iterate()
     
     vkCmdEndRenderPass(_framesData[imageIndex].commandBuffer);
 
-    _computeDepthPyramid(_framesData[imageIndex].commandBuffer);
+    if (!_applicationState->lockCullingCamera) {
+        _computeDepthPyramid(_framesData[imageIndex].commandBuffer);
+    }
 
     VK_CHECK(vkEndCommandBuffer(_framesData[imageIndex].commandBuffer));
 
@@ -716,12 +721,12 @@ void VulkanRenderer::_computeDepthPyramid(VkCommandBuffer commandBuffer) {
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &_framebufferDepthReadBarrier);
 }
 
-void VulkanRenderer::_updateCamera(uint32_t currentImage) {
+void VulkanRenderer::_updateDynamicData() {
     /*
     * Camera data
     */
 
-    GPUCameraData cameraData = {};
+    GPUCameraData cameraData{};
     glm::vec3 front = _camera->getFront();
     glm::vec3 up = _camera->getUp();
     glm::vec3 position = _camera->getPosition();
@@ -731,9 +736,23 @@ void VulkanRenderer::_updateCamera(uint32_t currentImage) {
     cameraData.proj = _projectionMatrix;
     cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
+    _vulkan->copyDataToBuffer(static_cast<uint32_t>(sizeof(GPUCameraData)), _cameraDataBuffer, &cameraData);
 
-    uint32_t cameraBufferPadding = static_cast<uint32_t>(_vulkan->padUniformBufferSize(sizeof(GPUCameraData)));
-    _vulkan->copyDataToBuffer(static_cast<uint32_t>(sizeof(GPUCameraData)), _cameraDataBuffer, &cameraData, cameraBufferPadding * currentImage);
+    /*
+    * Misc dynamic data
+    */
+
+    GPUDynamicData miscData{};
+    miscData.occlusionCulling = _applicationState->occlusionCulling ? 1 : 0;
+    miscData.frustumCulling = _applicationState->frustumCulling ? 1 : 0;
+    miscData.forcedColoring = _applicationState->makeAllObjectsTransparent ? glm::vec4(1.0f, 0.7f, 0.7f, 0.3f) : glm::vec4(1.0);
+
+    if (!_applicationState->lockCullingCamera) {
+        _cullingViewMatrix = cameraData.view;
+    }
+    miscData.cullingViewMatrix = _cullingViewMatrix;
+
+    _vulkan->copyDataToBuffer(static_cast<uint32_t>(sizeof(GPUDynamicData)), _miscDynamicDataBuffer, &miscData);
 }
 
 
@@ -1071,13 +1090,6 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     globalData.pyramidHeight = _depthPyramidHeight;
     globalData.nbInstances = _totalInstancesNb;
 
-    // Set an arbitrary view matrix into the global data.
-    // NOTE: This is used only for debugging the frustum by swapping the player's camera with this one in the culling shader.
-    leoscene::Camera camera;
-    camera.setPosition(glm::vec3(0.f, 2.5f, 0.f));
-    camera.setFront(glm::vec3(0, 0, 1));
-    globalData.viewMatrix = glm::lookAt(camera.getPosition(), camera.getPosition() + camera.getFront(), camera.getUp());
-
     _vulkan->createGPUBufferFromCPUData(_mainCommandPool, sizeof(GPUCullingGlobalData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         &globalData,
@@ -1129,9 +1141,8 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t _totalInstancesNb)
     DescriptorAllocator::Options globalDescriptorAllocatorOptions = {};
     globalDescriptorAllocatorOptions.poolBaseSize = 10;
     globalDescriptorAllocatorOptions.poolSizes = {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2.f },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3.f },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.f },
     };
     _globalDescriptorAllocator.init(globalDescriptorAllocatorOptions);
 
@@ -1144,22 +1155,28 @@ void VulkanRenderer::_createGlobalDescriptors(uint32_t _totalInstancesNb)
     VkDescriptorBufferInfo cameraBufferInfo = {};
     cameraBufferInfo.buffer = _cameraDataBuffer.buffer;
     cameraBufferInfo.offset = 0;
-    cameraBufferInfo.range = sizeof(GPUCameraData);
+    cameraBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo sceneBufferInfo = {};
     sceneBufferInfo.buffer = _sceneDataBuffer.buffer;
     sceneBufferInfo.offset = 0;
-    sceneBufferInfo.range = sizeof(GPUSceneData);
+    sceneBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo indexMapInfo = {};
     indexMapInfo.buffer = _gpuIndexToObjectId.buffer;
     indexMapInfo.offset = 0;
     indexMapInfo.range = VK_WHOLE_SIZE;
 
+    VkDescriptorBufferInfo miscBufferInfo = {};
+    miscBufferInfo.buffer = _miscDynamicDataBuffer.buffer;
+    miscBufferInfo.offset = 0;
+    miscBufferInfo.range = VK_WHOLE_SIZE;
+
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _globalDescriptorAllocator)
-        .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_VERTEX_BIT)
+        .bindBuffer(0, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
         .bindBuffer(1, sceneBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .bindBuffer(2, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+        .bindBuffer(3, miscBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build(_globalDataDescriptorSet, _globalDataDescriptorSetLayout);
 
     /*
@@ -1181,8 +1198,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     DescriptorAllocator::Options cullingDescriptorAllocatorOptions = {};
     cullingDescriptorAllocatorOptions.poolBaseSize = 10;
     cullingDescriptorAllocatorOptions.poolSizes = {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1.f },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.f },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2.f },
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5.f },
     };
     _cullingDescriptorAllocator.init(cullingDescriptorAllocatorOptions);
@@ -1195,7 +1211,7 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     VkDescriptorBufferInfo cameraBufferInfo = {};
     cameraBufferInfo.buffer = _cameraDataBuffer.buffer;
     cameraBufferInfo.offset = 0;
-    cameraBufferInfo.range = sizeof(GPUCameraData);
+    cameraBufferInfo.range = VK_WHOLE_SIZE;
 
     VkDescriptorBufferInfo objectsDataBufferInfo = {};
     objectsDataBufferInfo.buffer = _objectsDataBuffer.buffer;
@@ -1217,6 +1233,11 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
     indexMapInfo.offset = 0;
     indexMapInfo.range = VK_WHOLE_SIZE;
 
+    VkDescriptorBufferInfo miscBufferInfo = {};
+    miscBufferInfo.buffer = _miscDynamicDataBuffer.buffer;
+    miscBufferInfo.offset = 0;
+    miscBufferInfo.range = VK_WHOLE_SIZE;
+
     VkDescriptorImageInfo depthPyramidInfo = {};
     depthPyramidInfo.sampler = _depthImageSampler;
     depthPyramidInfo.imageView = _depthPyramid.view;
@@ -1224,12 +1245,13 @@ void VulkanRenderer::_createCullingDescriptors(uint32_t nbObjects)
 
     DescriptorBuilder::begin(_device, _globalDescriptorLayoutCache, _cullingDescriptorAllocator)
         .bindBuffer(0, globalDataBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-        .bindBuffer(1, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(1, cameraBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(2, objectsDataBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(3, drawBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(4, instancesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindBuffer(5, indexMapInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .bindImage(6, depthPyramidInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT)
+        .bindBuffer(7, miscBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
         .build(_cullingDescriptorSet, _cullingDescriptorSetLayout);
 }
 
@@ -1469,7 +1491,6 @@ void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& 
     shaderPassParameters.device = _device;
     shaderPassParameters.shaderBuilder = &_shaderBuilder;
     shaderPassParameters.shaderPaths[VK_SHADER_STAGE_COMPUTE_BIT] = shaderPath;
-    shaderPassParameters.descriptorTypeOverwrites["camera"] = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
     layout = shaderPass.reflectShaderModules(shaderPassParameters);
 

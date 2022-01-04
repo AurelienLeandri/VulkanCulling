@@ -49,31 +49,31 @@ bool InputManager::processInput()
         _updateApplicationCamera(CameraMovement::UP, deltaTime);
 
     // Keys for application state update
-    if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_PRESS && !oPressed)
-        oPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_RELEASE && oPressed) {
-        oPressed = false;
+    if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_PRESS && !_oPressed)
+        _oPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_RELEASE && _oPressed) {
+        _oPressed = false;
         _updateApplicationState(ApplicationToggle::OCCLUSION_CULLING);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_PRESS && !fPressed)
-        fPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_RELEASE && fPressed) {
-        fPressed = false;
+    if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_PRESS && !_fPressed)
+        _fPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_RELEASE && _fPressed) {
+        _fPressed = false;
         _updateApplicationState(ApplicationToggle::FRUSTUM_CULLING);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_PRESS && !tPressed)
-        tPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_RELEASE && tPressed) {
-        tPressed = false;
+    if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_PRESS && !_tPressed)
+        _tPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_RELEASE && _tPressed) {
+        _tPressed = false;
         _updateApplicationState(ApplicationToggle::MAKE_ALL_OBJECTS_TRANSPARENT);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_PRESS && !lPressed)
-        lPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_RELEASE && lPressed) {
-        lPressed = false;
+    if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_PRESS && !_lPressed)
+        _lPressed = true;
+    else if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_RELEASE && _lPressed) {
+        _lPressed = false;
         _updateApplicationState(ApplicationToggle::LOCK_FRUSTUM_CULLING_CAMERA);
     }
 
@@ -144,7 +144,7 @@ void InputManager::_updateApplicationState(ApplicationToggle toggle)
         _applicationState->makeAllObjectsTransparent = !_applicationState->makeAllObjectsTransparent;
         break;
     case ApplicationToggle::LOCK_FRUSTUM_CULLING_CAMERA:
-        _applicationState->lockFrustumCullingCamera = !_applicationState->lockFrustumCullingCamera;
+        _applicationState->lockCullingCamera = !_applicationState->lockCullingCamera;
         break;
     }
 }

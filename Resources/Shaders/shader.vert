@@ -1,4 +1,4 @@
-#version 460
+#version 430
 
 layout (location = 0) in vec3 inPosition;
 layout (location = 1) in vec3 inNormal;
@@ -8,14 +8,14 @@ layout (location = 0) out vec3 fragNormal;
 layout (location = 1) out vec2 fragTexCoord;
 layout (location = 2) out vec3 fragCoord;
 
-layout(std140, set = 0, binding = 0) uniform UniformBufferObject {
+layout(set = 0, binding = 0) uniform UniformBufferObject {
 	mat4 view;
     mat4 proj;
     mat4 viewProj;
     mat4 invProj;
 } camera;
 
-layout (std430, set = 0, binding = 2) buffer IndexMap {
+layout (set = 0, binding = 2) buffer IndexMap {
 	uint map[];
 } objectDataIndices;
 
@@ -24,7 +24,7 @@ struct ObjectData{
 	vec4 sphereBounds;
 };
 
-layout(std430, set = 1, binding = 0) readonly buffer ObjectBuffer{
+layout(set = 1, binding = 0) readonly buffer ObjectBuffer{
 	ObjectData objects[];
 } objectBuffer;
 

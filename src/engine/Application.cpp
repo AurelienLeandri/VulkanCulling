@@ -52,7 +52,7 @@ int Application::_initMembers() {
 
     _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
     try {
-        _renderer->init();
+        _renderer->init(_state.get());
     } catch (const VulkanRendererException& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << "Error: Failed to initialize Vulkan renderer." << std::endl;

@@ -41,6 +41,16 @@ struct GPUSceneData {
 };
 
 /*
+* Dynamic data that can be changed every frame (except the camera). The main camera is in GPUCameraData.
+*/
+struct GPUDynamicData {
+	glm::mat4 cullingViewMatrix;
+	glm::vec4 forcedColoring;
+	int frustumCulling;
+	int occlusionCulling;
+};
+
+/*
 * For an instance of a mesh, stores the batch in witch the instance is located and the index of the instance's data (see GPUObjectData)
 */
 struct GPUObjectInstance {
@@ -59,7 +69,6 @@ struct GPUIndirectDrawCommand {
 * Global data used for culling compute shaders
 */
 struct GPUCullingGlobalData {
-	glm::mat4 viewMatrix = glm::mat4(1);
 	glm::vec4 frustum[6] = { glm::vec4(0) };
 	float zNear = 0;
 	float zFar = 10000.f;
@@ -68,7 +77,6 @@ struct GPUCullingGlobalData {
 	int pyramidWidth = 0;
 	int pyramidHeight = 0;
 	uint32_t nbInstances = 0;
-	bool cullingEnabled = false;
 };
 
 /*
@@ -122,7 +130,7 @@ public:
 
 public:
 	void setCamera(const leoscene::Camera* camera);
-	void init();
+	void init(const ApplicationState* applicationState);
 	void loadSceneToDevice(const leoscene::Scene* scene);
 	void iterate();
 	void cleanup();
@@ -130,7 +138,7 @@ public:
 	void recreateSwapChainDependentObjects();
 
 private:
-	void _updateCamera(uint32_t currentImage);
+	void _updateDynamicData();
 	void _createMainRenderPass();
 	void _fillConstantGlobalBuffers(const leoscene::Scene* scene);
 	void _createComputePipeline(const char* shaderPath, VkPipeline& pipeline, VkPipelineLayout& layout, ShaderPass& shaderPass);
@@ -148,6 +156,7 @@ private:
 
 	// Data from other objects
 	const leoscene::Camera* _camera = nullptr;
+	const ApplicationState* _applicationState = nullptr;
 	VulkanInstance* _vulkan = nullptr;
 	VkDevice _device = VK_NULL_HANDLE;
 
@@ -178,6 +187,7 @@ private:
 	AllocatedBuffer _cameraDataBuffer;
 	AllocatedBuffer _sceneDataBuffer;
 	AllocatedBuffer _objectsDataBuffer;
+	AllocatedBuffer _miscDynamicDataBuffer;
 
 	// Data shared between framebuffers
 	AllocatedImage _framebufferColor;
@@ -223,6 +233,7 @@ private:
 	VkBufferMemoryBarrier _gpuIndexToObjectIdBarrier = {};
 	VkDescriptorSet _cullingDescriptorSet = VK_NULL_HANDLE;
 	VkDescriptorSetLayout _cullingDescriptorSetLayout = VK_NULL_HANDLE;
+	glm::mat4 _cullingViewMatrix = glm::mat4(1.f);
 
 	// Depth pyramid computing data
 	AllocatedImage _depthPyramid = {};

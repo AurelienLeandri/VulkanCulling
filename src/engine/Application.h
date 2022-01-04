@@ -20,7 +20,7 @@ struct ApplicationState
 	bool frustumCulling = true;
 	bool occlusionCulling = true;
 	bool makeAllObjectsTransparent = false;
-	bool lockFrustumCullingCamera = false;
+	bool lockCullingCamera = false;
 };
 
 class Application
