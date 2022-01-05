@@ -96,7 +96,7 @@ bool IsVisible(uint objectDataIndex)
 {
 	vec4 sphereBounds = objectBuffer.objects[objectDataIndex].sphereBounds;
 	vec3 center = (misc.cullingViewMatrix * vec4(sphereBounds.xyz, 1.f)).xyz;
-	center.z *= -1;  // z is negative in view space.
+	center.z *= -1;  // Computations below use positive z, so we flip center.z for now
 	float radius = sphereBounds.w;
 
 	bool visible = true;
@@ -124,11 +124,10 @@ bool IsVisible(uint objectDataIndex)
 
 		float depth = textureLod(depthPyramid, uv, level).x;
 
-		float depthSphere = ((center.z - radius) - zNear) / (zFar - zNear);
 		center.z *= -1;
 		vec4 projectedSphere = camera.proj * (vec4(center, 1.0) + vec4(0, 0, radius, 0));
 		projectedSphere /= projectedSphere.w;
-		depthSphere = projectedSphere.z;
+		float depthSphere = projectedSphere.z;
 
 		visible = visible && depthSphere <= depth;
 	}

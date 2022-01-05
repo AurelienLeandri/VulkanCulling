@@ -3,7 +3,6 @@
 **/x86/
 **/x64/
 **/Libraries/
-*.spv
 *.ppm
 out/
 *.ilk
