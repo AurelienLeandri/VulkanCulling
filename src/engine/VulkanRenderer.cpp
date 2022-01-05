@@ -24,16 +24,17 @@ namespace {
     uint32_t previousPow2(uint32_t v);
 }
 
-VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
+VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, const ApplicationState* applicationState, const leoscene::Camera* camera) :
     _vulkan(vulkan),
-    _options(options),
     _device(vulkan->getLogicalDevice()),
     _globalDescriptorAllocator(_device),
     _globalDescriptorLayoutCache(_device),
     _materialBuilder(_device, _vulkan),
     _shaderBuilder(_device),
     _cullingDescriptorAllocator(_device),
-    _depthPyramidDescriptorAllocator(_device)
+    _depthPyramidDescriptorAllocator(_device),
+    _applicationState(applicationState),
+    _camera(camera)
 {
 }
 
@@ -242,6 +243,7 @@ void VulkanRenderer::cleanupSwapChainDependentObjects()
     /*
     * Descriptors of screen size dependent resources
     */
+
     _cullingDescriptorAllocator.cleanup();
     _depthPyramidDescriptorAllocator.cleanup();
     _depthPyramidDescriptorSets.clear();
@@ -281,17 +283,14 @@ void VulkanRenderer::recreateSwapChainDependentObjects()
     _createBarriers();
 }
 
-void VulkanRenderer::init(const ApplicationState* applicationState)
+void VulkanRenderer::init()
 {
-    _framesData.resize(_vulkan->getSwapChainSize());
-
-    _applicationState = applicationState;
-
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan->getQueueFamilyIndices();
     size_t nbSwapChainImages = _vulkan->getSwapChainImageViews().size();
     const VulkanInstance::Properties& instanceProperties = _vulkan->getProperties();
     const std::vector<VkImageView>& swapChainImageViews = _vulkan->getSwapChainImageViews();
     VkExtent2D swapChainExtent = _vulkan->getProperties().swapChainExtent;
+    _framesData.resize(_vulkan->getSwapChainSize());
 
     _depthBufferFormat = _vulkan->findSupportedFormat(
         { VK_FORMAT_D32_SFLOAT },
@@ -302,6 +301,12 @@ void VulkanRenderer::init(const ApplicationState* applicationState)
         throw VulkanRendererException("Failed to find a supported format for the depth buffer.");
     }
 
+    /*
+    * Camera projection matrices
+    */
+
+    _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, _zNear, _zFar);
+    _invProjectionMatrix = glm::inverse(_projectionMatrix);
 
     /*
     * Command Pools
@@ -1542,15 +1547,6 @@ void VulkanRenderer::_createComputePipeline(const char* shaderPath, VkPipeline& 
     pipeline = computeBuilder.buildPipeline(_device);
 
     shaderPass.destroyShaderModules();
-}
-
-void VulkanRenderer::setCamera(const leoscene::Camera* camera)
-{
-    _camera = camera;
-
-    const VkExtent2D& swapChainExtent = _vulkan->getProperties().swapChainExtent;
-    _projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / swapChainExtent.height, _zNear, _zFar);
-    _invProjectionMatrix = glm::inverse(_projectionMatrix);
 }
 
 namespace {

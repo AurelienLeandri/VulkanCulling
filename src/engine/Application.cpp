@@ -42,10 +42,10 @@ int Application::init()
         return -1;
     }
 
-    _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
+    _renderer = std::make_unique<VulkanRenderer>(_vulkan.get(), _state.get(), _camera.get());
 
     try {
-        _renderer->init(_state.get());
+        _renderer->init();
     }
     catch (const VulkanRendererException& e) {
         std::cerr << e.what() << std::endl;
@@ -75,7 +75,6 @@ int Application::loadScene(const std::string& filePath)
         return -1;
     }
 
-    _renderer->setCamera(_camera.get());
     _renderer->loadSceneToDevice(&scene);
 
     return 0;

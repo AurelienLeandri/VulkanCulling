@@ -21,9 +21,7 @@ namespace leoscene {
 	class ImageTexture;
 }
 
-/*
-* Camera transform matrices
-*/
+// Camera transform matrices
 struct GPUCameraData {
 	glm::mat4 view;
 	glm::mat4 proj;
@@ -31,18 +29,14 @@ struct GPUCameraData {
 	glm::mat4 invProj;
 };
 
-/*
-* Global scene data. Not used at the moment.
-*/
+// Global scene data. Not used at the moment.
 struct GPUSceneData {
 	glm::vec4 ambientColor = { 0, 0, 0, 0 };
 	glm::vec4 sunlightDirection = { 0, -1, 0, 0 };
 	glm::vec4 sunlightColor = { 1, 1, 1, 1 };
 };
 
-/*
-* Dynamic data that can be changed every frame (except the camera). The main camera is in GPUCameraData.
-*/
+// Dynamic data that can be changed every frame (except the camera). The main camera is in GPUCameraData.
 struct GPUDynamicData {
 	glm::mat4 cullingViewMatrix;
 	glm::vec4 forcedColoring;
@@ -50,24 +44,18 @@ struct GPUDynamicData {
 	int occlusionCulling;
 };
 
-/*
-* For an instance of a mesh, stores the batch in witch the instance is located and the index of the instance's data (see GPUObjectData)
-*/
+// For an instance of a mesh, stores the batch in witch the instance is located and the index of the instance's data (see GPUObjectData)
 struct GPUObjectInstance {
 	uint32_t batchId = 0;
 	uint32_t dataId = 0;
 };
 
-/*
-* Stores the draw command parameters for a batch
-*/
+// Stores the draw command parameters for a batch
 struct GPUIndirectDrawCommand {
 	VkDrawIndexedIndirectCommand command = {};
 };
 
-/*
-* Global data used for culling compute shaders
-*/
+// Global data used for culling compute shaders
 struct GPUCullingGlobalData {
 	glm::vec4 frustum[6] = { glm::vec4(0) };
 	float zNear = 0;
@@ -79,26 +67,20 @@ struct GPUCullingGlobalData {
 	uint32_t nbInstances = 0;
 };
 
-/*
-* Data relative to each object instance. Instances will differ only by these data.
-*/
+// Data relative to each object instance. Instances will differ only by these data.
 struct GPUObjectData {
 	glm::mat4 modelMatrix;
 	glm::vec4 sphereBounds;
 };
 
-/*
-* Buffers for each mesh
-*/
+// Buffers for each mesh
 struct ShapeData {
 	AllocatedBuffer vertexBuffer;
 	AllocatedBuffer indexBuffer;
 	uint32_t nbElements = 0;
 };
 
-/*
-* Data tied to a frame
-*/
+// Data tied to a frame
 struct FrameData {
 	VkSemaphore presentSemaphore = VK_NULL_HANDLE;
 	VkSemaphore renderSemaphore = VK_NULL_HANDLE;
@@ -120,17 +102,17 @@ struct DrawCallInfo {
 class VulkanRenderer
 {
 public:
-	struct Options {
-	};
-
-	VulkanRenderer(VulkanInstance* vulkan, Options options = {});
+	VulkanRenderer(VulkanInstance* vulkan, const ApplicationState* applicationState, const leoscene::Camera* camera);
 
 public:
-	void setCamera(const leoscene::Camera* camera);
-	void init(const ApplicationState* applicationState);
-	void loadSceneToDevice(const leoscene::Scene* scene);
-	void drawFrame();
+	void init();
 	void cleanup();
+	void drawFrame();
+
+	// Allocate and fill all the scene-related data from the given scene
+	void loadSceneToDevice(const leoscene::Scene* scene);
+
+	// Reset data that is dependent on the window's dimensions.
 	void cleanupSwapChainDependentObjects();
 	void recreateSwapChainDependentObjects();
 
@@ -150,9 +132,6 @@ private:
 	void _createGlobalDescriptors(uint32_t nbObjects);
 
 private:
-	// Some options to the renderer. Reserved for later.
-	Options _options;
-
 	// Data owned by other objects referenced here for easy access.
 	const leoscene::Camera* _camera = nullptr;  // Application camera
 	const ApplicationState* _applicationState = nullptr;  // Application state

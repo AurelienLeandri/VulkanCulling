@@ -21,6 +21,9 @@ struct AllocatedBuffer {
 	VmaAllocation vmaAllocation = 0;
 };
 
+/*
+* Initializes swap chain, surface and logical device.
+*/
 class VulkanInstance
 {
 public:
@@ -50,8 +53,7 @@ public:
 	void cleanupSwapChain();
 	void recreateSwapChain();
 
-	// Utility
-	
+	// Convenience functions used by VulkanRenderer and VulkanInstance
 	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
 		VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, AllocatedImage& image);
 	void copyDataToImage(VkCommandPool commandPool, uint32_t width, uint32_t height, uint32_t nbChannels,
@@ -60,20 +62,16 @@ public:
 	void copyBufferToImage(VkCommandPool cmdPool, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 	void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels, VkImageView& imageView, uint32_t baseMipLevel = 0) const;
 	void generateMipmaps(VkCommandPool cmdPool, AllocatedImage& imageData, VkFormat imageFormat, int32_t texWidth, int32_t texHeight);
-
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, AllocatedBuffer& buffer, uint32_t minAlignment = 0);
 	void createGPUBufferFromCPUData(VkCommandPool cmdPool, VkDeviceSize size, VkBufferUsageFlags usage, const void* data, AllocatedBuffer& buffer);
 	void copyDataToBuffer(uint32_t size, AllocatedBuffer& buffer, const void* data, uint32_t offset = 0);
 	void destroyBuffer(AllocatedBuffer& buffer);
 	void copyBufferToBuffer(VkCommandPool cmdPool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	size_t padUniformBufferSize(size_t originalSize);
-
 	void* mapBuffer(AllocatedBuffer& buffer);
 	void unmapBuffer(AllocatedBuffer& buffer);
-
 	VkCommandBuffer beginSingleTimeCommands(VkCommandPool& commandPool);
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool& commandPool);
-	
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
 		VkImageTiling tiling, VkFormatFeatureFlags features) const;
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;

@@ -15,6 +15,9 @@ namespace leoscene {
 
 class Window;
 
+/*
+* Very (very!) simple state machine set by the input manager and read by the renderer.
+*/
 struct ApplicationState
 {
 	bool frustumCulling = true;
@@ -23,6 +26,9 @@ struct ApplicationState
 	bool lockCullingCamera = false;
 };
 
+/*
+* Entry point of the program. Sets up the scene and the renderers, then launches the renderer.
+*/
 class Application
 {
 public:
