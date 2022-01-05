@@ -35,7 +35,6 @@ VulkanRenderer::VulkanRenderer(VulkanInstance* vulkan, Options options) :
     _cullingDescriptorAllocator(_device),
     _depthPyramidDescriptorAllocator(_device)
 {
-    _framesData.resize(_vulkan->getSwapChainSize());
 }
 
 void VulkanRenderer::cleanup()
@@ -284,6 +283,8 @@ void VulkanRenderer::recreateSwapChainDependentObjects()
 
 void VulkanRenderer::init(const ApplicationState* applicationState)
 {
+    _framesData.resize(_vulkan->getSwapChainSize());
+
     _applicationState = applicationState;
 
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan->getQueueFamilyIndices();
@@ -518,7 +519,7 @@ void VulkanRenderer::_createMainRenderPass()
     VK_CHECK(vkCreateRenderPass2(_device, &renderPassInfo, nullptr, &_renderPass));
 }
 
-void VulkanRenderer::iterate()
+void VulkanRenderer::drawFrame()
 {
     FrameData& frameData = _framesData[_currentFrame];
 

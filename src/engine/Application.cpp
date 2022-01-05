@@ -15,45 +15,39 @@
 Application::Application()
 {
     _window = std::make_unique<Window>(1600, 1200);
+    _vulkan = std::make_unique<VulkanInstance>();
     _inputManager = std::make_unique<InputManager>();
     _state = std::make_unique<ApplicationState>();
+    _camera = std::make_unique<leoscene::Camera>();
 }
 
 Application::~Application() = default;
 
 int Application::init()
 {
-    if (_initMembers()) {
-        std::cerr << "Error: Failed to initialize application." << std::endl;
-        return -1;
-    }
-
-    return 0;
-}
-
-int Application::_initMembers() {
     if (_window->init()) {
         std::cerr << "Error: Failed to create window." << std::endl;
         return -1;
     }
 
     _inputManager->init(_window->window, _state.get());
-    _camera = std::make_unique<leoscene::Camera>();
     _inputManager->setCamera(_camera.get());
 
-    _vulkan = std::make_unique<VulkanInstance>(_window->window);
     try {
-        _vulkan->init();
-    } catch (const VulkanRendererException& e) {
+        _vulkan->init(_window->window);
+    }
+    catch (const VulkanRendererException& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << "Error: Failed to initialize Vulkan instance." << std::endl;
         return -1;
     }
 
     _renderer = std::make_unique<VulkanRenderer>(_vulkan.get());
+
     try {
         _renderer->init(_state.get());
-    } catch (const VulkanRendererException& e) {
+    }
+    catch (const VulkanRendererException& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << "Error: Failed to initialize Vulkan renderer." << std::endl;
         return -1;
@@ -66,8 +60,6 @@ void Application::cleanup()
 {
     _renderer->cleanup();
     _vulkan->cleanup();
-    _window.reset();
-    _camera.reset();
 }
 
 int Application::loadScene(const std::string& filePath)
@@ -93,7 +85,7 @@ int Application::start()
 {
     try {
         while (_inputManager->processInput()) {
-            _renderer->iterate();
+            _renderer->drawFrame();
         }
     } catch (const VulkanRendererException& e) {
         std::cerr << "Vulkan renderer error: " << e.what() << std::endl;

@@ -46,13 +46,10 @@ namespace {
     };
 }
 
-VulkanInstance::VulkanInstance(GLFWwindow* window) :
-    _window(window)
+void VulkanInstance::init(GLFWwindow* window)
 {
-}
+    _window = window;
 
-void VulkanInstance::init()
-{
     /*
     * Intance
     */

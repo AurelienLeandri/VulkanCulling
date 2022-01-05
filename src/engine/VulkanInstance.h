@@ -45,14 +45,7 @@ public:
 	};
 
 public:
-	VulkanInstance(GLFWwindow* application);
-	VulkanInstance(const VulkanInstance& other) = delete;
-	VulkanInstance(const VulkanInstance&& other) = delete;
-	VulkanInstance& operator=(const VulkanInstance& other) = delete;
-	VulkanInstance& operator=(const VulkanInstance&& other) = delete;
-
-public:
-	void init();
+	void init(GLFWwindow* window);
 	void cleanup();
 	void cleanupSwapChain();
 	void recreateSwapChain();

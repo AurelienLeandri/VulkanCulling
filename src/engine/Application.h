@@ -36,16 +36,11 @@ public:
 	void cleanup();
 
 private:
-	int _initMembers();
-
-private:
 	std::unique_ptr<VulkanRenderer> _renderer;
 	std::unique_ptr<InputManager> _inputManager;
 	std::unique_ptr<VulkanInstance> _vulkan;
 	std::unique_ptr<leoscene::Camera> _camera;
 	std::unique_ptr<Window> _window;
 	std::unique_ptr<ApplicationState> _state;
-
-	friend class InputManager;
 };
 
