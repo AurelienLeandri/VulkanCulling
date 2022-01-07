@@ -74,7 +74,7 @@ To configure the project, run
 
 > cd LeoEngine && cmake .
 
-CMake might ask you to specify a generator, in the case please use "Visual Studio 16 2019".
+CMake might ask you to specify a generator, in that case please use the one used by your version of Visual Studio (usually "Visual Studio 16 2019" or "Ninja").
 
 You can also use CMake-GUI of course.
 
