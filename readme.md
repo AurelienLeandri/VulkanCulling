@@ -4,16 +4,50 @@ LeoEngine
 Description
 -----------
 
-A personal C++ Vulkan project I have been working on for a few months. It features indirect draw with both occlusion and frustum culling, and should be extended with other features after I get some time off :)
+A personal C++ Vulkan project I have been working on for a few months. It features indirect draw with both occlusion and frustum culling done on GPU in a compute shader, and should be extended with other features after I get some time off :)
 
-TODO:
------
+<video width="640" height="480" controls>
+  <source src="https://youtu.be/I7Pb8edW5U8" type="video/mp4">
+</video>
+
+### TODO ###
 
 This is a work in progress. I am still investigating a few bugs:
 * Some objects close to the camera or to the edges of a blocking object aren't culled.
 * In the *sponza* scene, some big meshes (like the roof) are visibly culled by the bottom plane of the frustum if looking directly down from far above the building and moving forward.
 
 I feel this is mostly related to the math in the indirect_cull shader. I had to modify it significantly from the vkguide reference (see *'Acknowledgments"*).
+
+### Screenshots ###
+
+| ![Camera point of view](media/monkey_pov.png "Camera point of view (this is a giant field of monkey heads).") |
+| :-----------------------------------------------------------------------------------------------------------: |
+|                         Camera point of view (this is a giant field of monkey heads).                         |
+
+|                                                       ![Camera point of view](media/monkey_culling.png "From another point of view, we can see what is culled from the camera's perspective")                                                        |
+| :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| From another point of view, we can see what is culled from the camera's perspective. I indicated the frustum with red lines. The holes in the scene are due to occlusion culling. I was right behind a monkey head so the one in the center is huge. |
+
+
+|                       ![Camera point of view](media/sponza_pov.png "Camera's point of view.")                       |
+| :-----------------------------------------------------------------------------------------------------------------: |
+| Camera point of view. This scene loads lots of sponza models (a classic test model displaying some kind of atrium). |
+
+| ![Behind the camera, meshes were culled (frustum culling)](media/sponza_behind.png "Behind the camera, meshes were culled (frustum culling)") |
+| :-------------------------------------------------------------------------------------------------------------------------------------------: |
+|                                            Behind the camera, meshes were culled (frustum culling)                                            |
+
+|                                                                               ![Culling from the top](media/sponza_culling.png "From the top, we can see what is culled.")                                                                               |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| From the top, we can see what is culled. I indicated the camera's point of view from earlier. In the sponza models around the camera, only the outer walls are loaded. I believe they could be culled and this is what I am investigating at the moment. |
+
+|                      ![Frustum culling only](media/sponza_frustum_only.png "Frustum culling only.")                      |
+| :----------------------------------------------------------------------------------------------------------------------: |
+| Frustum culling only. The sponzas aligned with the frustum contain all their meshes since occlusion culling is disabled. |
+
+|        ![Occlusion culling only](media/sponza_occlusion_only.png "Occlusion culling only.")        |
+| :------------------------------------------------------------------------------------------------: |
+| Occlusion culling only. The sponza models on the left were culled by the frustum so they reappear. |
 
 Building
 --------
