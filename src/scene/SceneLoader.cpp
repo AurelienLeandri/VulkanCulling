@@ -35,6 +35,7 @@ namespace leoscene {
 	void SceneLoader::loadScene(const char* filePath, Scene* scene, Camera* camera)
 	{
 		std::string strFilePath(filePath);
+		std::replace(strFilePath.begin(), strFilePath.end(), '\\', '/');
 		std::string fileDirectoryPath = strFilePath.substr(0, strFilePath.find_last_of('/'));
 		std::ifstream ifs(filePath);
 		if (ifs.is_open()) {

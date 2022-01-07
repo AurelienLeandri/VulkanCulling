@@ -16,3 +16,11 @@ const char* VulkanRendererException::what() const noexcept
 {
 	return _message;
 }
+
+void VK_CHECK(VkResult err)
+{
+	if (err)
+	{
+		throw VulkanRendererException(err, nullptr);
+	}
+}

@@ -1019,6 +1019,9 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
 
     {
         size_t objectsDataBufferSize = scene->objects.size() * sizeof(GPUObjectData);
+        if (!objectsDataBufferSize) {
+            throw VulkanRendererException("The scene does not contain any objects!");
+        }
 
         AllocatedBuffer stagingBuffer;
         _vulkan->createBuffer(objectsDataBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, stagingBuffer);

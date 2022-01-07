@@ -75,7 +75,13 @@ int Application::loadScene(const std::string& filePath)
         return -1;
     }
 
-    _renderer->loadSceneToDevice(&scene);
+    try {
+        _renderer->loadSceneToDevice(&scene);
+    }
+    catch (VulkanRendererException e) {
+        std::cerr << e.what() << std::endl;
+        return -1;
+    }
 
     return 0;
 }

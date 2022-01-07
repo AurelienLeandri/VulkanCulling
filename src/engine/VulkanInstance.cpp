@@ -613,7 +613,7 @@ void VulkanInstance::createImage(
     VmaAllocationCreateInfo vmaAllocInfo = {};
     vmaAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    vmaCreateImage(_allocator, &imageInfo, &vmaAllocInfo, &image.image, &image.vmaAllocation, nullptr);
+    VK_CHECK(vmaCreateImage(_allocator, &imageInfo, &vmaAllocInfo, &image.image, &image.vmaAllocation, nullptr));
 
     image.mipLevels = mipLevels;
 }
@@ -645,10 +645,11 @@ void VulkanInstance::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
     vmaAllocInfo.usage = memoryUsage;
 
     if (minAlignment) {
-        vmaCreateBufferWithAlignment(_allocator, &bufferInfo, &vmaAllocInfo, minAlignment, &buffer.buffer, &buffer.vmaAllocation, nullptr);
+        VK_CHECK(vmaCreateBufferWithAlignment(_allocator, &bufferInfo, &vmaAllocInfo,
+            minAlignment, &buffer.buffer, &buffer.vmaAllocation, nullptr));
     }
     else {
-        vmaCreateBuffer(_allocator, &bufferInfo, &vmaAllocInfo, &buffer.buffer, &buffer.vmaAllocation, nullptr);
+        VK_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaAllocInfo, &buffer.buffer, &buffer.vmaAllocation, nullptr));
     }
 }
 
@@ -668,7 +669,7 @@ void VulkanInstance::createGPUBufferFromCPUData(VkCommandPool cmdPool, VkDeviceS
 void VulkanInstance::copyDataToBuffer(uint32_t size, AllocatedBuffer& buffer, const void *data, uint32_t offset)
 {
     void* dstData = nullptr;
-    vmaMapMemory(_allocator, buffer.vmaAllocation, &dstData);
+    VK_CHECK(vmaMapMemory(_allocator, buffer.vmaAllocation, &dstData));
     dstData = static_cast<char*>(dstData) + offset;
     memcpy(dstData, data, size);
     vmaUnmapMemory(_allocator, buffer.vmaAllocation);
@@ -719,7 +720,7 @@ void VulkanInstance::destroyImage(AllocatedImage& image)
 void* VulkanInstance::mapBuffer(AllocatedBuffer& buffer)
 {
     void* data = nullptr;
-    vmaMapMemory(_allocator, buffer.vmaAllocation, &data);
+    VK_CHECK(vmaMapMemory(_allocator, buffer.vmaAllocation, &data));
     return data;
 }
 

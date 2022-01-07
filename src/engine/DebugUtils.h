@@ -14,13 +14,5 @@ private:
 	const char* _message = nullptr;
 };
 
-#define VK_CHECK(x)                                                 \
-	do                                                              \
-	{                                                               \
-		VkResult err = x;                                           \
-		if (err)                                                    \
-		{                                                           \
-			throw VulkanRendererException(err, nullptr);			\
-		}                                                           \
-	} while (0)
+void VK_CHECK(VkResult err);
 
