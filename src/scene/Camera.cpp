@@ -5,15 +5,15 @@
 namespace leoscene {
 
 	Camera::Camera() :
-		Camera(glm::vec3(0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0), glm::radians(90.f))
+		Camera(glm::vec3(0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0), glm::radians(90.f))
 	{
 	}
 
-	Camera::Camera(glm::vec3 position, glm::vec3 look_at, glm::vec3 up_axis, float fov) :
+	Camera::Camera(glm::vec3 position, glm::vec3 front, glm::vec3 up_axis, float fov) :
 		_position(position), _fov(fov)
 	{
 		// Compute coordinate system
-		_front = glm::normalize(look_at - position);
+		_front = glm::normalize(front);
 		_right = glm::normalize(glm::cross(_front, glm::normalize(up_axis)));
 		_up = glm::normalize(cross(_right, _front));
 	}

@@ -35,8 +35,12 @@ namespace {
     VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
-    const std::vector<const char*> additionalLayers = {
+    const std::vector<const char*> additionalLayersDebug = {
     "VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_LUNARG_monitor"
+    };
+
+    const std::vector<const char*> additionalLayers = {
     "VK_LAYER_LUNARG_monitor"
     };
 
@@ -76,9 +80,9 @@ void VulkanInstance::init(GLFWwindow* window)
 
     // Validation layers
     if (enableValidationLayers) {
-        checkValidationLayerSupport(additionalLayers);
-        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(additionalLayers.size());
-        instanceCreateInfo.ppEnabledLayerNames = additionalLayers.data();
+        checkValidationLayerSupport(additionalLayersDebug);
+        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(additionalLayersDebug.size());
+        instanceCreateInfo.ppEnabledLayerNames = additionalLayersDebug.data();
 
         // Create a debug messenger specificaly for instance creation and destruction.
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
@@ -86,8 +90,9 @@ void VulkanInstance::init(GLFWwindow* window)
         instanceCreateInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT*>(&debugCreateInfo);
     }
     else {
-        instanceCreateInfo.enabledLayerCount = 0;
-        instanceCreateInfo.ppEnabledLayerNames = nullptr;
+        checkValidationLayerSupport(additionalLayers);
+        instanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(additionalLayers.size());
+        instanceCreateInfo.ppEnabledLayerNames = additionalLayers.data();
     }
 
     VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &_vulkan));

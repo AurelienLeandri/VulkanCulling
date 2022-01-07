@@ -18,7 +18,7 @@ Application::Application()
     _vulkan = std::make_unique<VulkanInstance>();
     _inputManager = std::make_unique<InputManager>();
     _state = std::make_unique<ApplicationState>();
-    _camera = std::make_unique<leoscene::Camera>();
+    _camera = std::make_unique<leoscene::Camera>(glm::vec3(0, -3, 0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0), glm::radians(90.f));
 }
 
 Application::~Application() = default;

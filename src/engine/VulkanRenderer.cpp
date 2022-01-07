@@ -1175,6 +1175,8 @@ void VulkanRenderer::loadSceneToDevice(const leoscene::Scene* scene)
     _gpuBatchesResetBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
     _gpuBatchesResetBarrier.srcQueueFamilyIndex = static_cast<uint32_t>(_vulkan->getQueueFamilyIndices().graphicsFamily.value());
 
+    _updateDynamicData();
+
     _sceneLoaded = true;
 }
 

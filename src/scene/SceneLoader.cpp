@@ -67,10 +67,6 @@ namespace leoscene {
 				lineNb++;
 			}
 			ifs.close();
-
-			if (!cameraLoaded) {
-				*camera = Camera(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, -1, 0), glm::radians(90.f));
-			}
 		}
 		else {
 			throw std::runtime_error("Could not open the scene file");

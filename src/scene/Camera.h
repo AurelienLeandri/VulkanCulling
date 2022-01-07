@@ -8,7 +8,7 @@ namespace leoscene {
 	{
 	public:
 		Camera();
-		Camera(glm::vec3 position, glm::vec3 look_at, glm::vec3 up_axis, float fov);
+		Camera(glm::vec3 position, glm::vec3 front, glm::vec3 up_axis, float fov);
 
 	public:
 		const glm::vec3& getPosition() const;
