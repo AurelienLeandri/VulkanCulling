@@ -6,9 +6,7 @@ Description
 
 A personal C++ Vulkan project I have been working on for a few months. It features indirect draw with both occlusion and frustum culling done on GPU in a compute shader, and should be extended with other features after I get some time off :)
 
-<video width="640" height="480" controls>
-  <source src="https://youtu.be/I7Pb8edW5U8" type="video/mp4">
-</video>
+You can find a video demonstration [here](https://youtu.be/I7Pb8edW5U8)!
 
 ### TODO ###
 
