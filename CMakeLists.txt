@@ -44,10 +44,8 @@ if (NOT DEFINED ASSIMP_INCLUDE_PATH OR NOT DEFINED ASSIMP_LIB_PATH)
 endif()
 
 if (NOT DEFINED VMA_INCLUDE_PATH OR NOT DEFINED VMA_LIB_PATH)
-  message(FATAL_ERROR "ASSIMP_LIB_PATH and ASSIMP_INCLUDE_PATH is not set in .env.cmake!")
+  message(FATAL_ERROR "VMA_LIB_PATH and VMA_INCLUDE_PATH is not set in .env.cmake!")
 endif()
-
-message("Using Assimp lib found in ${ASSIMP_LIB_PATH}")
 
 include_directories(${INCLUDE_PATH})
 include_directories(src)

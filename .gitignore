@@ -1,5 +1,6 @@
 .*
 !.gitignore
+!.env.cmake
 **/x86/
 **/x64/
 **/Libraries/
