@@ -1,3 +1,4 @@
+set (INCLUDE_PATH ".\external\include")
 set (GLFW_LIB_PATH ".\external\lib")  # Set to your own GLFW libs path or leave it as it is
 set (GLFW_INCLUDE_PATH ".\external\include")  # Set to your own GLFW include path or leave it as it is
 set (ASSIMP_LIB_PATH ".\external\lib")  # Set to your own Assimp path or leave it as it is

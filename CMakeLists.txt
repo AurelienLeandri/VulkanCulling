@@ -48,6 +48,8 @@ if (NOT DEFINED VMA_INCLUDE_PATH OR NOT DEFINED VMA_LIB_PATH)
 endif()
 
 include_directories(${INCLUDE_PATH})
+message("Additional include directory: ${INCLUDE_PATH}")
+
 include_directories(src)
 
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/external/*.cpp ${PROJECT_SOURCE_DIR}/external/*.c)
@@ -75,6 +77,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   ${GLFW_INCLUDE_PATH}
   ${ASSIMP_INCLUDE_PATH}
   ${VMA_INCLUDE_PATH}
+  ${INCLUDE_PATH}
   )
 
 target_link_directories(${PROJECT_NAME} PUBLIC
