@@ -2,14 +2,11 @@
 
 #include <algorithm>
 
-DescriptorAllocator::DescriptorAllocator(VkDevice device) :
-	_device(device)
+void DescriptorAllocator::init(VkDevice device, const Options& options)
 {
-}
-
-void DescriptorAllocator::init(const Options& options)
-{
+	_device = device;
 	_options = options;
+
 	if (!_options.poolSizes.size()) {
 		_options.poolSizes = {
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, 0.5f },
@@ -117,9 +114,9 @@ VkDescriptorPool DescriptorAllocator::_createPool()
 	return descriptorPool;
 }
 
-DescriptorLayoutCache::DescriptorLayoutCache(VkDevice device) :
-	_device(device)
+void DescriptorLayoutCache::init(VkDevice device)
 {
+	_device = device;
 }
 
 void DescriptorLayoutCache::cleanup()

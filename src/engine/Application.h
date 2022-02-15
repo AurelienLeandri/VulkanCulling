@@ -42,9 +42,10 @@ public:
 	void cleanup();
 
 private:
-	std::unique_ptr<VulkanRenderer> _renderer;
+	std::unordered_map<std::string, std::unique_ptr<Renderer>> _renderers;
+	Renderer* _activeRenderer = nullptr;
+
 	std::unique_ptr<InputManager> _inputManager;
-	std::unique_ptr<VulkanInstance> _vulkan;
 	std::unique_ptr<leoscene::Camera> _camera;
 	std::unique_ptr<Window> _window;
 	std::unique_ptr<ApplicationState> _state;

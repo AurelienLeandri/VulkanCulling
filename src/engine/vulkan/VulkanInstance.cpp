@@ -1,6 +1,6 @@
 #include "VulkanInstance.h"
 
-#include "DebugUtils.h"
+#include "VulkanError.h"
 #include "VulkanUtils.h"
 
 #include <exception>

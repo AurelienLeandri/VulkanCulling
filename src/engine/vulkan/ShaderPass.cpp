@@ -1,7 +1,7 @@
 #include "ShaderPass.h"
 
 #include "ShaderBuilder.h"
-#include "DebugUtils.h"
+#include "VulkanError.h"
 
 #include "spirv-reflect/spirv_reflect.h"
 

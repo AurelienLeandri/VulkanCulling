@@ -1,6 +1,6 @@
 #include "VulkanUtils.h"
 
-#include "DebugUtils.h"
+#include "VulkanError.h"
 #include "Materials.h"
 
 #include <iostream>

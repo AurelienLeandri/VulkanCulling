@@ -6,12 +6,10 @@
 
 class ShaderBuilder {
 public:
-    ShaderBuilder(VkDevice device);
-
-public:
+    void init(VkDevice device);
     void createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule, std::vector<char>* buffer = nullptr);
 
 private:
-    VkDevice _device;
+    VkDevice _device = VK_NULL_HANDLE;
 };
 

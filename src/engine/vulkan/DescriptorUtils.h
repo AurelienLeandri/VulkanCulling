@@ -16,8 +16,7 @@ public:
 	};
 
 public:
-	DescriptorAllocator(VkDevice device);
-	void init(const Options& options = {});
+	void init(VkDevice device, const Options& options = {});
 	void cleanup();
 
 	void resetAllPools();
@@ -37,7 +36,7 @@ private:
 
 class DescriptorLayoutCache {
 public:
-	DescriptorLayoutCache(VkDevice device);
+	void init(VkDevice device);
 	void cleanup();
 
 	VkDescriptorSetLayout createDescriptorLayout(const VkDescriptorSetLayoutCreateInfo& info);
@@ -57,7 +56,7 @@ private:
 	};
 
 	std::unordered_map<DescriptorLayoutInfo, VkDescriptorSetLayout, _DescriptorLayoutHash> _cache;
-	VkDevice _device;
+	VkDevice _device = VK_NULL_HANDLE;
 };
 
 class DescriptorBuilder {

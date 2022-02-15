@@ -6,19 +6,23 @@
 
 #include <cstddef>
 
-MaterialBuilder::MaterialBuilder(VkDevice device, const VulkanInstance* instance)
-	: _device(device), _vulkan(instance), _shaderBuilder(_device), _descriptorAllocator(_device), _globalDescriptorLayoutCache(_device)
+
+void MaterialBuilder::init(Parameters parameters)
 {
+	_device = parameters.device;
+	_vulkan = parameters.instance;
+
+	_shaderBuilder.init(_device);
+	_descriptorAllocator.init(_device);
+	_globalDescriptorLayoutCache.init(_device);
+
 	DescriptorAllocator::Options descriptorAllocatorOptions = {};
 	descriptorAllocatorOptions.poolBaseSize = 10;
 	descriptorAllocatorOptions.poolSizes = {
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5.f },
 	};
-	_descriptorAllocator.init(descriptorAllocatorOptions);
-}
+	_descriptorAllocator.init(_device, descriptorAllocatorOptions);
 
-void MaterialBuilder::init(Parameters parameters)
-{
 	_parameters = parameters;
 
 	PipelineBuilder forwardPipelineBuilder;

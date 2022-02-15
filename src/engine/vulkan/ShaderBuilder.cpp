@@ -1,12 +1,12 @@
 #include "ShaderBuilder.h"
 
-#include "DebugUtils.h"
+#include "VulkanError.h"
 
 #include <fstream>
 
-ShaderBuilder::ShaderBuilder(VkDevice device)
-    : _device(device)
+void ShaderBuilder::init(VkDevice device)
 {
+    _device = device;
 }
 
 void ShaderBuilder::createShaderModule(const char* glslFilePath, VkShaderModule& shaderModule, std::vector<char>* buffer)

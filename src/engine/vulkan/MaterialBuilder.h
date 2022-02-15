@@ -11,14 +11,14 @@ class Material;
 class MaterialBuilder {
 public:
 	struct Parameters {
+		VkDevice device = VK_NULL_HANDLE;
+		const VulkanInstance* instance = nullptr;
 		VkSampleCountFlagBits multisamplingNbSamples = VK_SAMPLE_COUNT_1_BIT;
 		VkRenderPass forwardRenderPass = VK_NULL_HANDLE;
 	};
 
 public:
-	MaterialBuilder(VkDevice device, const VulkanInstance* instance);
-
-	void init(Parameters parameters = {});
+	void init(Parameters parameters);
 	void cleanup();
 	Material* createMaterial(MaterialType type);
 	void setupMaterialDescriptorSets(Material& material);
