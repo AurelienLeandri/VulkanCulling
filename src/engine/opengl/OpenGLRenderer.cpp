@@ -4,10 +4,14 @@
 
 #include "OpenGLError.h"
 
+#include <scene/Camera.h>
+
 #include <glad/glad.h>
 #include <glfw/glfw3.h>
 
 #include <string>
+
+#include <glm/glm.hpp>
 
 const char* vertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec3 aPos;\n"
@@ -52,52 +56,22 @@ void OpenGLRenderer::init(Window* window)
 	glViewport(0, 0, static_cast<GLsizei>(_window->width), static_cast<GLsizei>(_window->height));
 
 	/*
+	* Global options
+	*/
+
+	glEnable(GL_DEPTH_TEST);
+
+	/*
 	* Shaders
 	*/
 
-	unsigned int vertexShader;
-	vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
+	_mainShader = std::make_unique<Shader>("resources/shaders/opengl/main.vert", "resources/shaders/opengl/main.frag");
 
-	int  success;
-	char infoLog[512];
+	/*
+	* Some global data
+	*/
 
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		throw OpenGLRendererException(infoLog);
-	}
-
-	unsigned int fragmentShader;
-	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
-
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		throw OpenGLRendererException(infoLog);
-	}
-
-	shaderProgram = glCreateProgram();
-
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-		throw OpenGLRendererException(infoLog);
-	}
-
-	glUseProgram(shaderProgram);
-
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
+	_projectionMatrix = glm::perspective(glm::radians(45.0f), static_cast<float>(_window->width) / _window->width, _zNear, _zFar);
 
 	/*
 	* Input data buffers
@@ -133,9 +107,11 @@ void OpenGLRenderer::drawFrame()
 	}
 
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glUseProgram(shaderProgram);
+	_mainShader->use();
+	_updateCamera();
+	_mainShader->setMat("model", glm::mat4(1));
 	glBindVertexArray(VAO);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -143,6 +119,21 @@ void OpenGLRenderer::drawFrame()
 
 	glfwSwapBuffers(_window->window);
 }
+
+void OpenGLRenderer::_updateCamera()
+{
+	glm::vec3 front = _camera->getFront();
+	glm::vec3 up = _camera->getUp();
+	glm::vec3 position = _camera->getPosition();
+	position.y *= -1;
+
+	glm::mat4 view = glm::lookAt(position, position + front, up);
+	
+	_mainShader->setMat("view", view);
+	_mainShader->setMat("proj", _projectionMatrix);
+	_mainShader->setMat("viewProj", _projectionMatrix * view);
+}
+
 
 void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
 {
