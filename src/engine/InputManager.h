@@ -1,8 +1,5 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <glfw/glfw3.h>
-
 #include <ctime>
 
 namespace leoscene {
@@ -10,6 +7,10 @@ namespace leoscene {
 }
 
 struct ApplicationState;
+class Window;
+
+class Application;
+struct GLFWwindow;
 
 class InputManager
 {
@@ -34,7 +35,7 @@ public:
 	InputManager();
 
 public:
-	void init(GLFWwindow* window, ApplicationState* applicationState);
+	void init(Window* window, Application* application, ApplicationState* applicationState);
 	void setCamera(leoscene::Camera* camera);
 	bool processInput();
 	void processMouseMovement(float xoffset, float yoffset);
@@ -45,10 +46,12 @@ private:
 
 private:
 	static void _mouseCallback(GLFWwindow* window, double xpos, double ypos);
+	static void _framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 private:
 	leoscene::Camera* _camera = nullptr;
-	GLFWwindow* _window = nullptr;
+	Window* _window = nullptr;
+	Application* _application;  // TODO: Instead, use an observer for anything that needs to be read from renderers and application. Good enough for now.
 	ApplicationState* _applicationState = nullptr;
 	std::clock_t _frameClock = std::clock();
 	float _currentYaw = 0;

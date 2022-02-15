@@ -47,6 +47,8 @@ public:
 	int start();
 	void cleanup();
 
+	void notifyWindowResize();
+
 private:
 	std::unordered_map<std::string, std::unique_ptr<Renderer>> _renderers;
 

@@ -107,7 +107,7 @@ public:
 
 public:
 	// Inherited via Renderer
-	virtual void init(GLFWwindow* window) override;
+	virtual void init(Window* window) override;
 	virtual void cleanup() override;
 	virtual void drawFrame() override;
 	virtual void loadSceneToRenderer(const leoscene::Scene* scene) override;

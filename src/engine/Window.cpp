@@ -1,5 +1,7 @@
 #include "Window.h"
 
+#include <glfw/glfw3.h>
+
 Window::Window(size_t width, size_t height) :
     width(width), height(height)
 {

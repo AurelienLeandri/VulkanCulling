@@ -29,7 +29,7 @@ int Application::init(Options options)
         return -1;
     }
 
-    _inputManager->init(_window->window, _state.get());
+    _inputManager->init(_window.get(), this, _state.get());
     _inputManager->setCamera(_camera.get());
 
     _renderers["VulkanRenderer"] = std::make_unique<VulkanRenderer>(_state.get(), _camera.get());
@@ -37,7 +37,7 @@ int Application::init(Options options)
     _state->activeRenderer = _renderers[options.startingRenderer].get();
 
     try {
-        _state->activeRenderer->init(_window->window);
+        _state->activeRenderer->init(_window.get());
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -113,3 +113,12 @@ int Application::start()
 
     return 0;
 }
+
+void Application::notifyWindowResize()
+{
+    // TODO: Observer system for this, and application state changes. Good enough for now.
+    if (_renderers.find("OpenGLRenderer") != _renderers.end()) {
+        static_cast<OpenGLRenderer*>(_renderers["OpenGLRenderer"].get())->notifyWindowResize();
+    }
+}
+

@@ -8,8 +8,10 @@
 #include <scene/GeometryIncludes.h>
 
 #include "VulkanUtils.h"
-#include "../Application.h"
 #include "VulkanError.h"
+
+#include "../Application.h"
+#include "../Window.h"
 
 #include <iostream>
 #include <array>
@@ -277,9 +279,9 @@ void VulkanRenderer::_recreateSwapChainDependentObjects()
     _createBarriers();
 }
 
-void VulkanRenderer::init(GLFWwindow* window)
+void VulkanRenderer::init(Window* window)
 {
-    _vulkan.init(window);
+    _vulkan.init(window->window);
     _device = _vulkan.getLogicalDevice();
 
     const VulkanInstance::QueueFamilyIndices& queueFamilyIndices = _vulkan.getQueueFamilyIndices();
@@ -581,7 +583,7 @@ void VulkanRenderer::drawFrame()
 
     VkBufferCopy indirectCopy{};
     indirectCopy.dstOffset = 0;
-    indirectCopy.size = static_cast<uint32_t>(_drawCalls.size() * sizeof(GPUIndirectDrawCommand));
+    indirectCopy.size = static_cast<VkDeviceSize>(_drawCalls.size() * sizeof(GPUIndirectDrawCommand));
     indirectCopy.srcOffset = 0;
     vkCmdCopyBuffer(_framesData[imageIndex].commandBuffer, _gpuResetBatches.buffer, _gpuBatches.buffer, 1, &indirectCopy);
 

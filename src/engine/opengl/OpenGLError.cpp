@@ -5,11 +5,6 @@ OpenGLRendererException::OpenGLRendererException(const char* message) :
 {
 }
 
-OpenGLRendererException::OpenGLRendererException(const char* message) :
-	_message(message)
-{
-}
-
 const char* OpenGLRendererException::what() const noexcept
 {
 	return _message;

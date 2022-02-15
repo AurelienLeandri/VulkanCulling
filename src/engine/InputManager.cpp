@@ -3,6 +3,9 @@
 #include "Window.h"
 #include "Application.h"
 
+#define GLFW_INCLUDE_VULKAN
+#include <glfw/glfw3.h>
+
 #include <scene/Camera.h>
 
 const float InputManager::_MOVEMENT_SPEED = 5.f;
@@ -11,13 +14,15 @@ InputManager::InputManager()
 {
 }
 
-void InputManager::init(GLFWwindow* window, ApplicationState* applicationState)
+void InputManager::init(Window* window, Application* application, ApplicationState* applicationState)
 {
+    _application = application;
     _window = window;
     _applicationState = applicationState;
-    glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetWindowUserPointer(_window, this);
-    glfwSetCursorPosCallback(_window, _mouseCallback);
+    glfwSetInputMode(_window->window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetWindowUserPointer(_window->window, this);
+    glfwSetCursorPosCallback(_window->window, _mouseCallback);
+    glfwSetFramebufferSizeCallback(_window->window, _framebufferSizeCallback);
 
     _frameClock = std::clock();
 }
@@ -35,50 +40,50 @@ bool InputManager::processInput()
     _frameClock = std::clock();
 
     // Keys for camera update
-    if (glfwGetKey(_window, GLFW_KEY_W) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_W) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::FORWARD, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_S) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_S) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::BACKWARD, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_A) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_A) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::LEFT, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_D) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_D) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::RIGHT, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::DOWN, deltaTime);
-    if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    if (glfwGetKey(_window->window, GLFW_KEY_SPACE) == GLFW_PRESS)
         _updateApplicationCamera(CameraMovement::UP, deltaTime);
 
     // Keys for application state update
-    if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_PRESS && !_oPressed)
+    if (glfwGetKey(_window->window, GLFW_KEY_O) == GLFW_PRESS && !_oPressed)
         _oPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_O) == GLFW_RELEASE && _oPressed) {
+    else if (glfwGetKey(_window->window, GLFW_KEY_O) == GLFW_RELEASE && _oPressed) {
         _oPressed = false;
         _updateApplicationState(ApplicationToggle::OCCLUSION_CULLING);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_PRESS && !_fPressed)
+    if (glfwGetKey(_window->window, GLFW_KEY_F) == GLFW_PRESS && !_fPressed)
         _fPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_F) == GLFW_RELEASE && _fPressed) {
+    else if (glfwGetKey(_window->window, GLFW_KEY_F) == GLFW_RELEASE && _fPressed) {
         _fPressed = false;
         _updateApplicationState(ApplicationToggle::FRUSTUM_CULLING);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_PRESS && !_tPressed)
+    if (glfwGetKey(_window->window, GLFW_KEY_T) == GLFW_PRESS && !_tPressed)
         _tPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_T) == GLFW_RELEASE && _tPressed) {
+    else if (glfwGetKey(_window->window, GLFW_KEY_T) == GLFW_RELEASE && _tPressed) {
         _tPressed = false;
         _updateApplicationState(ApplicationToggle::MAKE_ALL_OBJECTS_TRANSPARENT);
     }
 
-    if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_PRESS && !_lPressed)
+    if (glfwGetKey(_window->window, GLFW_KEY_L) == GLFW_PRESS && !_lPressed)
         _lPressed = true;
-    else if (glfwGetKey(_window, GLFW_KEY_L) == GLFW_RELEASE && _lPressed) {
+    else if (glfwGetKey(_window->window, GLFW_KEY_L) == GLFW_RELEASE && _lPressed) {
         _lPressed = false;
         _updateApplicationState(ApplicationToggle::LOCK_FRUSTUM_CULLING_CAMERA);
     }
 
     // Closing window if needed
-    return !(glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwWindowShouldClose(_window));
+    return !(glfwGetKey(_window->window, GLFW_KEY_ESCAPE) == GLFW_PRESS || glfwWindowShouldClose(_window->window));
 }
 
 void InputManager::processMouseMovement(float xoffset, float yoffset)
@@ -172,3 +177,12 @@ void InputManager::_mouseCallback(GLFWwindow* window, double xpos, double ypos)
     InputManager* inputManager = static_cast<InputManager*>(glfwGetWindowUserPointer(window));
     inputManager->processMouseMovement(xoffset, yoffset);
 }
+
+void InputManager::_framebufferSizeCallback(GLFWwindow* window, int width, int height)
+{
+    InputManager* inputManager = static_cast<InputManager*>(glfwGetWindowUserPointer(window));
+    inputManager->_window->width = static_cast<size_t>(width);
+    inputManager->_window->height = static_cast<size_t>(height);
+    inputManager->_application->notifyWindowResize();
+}
+
