@@ -63,6 +63,7 @@ The following (lib and headers) are included in the external folder:
 * [GLFW](https://github.com/glfw/glfw)
 * [Assimp](https://github.com/assimp/assimp)
 * [VMA](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
+* [GLAD](https://github.com/Dav1dde/glad)
 
 The following (headers only) are also included in the external folder:
 * [STB image](https://github.com/nothings/stb/blob/master/stb_image.h)
