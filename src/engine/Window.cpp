@@ -16,11 +16,18 @@ Window::~Window()
     glfwTerminate();
 }
 
-int Window::init()
+int Window::init(Context context)
 {
     glfwInit();
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    if (context == Context::OPEN_GL) {
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    }
+    else {
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    }
 
     window = glfwCreateWindow(static_cast<int>(width), static_cast<int>(height), "LeoEngine", nullptr, nullptr);
 

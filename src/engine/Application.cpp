@@ -22,9 +22,9 @@ Application::Application()
 
 Application::~Application() = default;
 
-int Application::init()
+int Application::init(Options options)
 {
-    if (_window->init()) {
+    if (_window->init(options.startingRenderer == "OpenGLRenderer" ? Window::Context::OPEN_GL : Window::Context::NONE)) {
         std::cerr << "Error: Failed to create window." << std::endl;
         return -1;
     }
@@ -34,8 +34,19 @@ int Application::init()
 
     _renderers["VulkanRenderer"] = std::make_unique<VulkanRenderer>(_state.get(), _camera.get());
     _renderers["OpenGLRenderer"] = std::make_unique<OpenGLRenderer>(_state.get(), _camera.get());
-    _state->activeRenderer = _renderers["OpenGLRenderer"].get();
+    _state->activeRenderer = _renderers[options.startingRenderer].get();
 
+    try {
+        _state->activeRenderer->init(_window->window);
+    }
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cerr << "Error: Failed to initialize " << options.startingRenderer << "." << std::endl;
+        return -1;
+    }
+
+    /*
+    // TODO: When we allow using the same window for both Vulkan and OpenGL, initialize all renderers.
     for (const std::pair<const std::string, std::unique_ptr<Renderer>>& renderersPair : _renderers) {
         try {
             renderersPair.second->init(_window->window);
@@ -46,6 +57,7 @@ int Application::init()
             return -1;
         }
     }
+    */
     
 
     return 0;

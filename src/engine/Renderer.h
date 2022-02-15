@@ -14,7 +14,7 @@ public:
 	Renderer(const ApplicationState* applicationState, const leoscene::Camera* camera);
 
 public:
-	virtual void init(GLFWwindow* window) = 0;
+	virtual void init(GLFWwindow* window) = 0;  // TODO: pass a Window instead
 	virtual void cleanup() = 0;
 	virtual void drawFrame() = 0;
 	virtual void loadSceneToRenderer(const leoscene::Scene* scene) = 0;

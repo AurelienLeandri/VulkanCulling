@@ -132,6 +132,9 @@ private:
 	void _recreateSwapChainDependentObjects();
 
 private:
+	bool _initialized = false;
+	bool _sceneLoaded = false;
+
 	VulkanInstance _vulkan;  // Contains swap chain, VkInstance and general properties
 	VkDevice _device = VK_NULL_HANDLE;  // Logical device owned by the VulkanInstance
 
@@ -152,9 +155,6 @@ private:
 
 	// Per-frame data
 	std::vector<FrameData> _framesData;
-
-	// Just a flag to check if the scene was loaded
-	bool _sceneLoaded = false;
 
 	/*
 	* Data for the graphics pipeline

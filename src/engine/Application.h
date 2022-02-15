@@ -33,11 +33,16 @@ struct ApplicationState
 class Application
 {
 public:
+	struct Options {
+		std::string startingRenderer = "VulkanRenderer";
+	};
+
+public:
 	Application();
 	~Application();
 
 public:
-	int init();
+	int init(Options options = {});
 	int loadScene(const std::string& filePath);
 	int start();
 	void cleanup();

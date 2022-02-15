@@ -11,6 +11,7 @@ namespace {
 }
 
 int main(int argc, const char** argv) {
+	// TODO: add parameter for choosing which renderer to start the application with
 	if (argc > 2) {
 		std::cerr << "Error: too many arguments." << std::endl;
 		printUsage();
@@ -32,7 +33,11 @@ int main(int argc, const char** argv) {
 		Application application;
 
 		std::cout << "Initializing application" << std::endl;
-		if (application.init()) {
+
+		Application::Options applicationOptions{};
+		applicationOptions.startingRenderer = "OpenGLRenderer";
+
+		if (application.init(applicationOptions)) {
 			std::cerr << "Error. Application failed to initialize. Exiting." << std::endl;
 			return 2;
 		}

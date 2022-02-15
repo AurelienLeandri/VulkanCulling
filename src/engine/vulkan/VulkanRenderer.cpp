@@ -30,6 +30,8 @@ VulkanRenderer::VulkanRenderer(const ApplicationState* applicationState, const l
 
 void VulkanRenderer::cleanup()
 {
+    if (!_initialized) return;
+
     vkDeviceWaitIdle(_device);
 
     /*
@@ -410,6 +412,8 @@ void VulkanRenderer::init(GLFWwindow* window)
     */
 
     _createBarriers();
+
+    _initialized = true;
 }
 
 void VulkanRenderer::_createMainRenderPass()

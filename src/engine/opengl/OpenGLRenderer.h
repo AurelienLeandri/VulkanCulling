@@ -15,6 +15,6 @@ public:
 	virtual void loadSceneToRenderer(const leoscene::Scene* scene) override;
 
 private:
-	// Just a flag to check if the scene was loaded
 	bool _sceneLoaded = false;
+	bool _initialized = false;
 };
