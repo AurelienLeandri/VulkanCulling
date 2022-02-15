@@ -9,6 +9,7 @@
 #include <scene/SceneLoader.h>
 
 #include "vulkan/VulkanRenderer.h"
+#include "opengl/OpenGLRenderer.h"
 #include "Window.h"
 
 Application::Application()
@@ -32,7 +33,8 @@ int Application::init()
     _inputManager->setCamera(_camera.get());
 
     _renderers["VulkanRenderer"] = std::make_unique<VulkanRenderer>(_state.get(), _camera.get());
-    _activeRenderer = _renderers["VulkanRenderer"].get();
+    _renderers["OpenGLRenderer"] = std::make_unique<OpenGLRenderer>(_state.get(), _camera.get());
+    _state->activeRenderer = _renderers["OpenGLRenderer"].get();
 
     for (const std::pair<const std::string, std::unique_ptr<Renderer>>& renderersPair : _renderers) {
         try {
@@ -76,7 +78,7 @@ int Application::loadScene(const std::string& filePath)
     }
 
     try {
-        _activeRenderer->loadSceneToRenderer(&scene); // Whenever we allow having two real time renderers activated at the same time, scene should be loaded in both. TBD.
+        _state->activeRenderer->loadSceneToRenderer(&scene); // Whenever we allow having two real time renderers activated at the same time, scene should be loaded in both. TBD.
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -90,7 +92,7 @@ int Application::start()
 {
     try {
         while (_inputManager->processInput()) {
-            _activeRenderer->drawFrame();
+            _state->activeRenderer->drawFrame();
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

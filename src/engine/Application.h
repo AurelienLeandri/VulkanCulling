@@ -24,6 +24,7 @@ struct ApplicationState
 	bool occlusionCulling = true;
 	bool makeAllObjectsTransparent = false;
 	bool lockCullingCamera = false;
+	Renderer* activeRenderer = nullptr;
 };
 
 /*
@@ -43,7 +44,6 @@ public:
 
 private:
 	std::unordered_map<std::string, std::unique_ptr<Renderer>> _renderers;
-	Renderer* _activeRenderer = nullptr;
 
 	std::unique_ptr<InputManager> _inputManager;
 	std::unique_ptr<leoscene::Camera> _camera;

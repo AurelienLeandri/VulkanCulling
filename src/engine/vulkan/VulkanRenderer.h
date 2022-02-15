@@ -106,10 +106,11 @@ public:
 	VulkanRenderer(const ApplicationState* applicationState, const leoscene::Camera* camera);
 
 public:
-	virtual void init(GLFWwindow* window);
-	virtual void cleanup();
-	virtual void drawFrame();
-	virtual void loadSceneToRenderer(const leoscene::Scene* scene);
+	// Inherited via Renderer
+	virtual void init(GLFWwindow* window) override;
+	virtual void cleanup() override;
+	virtual void drawFrame() override;
+	virtual void loadSceneToRenderer(const leoscene::Scene* scene) override;
 
 private:
 	void _updateDynamicData();

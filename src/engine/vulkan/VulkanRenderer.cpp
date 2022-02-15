@@ -5,7 +5,6 @@
 #include <scene/Mesh.h>
 #include <scene/Transform.h>
 #include <scene/Camera.h>
-#include <scene/Camera.h>
 #include <scene/GeometryIncludes.h>
 
 #include "VulkanUtils.h"
@@ -576,7 +575,7 @@ void VulkanRenderer::drawFrame()
 
     vkCmdBindPipeline(_framesData[imageIndex].commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _cullingPipeline);
 
-    VkBufferCopy indirectCopy;
+    VkBufferCopy indirectCopy{};
     indirectCopy.dstOffset = 0;
     indirectCopy.size = static_cast<uint32_t>(_drawCalls.size() * sizeof(GPUIndirectDrawCommand));
     indirectCopy.srcOffset = 0;
@@ -1330,7 +1329,7 @@ void VulkanRenderer::_createDepthPyramidDescriptors()
         }
         srcInfo.sampler = _depthImageSampler;
 
-        VkDescriptorImageInfo dstInfo;
+        VkDescriptorImageInfo dstInfo{};
         dstInfo.sampler = _depthImageSampler;
         dstInfo.imageView = _depthPyramidLevelViews[i];
         dstInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
