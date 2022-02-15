@@ -37,14 +37,16 @@ if (NOT DEFINED GLFW_LIB_PATH OR NOT DEFINED GLFW_INCLUDE_PATH)
   message(FATAL_ERROR "GLFW_LIB_PATH and GLFW_INCLUDE_PATH are not set in .env.cmake!")
 endif()
 
-message("Using GLFW lib found in ${GLFW_LIB_PATH}")
-
 if (NOT DEFINED ASSIMP_INCLUDE_PATH OR NOT DEFINED ASSIMP_LIB_PATH)
   message(FATAL_ERROR "ASSIMP_LIB_PATH and ASSIMP_INCLUDE_PATH is not set in .env.cmake!")
 endif()
 
 if (NOT DEFINED VMA_INCLUDE_PATH OR NOT DEFINED VMA_LIB_PATH)
   message(FATAL_ERROR "VMA_LIB_PATH and VMA_INCLUDE_PATH is not set in .env.cmake!")
+endif()
+
+if (NOT DEFINED GLAD_LIB_PATH OR NOT DEFINED GLAD_INCLUDE_PATH)
+  message(FATAL_ERROR "GLAD_LIB_PATH and GLAD_INCLUDE_PATH are not set in .env.cmake!")
 endif()
 
 include_directories(${INCLUDE_PATH})
@@ -75,6 +77,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   ${PROJECT_SOURCE_DIR}/src
   ${VULKAN_INCLUDE_PATH}
   ${GLFW_INCLUDE_PATH}
+  ${GLAD_INCLUDE_PATH}
   ${ASSIMP_INCLUDE_PATH}
   ${VMA_INCLUDE_PATH}
   ${INCLUDE_PATH}

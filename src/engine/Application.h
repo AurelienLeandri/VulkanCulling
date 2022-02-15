@@ -6,8 +6,8 @@
 #include <scene/Camera.h>
 
 #include "InputManager.h"
-#include "VulkanInstance.h"
-#include "VulkanRenderer.h"
+#include "vulkan/VulkanInstance.h"
+#include "vulkan/VulkanRenderer.h"
 
 namespace leoscene {
 	class Scene;

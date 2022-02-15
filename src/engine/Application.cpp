@@ -8,8 +8,8 @@
 #include <scene/Scene.h>
 #include <scene/SceneLoader.h>
 
-#include "VulkanRenderer.h"
-#include "DebugUtils.h"
+#include "vulkan/VulkanRenderer.h"
+#include "vulkan/DebugUtils.h"
 #include "Window.h"
 
 Application::Application()
@@ -76,7 +76,7 @@ int Application::loadScene(const std::string& filePath)
     }
 
     try {
-        _renderer->loadSceneToDevice(&scene);
+        _renderer->loadSceneToRenderer(&scene);
     }
     catch (VulkanRendererException e) {
         std::cerr << e.what() << std::endl;
