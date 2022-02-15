@@ -27,4 +27,11 @@ private:
 	bool _sceneLoaded = false;
 	bool _initialized = false;
 	bool _viewportNeedsResize = false;
+
+	// OpenGL
+	unsigned int VAO;
+	unsigned int VBO;
+	unsigned int EBO;
+	unsigned int shaderProgram;
+
 };
