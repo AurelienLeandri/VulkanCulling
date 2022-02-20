@@ -26,8 +26,11 @@ int Window::init(Context context)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef _DEBUG
+        glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+#endif
     }
-    else {
+    else {  // Vulkan API
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     }
 

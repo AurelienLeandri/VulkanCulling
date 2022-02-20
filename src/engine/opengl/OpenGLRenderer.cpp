@@ -20,6 +20,16 @@
 
 #include <glm/glm.hpp>
 
+namespace {
+    static void APIENTRY _glDebugOutput(GLenum source,
+        GLenum type,
+        unsigned int id,
+        GLenum severity,
+        GLsizei length,
+        const char* message,
+        const void* userParam);
+}
+
 OpenGLRenderer::OpenGLRenderer(const ApplicationState* applicationState, const leoscene::Camera* camera) :
 	Renderer(applicationState, camera)
 {
@@ -33,6 +43,24 @@ void OpenGLRenderer::init(Window* window)
 	{
 		throw OpenGLRendererException("GLAD: Failed to load GL loader.");
 	}
+
+#ifdef _DEBUG
+    {
+        int flags = 0;
+        // Check if the debug context is active
+        GL_CHECK(glGetIntegerv(GL_CONTEXT_FLAGS, &flags));
+        if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+        {
+            glEnable(GL_DEBUG_OUTPUT);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            glDebugMessageCallback(_glDebugOutput, nullptr);
+            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+        }
+        else {
+            throw OpenGLRendererException("Failed to initialize DebugOutput for OpenGL.");
+        }
+    }
+#endif
 
     GL_CHECK(glViewport(0, 0, static_cast<GLsizei>(_window->width), static_cast<GLsizei>(_window->height)));
 
@@ -95,14 +123,16 @@ void OpenGLRenderer::drawFrame()
 	_mainShader->use();
 	_updateCamera();
 
-    size_t objectDataOffset = 0;
+    size_t baseInstanceIndex = 0;
     for (const std::pair<materialIdx_t, std::map<shapeIdx_t, std::vector<_ObjectInstanceData>>>& entriesPerMaterial : _objectInstances) {
         materialIdx_t materialId = entriesPerMaterial.first;
         for (const std::pair<shapeIdx_t, std::vector<_ObjectInstanceData>>& entriesPerShapePerMaterial : entriesPerMaterial.second) {
+            GLsizei nbInstances = static_cast<GLsizei>(entriesPerShapePerMaterial.second.size());
             shapeIdx_t shapeIdx = entriesPerShapePerMaterial.first;
             GL_CHECK(glBindVertexArray(_shapeData[shapeIdx].VAO));
-            GL_CHECK(glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(_shapeData[shapeIdx].nbElements), GL_UNSIGNED_INT,
-                nullptr, static_cast<GLsizei>(entriesPerShapePerMaterial.second.size())));
+            GL_CHECK(glDrawElementsInstancedBaseInstance(GL_TRIANGLES, static_cast<GLsizei>(_shapeData[shapeIdx].nbElements), GL_UNSIGNED_INT,
+                nullptr, nbInstances, baseInstanceIndex));
+            baseInstanceIndex += nbInstances;
         }
     }
     GL_CHECK(glBindVertexArray(0));
@@ -271,10 +301,11 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
             objectInstances[loadedMaterial][loadedShapeIdx].push_back({ sceneShape, sceneObject.transform.get() });
             */
 
+            // TODO: instead of zero, put the material id
             if (_objectInstances.find(0) == _objectInstances.end()) {
                 _objectInstances[0] = {};
             }
-            _objectInstances[0][loadedShapeIdx].emplace_back(sceneShape, nullptr);
+            _objectInstances[0][loadedShapeIdx].emplace_back(sceneShape, sceneObject.transform.get());
         }
 
     }
@@ -370,8 +401,8 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
 
         GL_CHECK(glGenBuffers(1, &_objectDataSSBO));
         GL_CHECK(glBindBuffer(GL_SHADER_STORAGE_BUFFER, _objectDataSSBO));
-        GL_CHECK(glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(OpenGLObjectData) * gpuObjectData.size(), gpuObjectData.data(), GL_STATIC_READ));
-        GL_CHECK(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, _objectDataSSBO));
+        GL_CHECK(glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(OpenGLObjectData) * gpuObjectData.size(), gpuObjectData.data(), GL_STATIC_COPY));
+        GL_CHECK(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, _objectDataSSBO));
     }
 
     ///*
@@ -513,5 +544,57 @@ void OpenGLRenderer::_resizeViewport(size_t width, size_t height)
 {
     GL_CHECK(glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height)));
 	_viewportNeedsResize = false;
+}
+
+namespace {
+    void APIENTRY _glDebugOutput(
+        GLenum source,
+        GLenum type,
+        unsigned int id,
+        GLenum severity,
+        GLsizei length,
+        const char* message,
+        const void* userParam)
+    {
+        // ignore non-significant error/warning codes
+        if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+        std::cerr << "---------------" << std::endl;
+        std::cerr << "Debug message (" << id << "): " << message << std::endl;
+
+        switch (source)
+        {
+        case GL_DEBUG_SOURCE_API:             std::cerr << "Source: API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cerr << "Source: Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cerr << "Source: Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cerr << "Source: Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION:     std::cerr << "Source: Application"; break;
+        case GL_DEBUG_SOURCE_OTHER:           std::cerr << "Source: Other"; break;
+        } std::cerr << std::endl;
+
+        switch (type)
+        {
+        case GL_DEBUG_TYPE_ERROR:               std::cerr << "Type: Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cerr << "Type: Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cerr << "Type: Undefined Behaviour"; break;
+        case GL_DEBUG_TYPE_PORTABILITY:         std::cerr << "Type: Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         std::cerr << "Type: Performance"; break;
+        case GL_DEBUG_TYPE_MARKER:              std::cerr << "Type: Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cerr << "Type: Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP:           std::cerr << "Type: Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER:               std::cerr << "Type: Other"; break;
+        } std::cerr << std::endl;
+
+        switch (severity)
+        {
+        case GL_DEBUG_SEVERITY_HIGH:         std::cerr << "Severity: High"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       std::cerr << "Severity: Medium"; break;
+        case GL_DEBUG_SEVERITY_LOW:          std::cerr << "Severity: Low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cerr << "Severity: Notification"; break;
+        } std::cerr << std::endl;
+        std::cerr << std::endl;
+
+        throw OpenGLRendererException("Error: DebugOutput callback called while using the OpenGL API.");
+    }
 }
 

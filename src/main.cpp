@@ -18,7 +18,8 @@ int main(int argc, const char** argv) {
 		return 1;
 	}
 
-	const char* scenePath = "resources/models/Monkey/super_monkey.scene";
+	//const char* scenePath = "resources/models/Monkey/super_monkey.scene";
+	const char* scenePath = "resources/models/Sponza/super_sponza.scene";
 	if (argc == 2) {
 		if (!strcmp(argv[1], "--help")) {
 			printUsage();

@@ -29,13 +29,14 @@ void CheckOpenGLError(const char* file, int line)
     while (errorCode)
     {
         try {
-            std::cerr << "OPENGL ERROR: " << errorCodeToString.at(errorCode) << " in file \"" << file << "\", line " << line << "." << std::endl;
+            std::cerr << "Error (notification from glGetError): " << errorCodeToString.at(errorCode)
+                << " in file \"" << file << "\", line " << line << "." << std::endl;
         }
         catch (const std::out_of_range&) {
-            std::cerr << "OPENGL ERROR: " << "OTHER (code: 0x" << std::hex << errorCode << std::dec << ")"
+            std::cerr << "Error (notification from glGetError): " << "OTHER (code: 0x" << std::hex << errorCode << std::dec << ")"
                 << " in file \"" << file << "\", line " << line << "." << std::endl;
         }
         errorCode = glGetError();
     }
-    throw OpenGLRendererException("Error using OpenGL API.");
+    throw OpenGLRendererException("Error: Notified by glGetError while using the OpenGL API.");
 }
