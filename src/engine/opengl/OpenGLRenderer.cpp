@@ -145,8 +145,9 @@ void OpenGLRenderer::_updateCamera()
 	glm::vec3 front = _camera->getFront();
 	glm::vec3 up = _camera->getUp();
 	glm::vec3 position = _camera->getPosition();
+    position.y *= -1;
 
-	glm::mat4 view = glm::lookAtRH(position, position + front, up);
+	glm::mat4 view = glm::lookAtRH(position, position + front, -up);
 	
 	_mainShader->setMat("view", view);
 	_mainShader->setMat("proj", _projectionMatrix);
