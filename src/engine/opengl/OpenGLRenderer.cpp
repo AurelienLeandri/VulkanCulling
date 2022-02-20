@@ -40,7 +40,7 @@ void OpenGLRenderer::init(Window* window)
 	* Global options
 	*/
 
-	glEnable(GL_DEPTH_TEST);
+    GL_CHECK(glEnable(GL_DEPTH_TEST));
 
 	/*
 	* Shaders
@@ -89,8 +89,8 @@ void OpenGLRenderer::drawFrame()
 		_resizeViewport(_window->width, _window->height);
 	}
 
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GL_CHECK(glClearColor(0.2f, 0.3f, 0.3f, 1.0f));
+    GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
 	_mainShader->use();
 	_updateCamera();
@@ -100,12 +100,12 @@ void OpenGLRenderer::drawFrame()
         materialIdx_t materialId = entriesPerMaterial.first;
         for (const std::pair<shapeIdx_t, std::vector<_ObjectInstanceData>>& entriesPerShapePerMaterial : entriesPerMaterial.second) {
             shapeIdx_t shapeIdx = entriesPerShapePerMaterial.first;
-            glBindVertexArray(_shapeData[shapeIdx].VAO);
-            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(_shapeData[shapeIdx].nbElements), GL_UNSIGNED_INT,
-                nullptr, static_cast<GLsizei>(entriesPerShapePerMaterial.second.size()));
+            GL_CHECK(glBindVertexArray(_shapeData[shapeIdx].VAO));
+            GL_CHECK(glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(_shapeData[shapeIdx].nbElements), GL_UNSIGNED_INT,
+                nullptr, static_cast<GLsizei>(entriesPerShapePerMaterial.second.size())));
         }
     }
-    glBindVertexArray(0);
+    GL_CHECK(glBindVertexArray(0));
 
 	glfwSwapBuffers(_window->window);
 }
@@ -228,25 +228,25 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
 
                 const leoscene::Mesh* mesh = static_cast<const leoscene::Mesh*>(sceneShape);  // TODO: assuming the shape is a mesh for now
 
-                glGenVertexArrays(1, &loadedShape.VAO);
-                glGenBuffers(1, &loadedShape.VBO);
-                glGenBuffers(1, &loadedShape.EBO);
+                GL_CHECK(glGenVertexArrays(1, &loadedShape.VAO));
+                GL_CHECK(glGenBuffers(1, &loadedShape.VBO));
+                GL_CHECK(glGenBuffers(1, &loadedShape.EBO));
 
-                glBindVertexArray(loadedShape.VAO);
+                GL_CHECK(glBindVertexArray(loadedShape.VAO));
                 {
-                    glBindBuffer(GL_ARRAY_BUFFER, loadedShape.VBO);
-                    glBufferData(GL_ARRAY_BUFFER, mesh->vertices.size() * sizeof(leoscene::Vertex), mesh->vertices.data(), GL_STATIC_DRAW);
-                    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr);
-                    glEnableVertexAttribArray(0);
+                    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, loadedShape.VBO));
+                    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, mesh->vertices.size() * sizeof(leoscene::Vertex), mesh->vertices.data(), GL_STATIC_DRAW));
+                    GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr));
+                    GL_CHECK(glEnableVertexAttribArray(0));
                     /*glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr);
                     glEnableVertexAttribArray(1);
                     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr);
                     glEnableVertexAttribArray(2);*/
 
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, loadedShape.EBO);
-                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(uint32_t), mesh->indices.data(), GL_STATIC_DRAW);
+                    GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, loadedShape.EBO));
+                    GL_CHECK(glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(uint32_t), mesh->indices.data(), GL_STATIC_DRAW));
                 }
-                glBindVertexArray(0);
+                GL_CHECK(glBindVertexArray(0));
 
                 loadedShape.nbElements = mesh->indices.size();
 
@@ -368,10 +368,10 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
             }
         }
 
-        glGenBuffers(1, &_objectDataSSBO);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _objectDataSSBO);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(OpenGLObjectData) * gpuObjectData.size(), gpuObjectData.data(), GL_STATIC_READ);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, _objectDataSSBO);
+        GL_CHECK(glGenBuffers(1, &_objectDataSSBO));
+        GL_CHECK(glBindBuffer(GL_SHADER_STORAGE_BUFFER, _objectDataSSBO));
+        GL_CHECK(glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(OpenGLObjectData) * gpuObjectData.size(), gpuObjectData.data(), GL_STATIC_READ));
+        GL_CHECK(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, _objectDataSSBO));
     }
 
     ///*
@@ -511,7 +511,7 @@ void OpenGLRenderer::notifyWindowResize()
 
 void OpenGLRenderer::_resizeViewport(size_t width, size_t height)
 {
-	glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+    GL_CHECK(glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height)));
 	_viewportNeedsResize = false;
 }
 
