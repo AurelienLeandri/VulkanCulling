@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <unordered_map>
 
 #include <glad/glad.h>
 
@@ -22,10 +23,15 @@ struct OpenGLMaterialUniform
 
 struct OpenGLShapeData
 {
-	unsigned int VAO;
-	unsigned int VBO;
-	unsigned int EBO;
+	GLuint VAO = 0;
+	GLuint VBO = 0;
+	GLuint EBO = 0;
 	size_t nbElements = 0;
+};
+
+struct OpenGLMaterialData
+{
+	std::unordered_map<std::string, GLuint> textures;
 };
 
 struct OpenGLObjectData
@@ -57,6 +63,7 @@ public:
 private:
 	void _resizeViewport(size_t width, size_t height);
 	void _updateCamera();
+	void _setActiveMaterial(materialIdx_t id);
 
 private:
 	Window* _window = nullptr;
@@ -76,6 +83,7 @@ private:
 	std::unique_ptr<Shader> _mainShader;
 
 	std::vector<OpenGLShapeData> _shapeData;
+	std::vector<OpenGLMaterialData> _materialData;
 
 	struct _ObjectInstanceData {
 		_ObjectInstanceData(const leoscene::Shape* shape, const leoscene::Transform* transform) :

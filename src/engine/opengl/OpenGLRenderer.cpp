@@ -125,7 +125,7 @@ void OpenGLRenderer::drawFrame()
 
     size_t baseInstanceIndex = 0;
     for (const std::pair<materialIdx_t, std::map<shapeIdx_t, std::vector<_ObjectInstanceData>>>& entriesPerMaterial : _objectInstances) {
-        materialIdx_t materialId = entriesPerMaterial.first;
+        _setActiveMaterial(entriesPerMaterial.first);
         for (const std::pair<shapeIdx_t, std::vector<_ObjectInstanceData>>& entriesPerShapePerMaterial : entriesPerMaterial.second) {
             GLsizei nbInstances = static_cast<GLsizei>(entriesPerShapePerMaterial.second.size());
             shapeIdx_t shapeIdx = entriesPerShapePerMaterial.first;
@@ -136,9 +136,23 @@ void OpenGLRenderer::drawFrame()
         }
     }
     GL_CHECK(glBindVertexArray(0));
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
 
 	glfwSwapBuffers(_window->window);
 }
+
+void OpenGLRenderer::_setActiveMaterial(materialIdx_t id)
+{
+    const OpenGLMaterialData& material = _materialData[id];
+    GLuint i = 0;
+    for (const auto& [uniformName, textureId] : material.textures) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        _mainShader->setInt(uniformName, i);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        ++i;
+    }
+}
+
 
 void OpenGLRenderer::_updateCamera()
 {
@@ -163,57 +177,51 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
 
     {
         std::map<const leoscene::Material*, materialIdx_t> loadedMaterialsCache;
-        //std::map<const leoscene::ImageTexture*, AllocatedImage*> loadedImagesCache;
-        //std::map<const leoscene::ImageTexture*, VkSampler> loadedImageSamplersCache;
+        std::map<const leoscene::ImageTexture*, GLuint> loadedImagesCache;
         std::map<const leoscene::Shape*, shapeIdx_t> shapeDataCache;
 
         for (const leoscene::SceneObject& sceneObject : scene->objects) {
             const leoscene::PerformanceMaterial* sceneMaterial = static_cast<const leoscene::PerformanceMaterial*>(sceneObject.material.get());
             const leoscene::Shape* sceneShape = sceneObject.shape.get();
-            materialIdx_t loadedMaterial = 0;
+            materialIdx_t loadedMaterialIdx = 0;
             shapeIdx_t loadedShapeIdx = 0;
 
             // Load material data on the device
-
-            /*
             if (loadedMaterialsCache.find(sceneMaterial) == loadedMaterialsCache.end()) {
-                loadedMaterial = _materialBuilder.createMaterial(MaterialType::BASIC);
+                _materialData.emplace_back();
+                loadedMaterialIdx = _materialData.size() - 1;
 
                 static const size_t nbTexturesInMaterial = 5;
-                std::array<const leoscene::ImageTexture*, nbTexturesInMaterial> materialTextures = {
-                    sceneMaterial->diffuseTexture.get(),
-                    sceneMaterial->specularTexture.get(),
-                    sceneMaterial->ambientTexture.get(),
-                    sceneMaterial->normalsTexture.get(),
-                    sceneMaterial->heightTexture.get()
+                std::array<std::pair<std::string, const leoscene::ImageTexture*>, nbTexturesInMaterial> materialTextures{
+                    std::make_pair<std::string, const leoscene::ImageTexture*>("diffuseTexture", sceneMaterial->diffuseTexture.get()),
+                    std::make_pair<std::string, const leoscene::ImageTexture*>("specularTexture", sceneMaterial->specularTexture.get()),
+                    std::make_pair<std::string, const leoscene::ImageTexture*>("ambientTexture", sceneMaterial->ambientTexture.get()),
+                    std::make_pair<std::string, const leoscene::ImageTexture*>("normalTexture", sceneMaterial->normalsTexture.get()),
+                    std::make_pair<std::string, const leoscene::ImageTexture*>("heightTexture", sceneMaterial->heightTexture.get()),
                 };
 
                 for (size_t i = 0; i < nbTexturesInMaterial; ++i) {
-                    const leoscene::ImageTexture* sceneTexture = materialTextures[i];
-                    AllocatedImage* loadedImage = nullptr;
-                    VkSampler loadedImageSampler = VK_NULL_HANDLE;
+                    const leoscene::ImageTexture* sceneTexture = materialTextures[i].second;
+                    GLuint loadedImage = 0;
                     if (loadedImagesCache.find(sceneTexture) == loadedImagesCache.end()) {
-                        _materialImagesData.push_back(std::make_unique<AllocatedImage>());
-                        loadedImage = _materialImagesData.back().get();
 
                         uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                         uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
-
                         uint32_t imageMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
                         uint32_t nbChannels = 0;
-                        VkFormat imageFormat = VkFormat::VK_FORMAT_UNDEFINED;
+                        GLenum imageFormat = 0;
                         switch (sceneTexture->layout) {
                         case leoscene::ImageTexture::Layout::R:
-                            imageFormat = VK_FORMAT_R8_UNORM;
+                            imageFormat = GL_RED;
                             nbChannels = 1;
                             break;
                         case leoscene::ImageTexture::Layout::RGBA:
                             if (i == 3) { // Normals texture
-                                imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                                imageFormat = GL_RGBA;  // TODO: Might need a change later
                             }
                             else {
-                                imageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                                imageFormat = GL_RGBA;
                             }
                             nbChannels = 4;
                             break;
@@ -221,31 +229,35 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
                             break;
                         }
 
-                        if (!nbChannels || imageFormat == VkFormat::VK_FORMAT_UNDEFINED) {
-                            throw VulkanRendererException("A texture on a sceneMaterial has a format that is not expected. Something is very very wrong.");
+                        if (!nbChannels || !imageFormat) {
+                            throw OpenGLRendererException("A texture on a sceneMaterial has a format that is not expected. Something is very very wrong.");
                         }
 
                         // Image handle and memory
 
-                        // FIXME
+                        glGenTextures(1, &loadedImage);
+                        glBindTexture(GL_TEXTURE_2D, loadedImage);
+                        glTexImage2D(GL_TEXTURE_2D, 0, imageFormat, texWidth, texHeight, 0, imageFormat, GL_UNSIGNED_BYTE, sceneTexture->data);
+                        glGenerateMipmap(GL_TEXTURE_2D);
+
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+                        _materialData[loadedMaterialIdx].textures[materialTextures[i].first] = loadedImage;
 
                         loadedImagesCache[sceneTexture] = loadedImage;
-                        loadedImageSamplersCache[sceneTexture] = loadedImageSampler;
                     }
                     else {
                         loadedImage = loadedImagesCache[sceneTexture];
-                        loadedImageSampler = loadedImageSamplersCache[sceneTexture];
                     }
-
-                    loadedMaterial->textures[i].sampler = loadedImageSampler;
-                    loadedMaterial->textures[i].view = loadedImage->view;
                 }
-                loadedMaterialsCache[sceneMaterial] = loadedMaterial;
+                loadedMaterialsCache[sceneMaterial] = loadedMaterialIdx;
             }
             else {
-                loadedMaterial = loadedMaterialsCache[sceneMaterial];
+                loadedMaterialIdx = loadedMaterialsCache[sceneMaterial];
             }
-            */
 
 
             /*
@@ -267,12 +279,15 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
                 {
                     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, loadedShape.VBO));
                     GL_CHECK(glBufferData(GL_ARRAY_BUFFER, mesh->vertices.size() * sizeof(leoscene::Vertex), mesh->vertices.data(), GL_STATIC_DRAW));
-                    GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr));
+
+                    GL_CHECK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), static_cast<void*>(0)));
                     GL_CHECK(glEnableVertexAttribArray(0));
-                    /*glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr);
+                    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), (void*)(3 * sizeof(float)));
                     glEnableVertexAttribArray(1);
-                    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), nullptr);
-                    glEnableVertexAttribArray(2);*/
+                    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), (void*)(6 * sizeof(float)));
+                    glEnableVertexAttribArray(2);
+                    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(leoscene::Vertex), (void*)(9 * sizeof(float)));
+                    glEnableVertexAttribArray(3);
 
                     GL_CHECK(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, loadedShape.EBO));
                     GL_CHECK(glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(uint32_t), mesh->indices.data(), GL_STATIC_DRAW));
@@ -303,10 +318,10 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
             */
 
             // TODO: instead of zero, put the material id
-            if (_objectInstances.find(0) == _objectInstances.end()) {
-                _objectInstances[0] = {};
+            if (_objectInstances.find(loadedMaterialIdx) == _objectInstances.end()) {
+                _objectInstances[loadedMaterialIdx] = {};
             }
-            _objectInstances[0][loadedShapeIdx].emplace_back(sceneShape, sceneObject.transform.get());
+            _objectInstances[loadedMaterialIdx][loadedShapeIdx].emplace_back(sceneShape, sceneObject.transform.get());
         }
 
     }
