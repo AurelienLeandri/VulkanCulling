@@ -34,7 +34,7 @@ void OpenGLRenderer::init(Window* window)
 		throw OpenGLRendererException("GLAD: Failed to load GL loader.");
 	}
 
-	glViewport(0, 0, static_cast<GLsizei>(_window->width), static_cast<GLsizei>(_window->height));
+    GL_CHECK(glViewport(0, 0, static_cast<GLsizei>(_window->width), static_cast<GLsizei>(_window->height)));
 
 	/*
 	* Global options
@@ -101,7 +101,8 @@ void OpenGLRenderer::drawFrame()
         for (const std::pair<shapeIdx_t, std::vector<_ObjectInstanceData>>& entriesPerShapePerMaterial : entriesPerMaterial.second) {
             shapeIdx_t shapeIdx = entriesPerShapePerMaterial.first;
             glBindVertexArray(_shapeData[shapeIdx].VAO);
-            glDrawElementsInstanced(GL_TRIANGLES, _shapeData[shapeIdx].nbElements, GL_UNSIGNED_INT, nullptr, entriesPerShapePerMaterial.second.size());
+            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(_shapeData[shapeIdx].nbElements), GL_UNSIGNED_INT,
+                nullptr, static_cast<GLsizei>(entriesPerShapePerMaterial.second.size()));
         }
     }
     glBindVertexArray(0);
