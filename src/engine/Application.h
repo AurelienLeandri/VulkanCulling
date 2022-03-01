@@ -16,18 +16,6 @@ namespace leoscene {
 class Window;
 
 /*
-* Very (very!) simple state machine set by the input manager and read by the renderer.
-*/
-struct ApplicationState
-{
-	bool frustumCulling = true;
-	bool occlusionCulling = true;
-	bool makeAllObjectsTransparent = false;
-	bool lockCullingCamera = false;
-	Renderer* activeRenderer = nullptr;
-};
-
-/*
 * Entry point of the program. Sets up the scene and the renderers, then launches the renderer.
 */
 class Application

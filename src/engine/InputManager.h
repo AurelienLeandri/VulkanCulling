@@ -54,8 +54,6 @@ private:
 	Application* _application;  // TODO: Instead, use an observer for anything that needs to be read from renderers and application. Good enough for now.
 	ApplicationState* _applicationState = nullptr;
 	std::clock_t _frameClock = std::clock();
-	float _currentYaw = 0;
-	float _currentPitch = 0;
 	bool _oPressed = false;
 	bool _fPressed = false;
 	bool _tPressed = false;

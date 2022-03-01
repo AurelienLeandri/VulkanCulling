@@ -36,7 +36,8 @@ int main(int argc, const char** argv) {
 		std::cout << "Initializing application" << std::endl;
 
 		Application::Options applicationOptions{};
-		applicationOptions.startingRenderer = "OpenGLRenderer";
+		//applicationOptions.startingRenderer = "OpenGLRenderer";
+		applicationOptions.startingRenderer = "VulkanRenderer";
 
 		if (application.init(applicationOptions)) {
 			std::cerr << "Error. Application failed to initialize. Exiting." << std::endl;

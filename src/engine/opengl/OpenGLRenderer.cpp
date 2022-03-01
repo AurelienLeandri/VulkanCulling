@@ -136,7 +136,6 @@ void OpenGLRenderer::drawFrame()
         }
     }
     GL_CHECK(glBindVertexArray(0));
-    GL_CHECK(glActiveTexture(GL_TEXTURE0));
 
 	glfwSwapBuffers(_window->window);
 }
@@ -151,6 +150,7 @@ void OpenGLRenderer::_setActiveMaterial(materialIdx_t id)
         glBindTexture(GL_TEXTURE_2D, textureId);
         ++i;
     }
+    GL_CHECK(glActiveTexture(GL_TEXTURE0));
 }
 
 
@@ -207,7 +207,6 @@ void OpenGLRenderer::loadSceneToRenderer(const leoscene::Scene* scene)
 
                         uint32_t texWidth = static_cast<uint32_t>(sceneTexture->width);
                         uint32_t texHeight = static_cast<uint32_t>(sceneTexture->height);
-                        uint32_t imageMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
                         uint32_t nbChannels = 0;
                         GLenum imageFormat = 0;

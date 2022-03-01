@@ -2,6 +2,7 @@
 
 #include "Window.h"
 #include "Application.h"
+#include "ApplicationState.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
@@ -92,18 +93,29 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     xoffset *= MOUSE_SENSITIVITY;
     yoffset *= MOUSE_SENSITIVITY;
 
-    _currentYaw += -xoffset;
-    _currentPitch += -yoffset;  // Vulkan convention
+    float yaw = _applicationState->fpsCamera.yaw - xoffset;
+    if (yaw > 360.0f) yaw -= 360.0f;
 
-    if (_currentPitch > 89.0f)
-        _currentPitch = 89.0f;
-    if (_currentPitch < -89.0f)
-        _currentPitch = -89.0f;
+    float pitch = glm::clamp(_applicationState->fpsCamera.pitch + yoffset, -89.0f, 89.0f);
+
+    _applicationState->fpsCamera.yaw = yaw;
+    _applicationState->fpsCamera.pitch = pitch;
+
+    float radPitch = glm::radians(pitch);
+    float radYaw = glm::radians(yaw);
+    float cosPitch = glm::cos(radPitch);
+    float sinPitch = glm::sin(radPitch);
+    float cosYaw = glm::cos(radYaw);
+    float sinYaw = glm::sin(radYaw);
+
+    glm::vec3 xAxis{ cosYaw, 0, -sinYaw };
+    glm::vec3 yAxis{ sinYaw * sinPitch, cosPitch, cosYaw * sinPitch };
+    glm::vec3 zAxis{ sinYaw * cosPitch, -sinPitch, cosPitch * cosYaw };
 
     glm::vec3 cameraFront = glm::normalize(glm::vec3(
-        cos(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch)),
-        -sin(glm::radians(_currentPitch)),
-        sin(glm::radians(_currentYaw)) * cos(glm::radians(_currentPitch))
+        glm::cos(radYaw) * cosPitch,
+        glm::sin(radPitch),
+        glm::sin(radYaw) * cosPitch
     ));
 
     _camera->setFront(cameraFront);
@@ -117,21 +129,27 @@ void InputManager::_updateApplicationCamera(CameraMovement direction, float delt
     switch (direction) {
     case CameraMovement::FORWARD:
         _camera->setPosition(_camera->getPosition() + glm::vec3(cameraFront.x, 0, cameraFront.z) * velocity);
+        _applicationState->fpsCamera.position.z += velocity;
         break;
     case CameraMovement::BACKWARD:
         _camera->setPosition(_camera->getPosition() - glm::vec3(cameraFront.x, 0, cameraFront.z) * velocity);
+        _applicationState->fpsCamera.position.z -= velocity;
         break;
     case CameraMovement::LEFT:
         _camera->setPosition(_camera->getPosition() - glm::vec3(cameraRight.x, 0, cameraRight.z) * velocity);
+        _applicationState->fpsCamera.position.x -= velocity;
         break;
     case CameraMovement::RIGHT:
         _camera->setPosition(_camera->getPosition() + glm::vec3(cameraRight.x, 0, cameraRight.z) * velocity);
+        _applicationState->fpsCamera.position.x += velocity;
         break;
     case CameraMovement::UP:
         _camera->setPosition(_camera->getPosition() - glm::vec3(0, velocity, 0));
+        _applicationState->fpsCamera.position.y -= velocity;
         break;
     case CameraMovement::DOWN:
         _camera->setPosition(_camera->getPosition() + glm::vec3(0, velocity, 0));
+        _applicationState->fpsCamera.position.y += velocity;
         break;
     }
 }

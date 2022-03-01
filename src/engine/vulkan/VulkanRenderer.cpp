@@ -11,6 +11,7 @@
 #include "VulkanError.h"
 
 #include "../Application.h"
+#include "../ApplicationState.h"
 #include "../Window.h"
 
 #include <iostream>

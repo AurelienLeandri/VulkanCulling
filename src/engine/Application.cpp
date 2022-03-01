@@ -5,6 +5,8 @@
 
 #include <iostream>
 
+#include "ApplicationState.h"
+
 #include <scene/Scene.h>
 #include <scene/SceneLoader.h>
 
@@ -18,6 +20,7 @@ Application::Application()
     _inputManager = std::make_unique<InputManager>();
     _state = std::make_unique<ApplicationState>();
     _camera = std::make_unique<leoscene::Camera>(glm::vec3(0, -3, 0), glm::vec3(1, 0, 0), glm::vec3(0, -1, 0), glm::radians(90.f));
+    _state->fpsCamera.position = { 0, -3, 0 };
 }
 
 Application::~Application() = default;
