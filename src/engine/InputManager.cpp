@@ -96,7 +96,7 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     float yaw = _applicationState->fpsCamera.yaw - xoffset;
     if (yaw > 360.0f) yaw -= 360.0f;
 
-    float pitch = glm::clamp(_applicationState->fpsCamera.pitch + yoffset, -89.0f, 89.0f);
+    float pitch = glm::clamp(_applicationState->fpsCamera.pitch - yoffset, -89.0f, 89.0f);
 
     _applicationState->fpsCamera.yaw = yaw;
     _applicationState->fpsCamera.pitch = pitch;
@@ -104,13 +104,6 @@ void InputManager::processMouseMovement(float xoffset, float yoffset)
     float radPitch = glm::radians(pitch);
     float radYaw = glm::radians(yaw);
     float cosPitch = glm::cos(radPitch);
-    float sinPitch = glm::sin(radPitch);
-    float cosYaw = glm::cos(radYaw);
-    float sinYaw = glm::sin(radYaw);
-
-    glm::vec3 xAxis{ cosYaw, 0, -sinYaw };
-    glm::vec3 yAxis{ sinYaw * sinPitch, cosPitch, cosYaw * sinPitch };
-    glm::vec3 zAxis{ sinYaw * cosPitch, -sinPitch, cosPitch * cosYaw };
 
     glm::vec3 cameraFront = glm::normalize(glm::vec3(
         glm::cos(radYaw) * cosPitch,

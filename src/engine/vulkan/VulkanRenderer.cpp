@@ -13,6 +13,7 @@
 #include "../Application.h"
 #include "../ApplicationState.h"
 #include "../Window.h"
+#include "../GeometryUtils.h"
 
 #include <iostream>
 #include <array>
@@ -785,6 +786,10 @@ void VulkanRenderer::_updateDynamicData() {
     position.y *= -1;
 
     cameraData.view = glm::lookAt(position, position + front, up);
+    cameraData.view = fpsCameraToViewMatrix(
+        glm::radians(_applicationState->fpsCamera.pitch),
+        glm::radians(_applicationState->fpsCamera.yaw),
+        _applicationState->fpsCamera.position);
     cameraData.proj = _projectionMatrix;
     cameraData.invProj = _invProjectionMatrix;
     cameraData.viewProj = cameraData.proj * cameraData.view;
